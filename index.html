@@ -1,0 +1,1646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Overlay Board — Race Value Finder</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+  :root{
+    --board-950:#0F2A20;
+    --board-900:#15332A;
+    --board-800:#1B3A2C;
+    --paper:#F1E9D6;
+    --paper-dim:#E4D9BE;
+    --paper-line:#CFC2A0;
+    --amber:#D9A73B;
+    --amber-dim:#8A6A26;
+    --red:#8B2A2A;
+    --red-dim:#6E2222;
+    --ink:#1E1B14;
+    --ink-soft:#4A4433;
+    --mono: ui-monospace, "SF Mono", "Roboto Mono", "Courier New", monospace;
+    --sans: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--board-950); color:var(--ink);
+    font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1080px;margin:0 auto;}
+
+  /* ---------- HEADER / BOARD ---------- */
+  header{
+    background:
+      linear-gradient(180deg,var(--board-900),var(--board-950));
+    padding:38px 24px 30px;
+    border-bottom:3px solid var(--amber-dim);
+    position:relative;
+    overflow:hidden;
+  }
+  header::before{
+    content:"";
+    position:absolute; inset:0;
+    background-image:repeating-linear-gradient(180deg, rgba(255,255,255,0.025) 0px, rgba(255,255,255,0.025) 1px, transparent 1px, transparent 3px);
+    pointer-events:none;
+  }
+  .eyebrow{
+    font-family:var(--mono); color:var(--amber); font-size:12px;
+    letter-spacing:.22em; text-transform:uppercase; margin:0 0 10px;
+  }
+  h1{
+    margin:0; color:var(--paper); font-weight:800; letter-spacing:.01em;
+    font-size:clamp(28px,5vw,44px); line-height:1.02;
+  }
+  .flap{display:inline-block; animation:flapin .5s ease both;}
+  @media (prefers-reduced-motion: reduce){ .flap{animation:none;} }
+  @keyframes flapin{ from{opacity:0; transform:translateY(-.35em) rotateX(60deg);} to{opacity:1; transform:none;} }
+  h1 .flap:nth-child(1){animation-delay:.02s}
+  h1 .flap:nth-child(2){animation-delay:.05s}
+  h1 .flap:nth-child(3){animation-delay:.08s}
+  h1 .flap:nth-child(4){animation-delay:.11s}
+  h1 .flap:nth-child(5){animation-delay:.14s}
+  h1 .flap:nth-child(6){animation-delay:.17s}
+  h1 .flap:nth-child(7){animation-delay:.20s}
+  h1 .flap:nth-child(8){animation-delay:.23s}
+  h1 .flap:nth-child(9){animation-delay:.26s}
+  h1 .flap:nth-child(10){animation-delay:.29s}
+  .tagline{color:#B9C9BE; font-size:15px; max-width:56ch; margin:12px 0 0; line-height:1.5;}
+
+  main{background:var(--paper); padding:28px 24px 60px;}
+  section{margin:0 0 34px;}
+  .panel{
+    background:var(--paper); border:1px solid var(--paper-line);
+    border-radius:2px;
+  }
+  h2{
+    font-size:13px; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--ink-soft); margin:0 0 14px; font-weight:700;
+    display:flex; align-items:center; gap:10px;
+  }
+  h2::after{content:""; flex:1; height:1px; background:var(--paper-line);}
+  .step-num{
+    font-family:var(--mono); background:var(--board-950); color:var(--amber);
+    font-size:11px; padding:3px 7px; border-radius:2px; letter-spacing:.05em;
+  }
+
+  /* ---------- UPLOAD CARDS ---------- */
+  .upload-grid{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+  .upload-grid.three-col{grid-template-columns:1fr 1fr 1fr;}
+  .upload-grid.four-col{grid-template-columns:1fr 1fr 1fr 1fr;}
+  @media (max-width:1200px){.upload-grid.four-col{grid-template-columns:1fr 1fr;}}
+  @media (max-width:960px){.upload-grid.three-col{grid-template-columns:1fr 1fr;}}
+  @media (max-width:720px){.upload-grid{grid-template-columns:1fr;}}
+  .upload-card{
+    border:1.5px dashed var(--paper-line); border-radius:4px; padding:20px;
+    background:var(--paper-dim);
+  }
+  .upload-card h3{margin:0 0 6px; font-size:15px; color:var(--ink);}
+  .upload-card p{margin:0 0 14px; font-size:13px; color:var(--ink-soft); line-height:1.5;}
+  .file-btn{
+    display:inline-flex; align-items:center; gap:8px;
+    background:var(--board-950); color:var(--paper); border:none;
+    padding:10px 16px; border-radius:3px; font-size:13px; font-weight:600;
+    cursor:pointer; font-family:var(--sans);
+  }
+  .file-btn:hover{background:var(--board-800);}
+  .file-btn:focus-visible{outline:2px solid var(--amber); outline-offset:2px;}
+  input[type=file]{display:none;}
+  .status{font-family:var(--mono); font-size:12px; margin-top:10px; color:var(--ink-soft); min-height:16px;}
+  .status.ok{color:#2E5C3E;}
+  .status.err{color:var(--red);}
+
+  .mapper{margin-top:14px; display:none; border-top:1px solid var(--paper-line); padding-top:14px;}
+  .mapper.show{display:block;}
+  .map-row{display:grid; grid-template-columns:110px 1fr; gap:10px; align-items:center; margin-bottom:8px;}
+  .map-row label{font-size:12px; color:var(--ink-soft);}
+  select, input[type=text], input[type=number]{
+    font-family:var(--sans); font-size:13px; padding:6px 8px;
+    border:1px solid var(--paper-line); border-radius:3px; background:#fff; color:var(--ink);
+    width:100%;
+  }
+  .small-btn{
+    background:transparent; border:1px solid var(--board-950); color:var(--board-950);
+    padding:7px 12px; border-radius:3px; font-size:12px; font-weight:600; cursor:pointer; margin-top:6px;
+  }
+  .small-btn:hover{background:var(--board-950); color:var(--paper);}
+
+  /* ---------- TABLE ---------- */
+  .table-wrap{overflow-x:auto; border:1px solid var(--paper-line); border-radius:3px;}
+  table{width:100%; border-collapse:collapse; font-size:13px;}
+  thead th{
+    text-align:left; font-family:var(--mono); font-size:10.5px; letter-spacing:.08em;
+    text-transform:uppercase; color:var(--paper); background:var(--board-900);
+    padding:9px 10px; white-space:nowrap;
+  }
+  tbody td{padding:5px 8px; border-bottom:1px solid var(--paper-line); vertical-align:middle;}
+  tbody tr:nth-child(even){background:rgba(0,0,0,0.02);}
+  tbody input{border:1px solid transparent; background:transparent; padding:4px 5px; font-size:13px; width:100%;}
+  tbody input:hover, tbody input:focus{border-color:var(--paper-line); background:#fff;}
+  tbody input::placeholder{color:var(--ink-soft); opacity:.55; font-style:italic;}
+  .col-num input{font-family:var(--mono);}
+  .del-btn{
+    background:none; border:none; color:var(--red); cursor:pointer; font-size:15px; padding:2px 6px;
+  }
+  .del-btn:hover{color:var(--red-dim);}
+  .table-actions{display:flex; gap:10px; margin-top:12px; flex-wrap:wrap;}
+  .primary-btn{
+    background:var(--amber); color:var(--ink); border:none; padding:11px 22px;
+    border-radius:3px; font-weight:700; font-size:13.5px; cursor:pointer; letter-spacing:.02em;
+  }
+  .primary-btn:hover{background:#c69528;}
+  .ghost-btn{
+    background:none; border:1px solid var(--ink-soft); color:var(--ink-soft);
+    padding:10px 16px; border-radius:3px; font-size:13px; cursor:pointer;
+  }
+  .ghost-btn:hover{border-color:var(--ink); color:var(--ink);}
+  .empty-note{font-size:13px; color:var(--ink-soft); padding:18px; text-align:center;}
+
+  /* ---------- RESULTS: TOTE BOARD ---------- */
+  .board{
+    background:var(--board-950); border-radius:4px; padding:18px 16px;
+    box-shadow:inset 0 0 0 1px rgba(217,167,59,0.25);
+  }
+  .board h2{color:var(--paper);}
+  .board h2::after{background:rgba(255,255,255,0.12);}
+  .board .step-num{background:var(--amber); color:var(--board-950);}
+  .play-row{
+    display:grid; grid-template-columns:34px 1fr auto auto auto; gap:12px; align-items:center;
+    padding:10px 8px; border-bottom:1px solid rgba(255,255,255,0.08);
+  }
+  .play-row:last-child{border-bottom:none;}
+  .badge{
+    width:32px; height:32px; border-radius:50%; background:var(--amber); color:var(--board-950);
+    display:flex; align-items:center; justify-content:center; font-family:var(--mono);
+    font-weight:800; font-size:13px; flex-shrink:0;
+  }
+  .play-name{color:var(--paper); font-size:14px; font-weight:600;}
+  .play-sub{color:#8FA396; font-size:11.5px; font-family:var(--mono); margin-top:2px;}
+  .play-odds{font-family:var(--mono); color:var(--paper); font-size:13px; text-align:right;}
+  .play-edge{font-family:var(--mono); font-size:15px; font-weight:800; text-align:right; min-width:64px;}
+  .play-edge.pos{color:#7FD99A;}
+  .play-edge.neg{color:#E2897F;}
+  .play-model{font-family:var(--mono); color:#8FA396; font-size:11.5px; text-align:right;}
+
+  .race-card{
+    background:var(--paper-dim); border:1px solid var(--paper-line); border-radius:3px;
+    padding:14px 16px; margin-bottom:10px;
+  }
+  .race-card-top{display:flex; justify-content:space-between; align-items:baseline; gap:10px; flex-wrap:wrap;}
+  .race-card-top strong{font-size:14px;}
+  .race-metric{font-family:var(--mono); font-size:12px; color:var(--ink-soft);}
+  .rec-badge{
+    font-family:var(--mono); font-size:10.5px; font-weight:800; letter-spacing:.06em;
+    padding:3px 9px; border-radius:12px; text-transform:uppercase;
+  }
+  .rec-badge.rec-play{background:#2E6E45; color:#fff;}
+  .rec-badge.rec-caution{background:var(--amber-dim); color:#fff;}
+  .rec-badge.rec-pass{background:#8a8a8a; color:#fff;}
+  .race-reason{font-size:12px; color:var(--ink-soft); margin-top:6px; font-style:italic;}
+  .pace-note{font-size:11.5px; color:var(--ink-soft); margin-top:8px; padding:7px 9px; background:rgba(0,0,0,.035); border-radius:4px; line-height:1.5;}
+  .bet-suggestion{margin-top:10px; padding-top:10px; border-top:1px dashed var(--paper-line);}
+  .bet-suggestion.bet-none{font-size:12px; color:var(--ink-soft); font-style:italic; border-top:1px dashed var(--paper-line); padding-top:10px; margin-top:10px;}
+  .bet-line{font-size:12.5px; color:var(--ink); margin-bottom:5px; line-height:1.5;}
+  .bet-line:last-child{margin-bottom:0;}
+  .bet-tag{
+    display:inline-block; font-family:var(--mono); font-size:10px; font-weight:800; letter-spacing:.04em;
+    background:var(--amber); color:var(--ink); padding:2px 7px; border-radius:3px; margin-right:6px; text-transform:uppercase;
+  }
+  .bet-tag.skip{background:#8a8a8a; color:#fff;}
+
+  .race-pick{font-size:12.5px; color:var(--ink-soft); margin-top:6px;}
+  .race-pick b{color:var(--ink);}
+
+  .sort-toggle{display:flex; gap:8px; margin-bottom:16px;}
+  .toggle-btn{
+    background:var(--paper-dim); border:1px solid var(--paper-line); color:var(--ink-soft);
+    padding:8px 14px; border-radius:3px; font-size:12.5px; font-weight:600; cursor:pointer;
+    font-family:var(--sans);
+  }
+  .toggle-btn:hover{border-color:var(--ink-soft); color:var(--ink);}
+  .toggle-btn.active{background:var(--board-950); color:var(--paper); border-color:var(--board-950);}
+  .toggle-btn:focus-visible{outline:2px solid var(--amber); outline-offset:2px;}
+
+  .field-race{margin-bottom:20px;}
+  .field-race-head{
+    display:flex; justify-content:space-between; align-items:baseline; gap:10px; flex-wrap:wrap;
+    margin-bottom:6px;
+  }
+  .field-race-head strong{font-size:14px;}
+  .field-table{width:100%; border-collapse:collapse; font-size:14px; border:1px solid var(--paper-line);}
+  .field-table thead th{
+    text-align:left; font-family:var(--mono); font-size:11px; letter-spacing:.06em;
+    text-transform:uppercase; color:var(--paper); background:var(--board-900); padding:8px 10px;
+  }
+  .field-table td{padding:8px 10px; border-bottom:1px solid var(--paper-line); font-family:var(--mono); font-size:13.5px;}
+  .field-table td.name{font-family:var(--sans); font-size:14px;}
+  .field-table tr:last-child td{border-bottom:none;}
+  .field-table tr:nth-child(even){background:rgba(0,0,0,0.02);}
+  .field-edge{
+    display:inline-block; font-family:var(--mono); font-size:13px; font-weight:800;
+    padding:3px 9px; border-radius:3px; min-width:56px; text-align:center;
+  }
+  .field-edge.pos{background:#2E6E45; color:#fff;}
+  .field-edge.neg{background:var(--red); color:#fff;}
+  .field-edge.dash{background:none; color:var(--ink-soft); font-weight:400; padding:3px 0;}
+  .fit-mark{color:var(--amber-dim); font-weight:800; cursor:help;}
+  .field-badge{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:22px; height:22px; border-radius:50%; background:var(--board-950); color:var(--paper);
+    font-family:var(--mono); font-size:11px; font-weight:700;
+  }
+
+  textarea{
+    font-family:var(--mono); font-size:12.5px; padding:10px; width:100%;
+    border:1px solid var(--paper-line); border-radius:3px; background:#fff; color:var(--ink);
+    resize:vertical; line-height:1.5;
+  }
+
+  .score-summary{
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:12px;
+    margin-bottom:18px;
+  }
+  .score-stat{
+    background:var(--board-950); border-radius:4px; padding:14px 12px; text-align:center;
+  }
+  .score-stat .num{font-family:var(--mono); font-size:22px; font-weight:800; color:var(--amber);}
+  .score-stat .lbl{font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:#B9C9BE; margin-top:4px;}
+  .score-stat .num.roi-pos{color:#7FD99A;}
+  .score-stat .num.roi-neg{color:#E2897F;}
+
+  .score-row{
+    display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;
+    padding:10px 14px; border:1px solid var(--paper-line); border-radius:3px; margin-bottom:8px;
+    background:var(--paper-dim);
+  }
+  .score-row .sr-left{font-size:13px;}
+  .score-row .sr-left b{font-size:14px;}
+  .score-tag{
+    font-family:var(--mono); font-size:11px; font-weight:800; letter-spacing:.05em;
+    padding:4px 9px; border-radius:12px; text-transform:uppercase;
+  }
+  .score-tag.win{background:#2E6E45; color:#fff;}
+  .score-tag.place{background:#5C7A8A; color:#fff;}
+  .score-tag.show{background:#8A7A45; color:#fff;}
+  .score-tag.miss{background:var(--red); color:#fff;}
+  .score-tag.unmatched{background:#999; color:#fff;}
+
+  .methodology{
+    font-size:13px; color:var(--ink-soft); line-height:1.6; padding:16px;
+    background:var(--paper-dim); border-left:3px solid var(--amber-dim); border-radius:0 3px 3px 0;
+  }
+  .methodology strong{color:var(--ink);}
+  .disclaimer{
+    font-size:12px; color:var(--ink-soft); line-height:1.6; padding-top:18px;
+    border-top:1px solid var(--paper-line); margin-top:36px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Handicapping utility · odds &amp; ratings, no black box</p>
+    <h1><span class="flap">O</span><span class="flap">v</span><span class="flap">e</span><span class="flap">r</span><span class="flap">l</span><span class="flap">a</span><span class="flap">y</span> <span class="flap">B</span><span class="flap">o</span><span class="flap">a</span><span class="flap">r</span><span class="flap">d</span></h1>
+    <p class="tagline">Upload a CSV or a race-program PDF. Overlay Board reads the odds, lines up any rating you give it against what the crowd is paying, and ranks where the price beats the probability.</p>
+  </header>
+
+  <main>
+    <!-- STEP 1: UPLOAD -->
+    <section>
+      <h2><span class="step-num">1</span> Bring in your data</h2>
+      <div class="upload-grid four-col">
+        <div class="upload-card">
+          <h3>Brisnet data file</h3>
+          <p>The .DRF file from Brisnet's "Single File" comma-delimited data product — headerless, ~1,435 fields per horse. Reads post, horse, morning-line odds, Prime Power, a surface-specific speed figure, and an exact claiming-price class-move directly from the structured data — no guessing. <b>If .drf files show up grayed out in your file picker</b>, that's your phone/browser not recognizing the extension, not this tool — just rename the file to end in .csv before picking it. The parser reads the file's content, never its name, so this is completely safe and changes nothing about how it's read. If your download is a .zip, unzip it first (or send me the .zip directly and I'll pull it out for you).</p>
+          <label class="file-btn" for="drfInput">Choose .DRF / .csv</label>
+          <input type="file" id="drfInput" accept=".drf,.csv,.txt,text/csv,text/plain,text/*">
+          <div class="status" id="drfStatus"></div>
+        </div>
+        <div class="upload-card">
+          <h3>CSV file</h3>
+          <p>Any spreadsheet export with race, horse, and odds columns. A rating column (speed figure, power rank, your own number) is optional but unlocks value ranking.</p>
+          <label class="file-btn" for="csvInput">Choose CSV</label>
+          <input type="file" id="csvInput" accept=".csv">
+          <div class="status" id="csvStatus"></div>
+          <div class="mapper" id="csvMapper">
+            <div class="map-row"><label>Race</label><select id="mapRace"></select></div>
+            <div class="map-row"><label>Post #</label><select id="mapPost"></select></div>
+            <div class="map-row"><label>Horse</label><select id="mapHorse"></select></div>
+            <div class="map-row"><label>Odds</label><select id="mapOdds"></select></div>
+            <div class="map-row"><label>Rating</label><select id="mapScore"></select></div>
+            <div class="map-row"><label>Surface fit</label><select id="mapSurface"></select></div>
+            <div class="map-row"><label>Class move</label><select id="mapClass"></select></div>
+            <button class="small-btn" id="importCsvBtn">Import mapped rows →</button>
+          </div>
+        </div>
+        <div class="upload-card">
+          <h3>Program PDF</h3>
+          <p>Built for brisnet-style past-performance sheets. It extracts post #, horse name, morning-line odds, Prime Power, a today's-surface rating, and a coarse class-move signal where the text supports it. Runs entirely in-browser — on some phones/in-app browsers this can be slow or blocked; if it hangs, use "Paste text" instead.</p>
+          <label class="file-btn" for="pdfInput">Choose PDF</label>
+          <input type="file" id="pdfInput" accept=".pdf">
+          <div class="status" id="pdfStatus"></div>
+        </div>
+        <div class="upload-card">
+          <h3>Paste text</h3>
+          <p>Zero dependencies, works everywhere. Open the PDF in your phone's viewer, select all / copy the text, and paste it here. Same extraction as the PDF option, no library required.</p>
+          <textarea id="pdfPasteText" rows="4" placeholder="Paste program text here…"></textarea>
+          <div class="table-actions" style="margin-top:10px;">
+            <button class="small-btn" id="extractPasteBtn">Extract from pasted text →</button>
+          </div>
+          <div class="status" id="pdfPasteStatus"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- STEP 2: TABLE -->
+    <section>
+      <h2><span class="step-num">2</span> Check &amp; edit entries</h2>
+      <p style="font-size:12.5px; color:var(--ink-soft); margin:-6px 0 12px;">"Surface fit" is optional — the horse's rating specific to today's surface/distance (e.g. the Trf or Dis figure from the PP, not the overall Prime Power). "Class" is optional — whether today is a step down or up from recent company. Leave both blank to use the overall rating as-is.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:70px">Race</th>
+              <th style="width:60px">Post</th>
+              <th>Horse</th>
+              <th style="width:90px">Odds</th>
+              <th style="width:90px">Rating</th>
+              <th style="width:90px">Surface fit</th>
+              <th style="width:70px">Class</th>
+              <th style="width:34px"></th>
+            </tr>
+          </thead>
+          <tbody id="rowsBody"></tbody>
+        </table>
+        <div class="empty-note" id="emptyNote">No entries yet. Upload a file above, or add a row manually.</div>
+      </div>
+      <div class="table-actions">
+        <button class="ghost-btn" id="addRowBtn">+ Add row</button>
+        <button class="ghost-btn" id="demoBtn">Load demo data</button>
+        <button class="ghost-btn" id="clearBtn">Clear all</button>
+        <button class="primary-btn" id="computeBtn">Compute value →</button>
+      </div>
+    </section>
+
+    <!-- STEP 3: RESULTS -->
+    <section id="resultsSection" style="display:none;">
+      <h2><span class="step-num">3</span> Best plays</h2>
+      <div class="board" id="bestPlaysBoard"></div>
+    </section>
+
+    <section id="racesSection" style="display:none;">
+      <h2><span class="step-num">4</span> Best races</h2>
+      <div id="racesList"></div>
+    </section>
+
+    <section id="fieldSection" style="display:none;">
+      <h2><span class="step-num">5</span> Full field, race by race</h2>
+      <div class="sort-toggle" role="group" aria-label="Sort order">
+        <button class="toggle-btn active" id="sortByEdgeBtn" data-sort="edge">Sort: edge</button>
+        <button class="toggle-btn" id="sortByPostBtn" data-sort="post">Sort: post position</button>
+      </div>
+      <div id="fieldTables"></div>
+    </section>
+
+    <section id="resultsScoreSection" style="display:none;">
+      <h2><span class="step-num">6</span> Score against results</h2>
+      <div class="upload-card">
+        <h3>Paste a results chart</h3>
+        <p>Paste the text of a brisnet-style results chart (the "FIRST RACE… $2 Mutuel Prices…" pages). It only needs the win/place/show payout lines — copy as much of the chart as you have and drop it in below.</p>
+        <textarea id="resultsPaste" rows="6" placeholder="FIRST RACE&#10;Canterbury Park&#10;$2 Mutuel Prices:&#10; 2- EOS HEY BUCKO . . . 4.40 2.80 2.20&#10; 5- IZA B SLICK . . . 5.40 3.20&#10; ..."></textarea>
+        <div class="table-actions" style="margin-top:10px;">
+          <button class="primary-btn" id="scoreResultsBtn">Score my picks →</button>
+        </div>
+        <div class="status" id="resultsStatus"></div>
+      </div>
+      <div id="scoreboard" style="margin-top:18px;"></div>
+    </section>
+
+    <div class="methodology" id="methodology" style="display:none;"></div>
+
+    <div class="disclaimer">
+      <strong>How to read this:</strong> odds get converted to an implied win probability and normalized across the field to strip out the track's built-in edge (the overround). If you supplied a rating column, that becomes a second, independent probability estimate by weighting each horse's share of the field's total rating — nothing fancier than that, and it's only as good as the rating you feed it. "Edge" is just the gap between the two. A positive edge means the rating thinks the horse is more likely to win than the odds imply; it is not a prediction of the outcome, and ratings-based edges are especially unreliable with small samples or thin fields. This tool doesn't know track bias, scratches after your upload, trip trouble, or today's pace shape — read the past performances yourself before betting.<br><br>
+      This is an analytical aid, not advice, and it carries no guarantee of accuracy. Wagering involves real financial risk. If gambling stops being fun or starts causing problems, the National Problem Gambling Helpline (1-800-522-4700) is free and confidential.
+    </div>
+  </main>
+</div>
+
+<script>
+if (typeof pdfjsLib !== 'undefined') {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+} else {
+  console.warn('pdf.js did not load — PDF upload will be unavailable, everything else still works.');
+}
+
+let rows = [];
+let rowId = 0;
+let lastCsvData = null;
+let computedRaces = [];   // full per-race horse data, kept around for re-sorting
+let currentSort = 'edge';
+
+const rowsBody = document.getElementById('rowsBody');
+const emptyNote = document.getElementById('emptyNote');
+
+function newRow(partial){
+  return Object.assign({id: rowId++, race:'', post:'', horse:'', odds:'', score:'', surfaceRating:'', classMove:'', connAdjusted:false, runStyle:'', quirin:'', distStarts:'', distAdjusted:false, turfStarts:'', surface:'', daysSinceWork:'', worksAtTrack:'', lastFinMargin:'', h2hNote:''}, partial);
+}
+
+function renderRows(){
+  rowsBody.innerHTML = '';
+  emptyNote.style.display = rows.length ? 'none' : 'block';
+  rows.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="col-num"><input type="text" value="${escAttr(r.race)}" data-f="race"></td>
+      <td class="col-num"><input type="text" value="${escAttr(r.post)}" data-f="post"></td>
+      <td><input type="text" value="${escAttr(r.horse)}" data-f="horse"></td>
+      <td class="col-num"><input type="text" value="${escAttr(r.odds)}" data-f="odds" placeholder="odds e.g. 5/2"></td>
+      <td class="col-num"><input type="text" value="${escAttr(r.score)}" data-f="score" placeholder="optional"></td>
+      <td class="col-num"><input type="text" value="${escAttr(r.surfaceRating)}" data-f="surfaceRating" placeholder="optional"></td>
+      <td class="col-num">
+        <select data-f="classMove">
+          <option value="" ${!r.classMove ? 'selected' : ''}>–</option>
+          <option value="down" ${r.classMove==='down' ? 'selected' : ''}>drop</option>
+          <option value="up" ${r.classMove==='up' ? 'selected' : ''}>rise</option>
+        </select>
+      </td>
+      <td><button class="del-btn" title="Remove row">✕</button></td>
+    `;
+    tr.querySelectorAll('input, select').forEach(inp => {
+      const evt = inp.tagName === 'SELECT' ? 'change' : 'input';
+      inp.addEventListener(evt, e => { r[e.target.dataset.f] = e.target.value; });
+    });
+    tr.querySelector('.del-btn').addEventListener('click', () => {
+      rows = rows.filter(x => x.id !== r.id);
+      renderRows();
+    });
+    rowsBody.appendChild(tr);
+  });
+}
+
+function escAttr(s){
+  return String(s == null ? '' : s).replace(/"/g,'&quot;');
+}
+
+document.getElementById('addRowBtn').addEventListener('click', () => {
+  rows.push(newRow({}));
+  renderRows();
+});
+
+document.getElementById('clearBtn').addEventListener('click', () => {
+  rows = [];
+  computedRaces = [];
+  renderRows();
+  document.getElementById('resultsSection').style.display='none';
+  document.getElementById('racesSection').style.display='none';
+  document.getElementById('fieldSection').style.display='none';
+  document.getElementById('resultsScoreSection').style.display='none';
+  document.getElementById('methodology').style.display='none';
+});
+
+document.getElementById('demoBtn').addEventListener('click', () => {
+  const demo = [
+    {race:'3', post:'1', horse:'Paarl', odds:'10/1', score:'94.3'},
+    {race:'3', post:'2', horse:'Queen Atlas', odds:'4/1', score:'114.8'},
+    {race:'3', post:'3', horse:"Merlin's Sister", odds:'15/1', score:'73.0'},
+    {race:'3', post:'4', horse:'Alcohol', odds:'9/2', score:'103.6'},
+    {race:'3', post:'5', horse:'Fall Moon', odds:'5/2', score:'90.4'},
+    {race:'3', post:'6', horse:'Dixi So Fast', odds:'6/1', score:'101.5'},
+    {race:'3', post:'7', horse:'Mark of Victory', odds:'9/2', score:'95.5'},
+    {race:'3', post:'8', horse:'Sirius Light', odds:'6/1', score:'104.8'},
+    {race:'8', post:'1', horse:'Treble Clef', odds:'9/2', score:'114.7'},
+    {race:'8', post:'2', horse:'Ky Do Declare', odds:'4/1', score:'113.8'},
+    {race:'8', post:'3', horse:'Cobblestone Bridge', odds:'5/2', score:'120.7'},
+    {race:'8', post:'4', horse:'Lace Up', odds:'3/1', score:'112.8'},
+    {race:'8', post:'5', horse:'Secret Potion', odds:'8/1', score:'116.3'},
+    {race:'8', post:'6', horse:'Fort Warren', odds:'12/1', score:'112.8'},
+    {race:'8', post:'7', horse:'Words of Wisdom', odds:'5/1', score:'116.9'},
+  ];
+  rows = demo.map(d => newRow(d));
+  renderRows();
+});
+
+/* ---------------- Built-in CSV parser (no external library) ---------------- */
+function parseCSVLine(line){
+  const out = []; let cur = ''; let inQ = false;
+  for (let i = 0; i < line.length; i++){
+    const c = line[i];
+    if (inQ){
+      if (c === '"'){
+        if (line[i+1] === '"'){ cur += '"'; i++; } else { inQ = false; }
+      } else cur += c;
+    } else {
+      if (c === '"') inQ = true;
+      else if (c === ','){ out.push(cur); cur = ''; }
+      else cur += c;
+    }
+  }
+  out.push(cur);
+  return out.map(v => v.trim());
+}
+
+function parseCSV(text){
+  const lines = text.split(/\r\n|\n|\r/).filter(l => l.length > 0);
+  if (!lines.length) return {data: [], fields: []};
+  const fields = parseCSVLine(lines[0]);
+  const data = lines.slice(1).map(line => {
+    const vals = parseCSVLine(line);
+    const obj = {};
+    fields.forEach((f,i) => obj[f] = vals[i] !== undefined ? vals[i] : '');
+    return obj;
+  });
+  return {data, fields};
+}
+
+/* ---------------- Brisnet Single-File (.DRF) ---------------- */
+// Field positions per Brisnet's published "Single File" comma-delimited
+// spec (support.brisnet.com) — headerless, one row per horse per race.
+const DRF_CLASS_RANK = {
+  M: 1, MO: 1,
+  S: 2, C: 2,
+  CO: 3, A: 3, R: 3, T: 3, AO: 3, NO: 3,
+  N: 4, G3: 4,
+  G2: 5, G1: 6
+};
+function titleCase(s){
+  return s.toLowerCase().replace(/\b[a-z]/g, c => c.toUpperCase());
+}
+function parseCYMD(s){
+  if (!s || s.length !== 8) return null;
+  const y = parseInt(s.slice(0,4),10), m = parseInt(s.slice(4,6),10), d = parseInt(s.slice(6,8),10);
+  if (!y || !m || !d) return null;
+  return new Date(Date.UTC(y, m-1, d));
+}
+function parseBrisnetSingleFile(text){
+  const lines = text.split(/\r\n|\n|\r/).filter(l => l.trim().length > 0);
+  const out = [];
+  lines.forEach(line => {
+    const f = parseCSVLine(line); // 0-indexed array; spec field N is f[N-1]
+    const get = n => (f[n-1] !== undefined ? f[n-1].trim() : '');
+    const num = n => { const v = parseFloat(get(n)); return isNaN(v) ? null : v; };
+
+    const race = get(3);
+    const post = get(4);
+    const horse = get(45);
+    if (!race || !horse) return; // skip malformed/blank rows
+
+    const mlOdds = num(44);
+    const odds = mlOdds != null ? mlOdds.toFixed(2) : '';
+    const surface = get(7);
+    const pp = get(251);
+    const rtype = get(9);
+    const todayTrack = get(1);
+    const raceDate = parseCYMD(get(2));
+    const lastWorkDate = parseCYMD(get(102));
+    const daysSinceWork = (raceDate && lastWorkDate) ? Math.round((raceDate - lastWorkDate) / 86400000) : null;
+    let worksAtTrack = 0;
+    for (let i = 0; i < 6; i++){
+      if (get(126+i) === todayTrack && todayTrack) worksAtTrack++;
+    }
+    const lastFinMargin = num(736); // beaten lengths at the finish, most recent race only
+
+    // Full 10-back (date, track, race#, finish) history, used only to detect
+    // when two horses in today's field actually met before — this file only
+    // carries the last 10 races per horse, so a meeting older than that is
+    // invisible here regardless of whether it happened.
+    const pastMeets = [];
+    for (let i = 0; i < 10; i++){
+      const d = get(256+i);
+      if (!d) continue;
+      pastMeets.push({
+        date: d, track: get(276+i), raceNum: get(296+i), finPos: get(616+i),
+        winner: get(406+i).toUpperCase(), second: get(416+i).toUpperCase(), third: get(426+i).toUpperCase()
+      });
+    }
+
+    const bestTurf = num(1179);
+    const bestFast = num(1178);
+    const isTurfToday = /^[Tt]$/.test(surface);
+    // Only ever use the figure for TODAY's actual surface. A horse with no
+    // turf figure (0 or missing) racing on turf gets no surface rating at
+    // all — substituting its dirt figure instead is a different surface's
+    // number wearing a "surface fit" label, which is misleading, not useful.
+    const surfaceRating = isTurfToday ? (bestTurf ? bestTurf : '') : (bestFast ? bestFast : '');
+
+    const todayClm = num(14) != null ? num(14) : num(13);
+    const recentClm = num(546);
+    const recentType = get(1086);
+    let classMove = '';
+    if (todayClm && recentClm){
+      const pctDiff = (todayClm - recentClm) / recentClm;
+      if (pctDiff <= -0.15) classMove = 'down';
+      else if (pctDiff >= 0.15) classMove = 'up';
+    } else if (DRF_CLASS_RANK[rtype] && DRF_CLASS_RANK[recentType]){
+      const tr = DRF_CLASS_RANK[rtype], rr = DRF_CLASS_RANK[recentType];
+      if (tr < rr) classMove = 'down';
+      else if (tr > rr) classMove = 'up';
+    }
+
+    out.push({
+      race, post, horse: titleCase(horse), odds, score: pp,
+      surfaceRating: surfaceRating !== '' ? String(surfaceRating) : '',
+      classMove,
+      trnPct: (num(29) && num(30) != null) ? (num(30)/num(29)*100) : null,
+      jkyPct: (num(35) && num(36) != null) ? (num(36)/num(35)*100) : null,
+      runStyle: get(210),
+      quirin: num(211),
+      distStarts: num(65),
+      turfStarts: num(70),
+      surface: surface,
+      daysSinceWork,
+      worksAtTrack,
+      lastFinMargin,
+      pastMeets
+    });
+  });
+
+  // First-time-at-today's-distance, first-time-on-turf, workout-freshness,
+  // and beaten-badly-last-time penalties. All validated against a real
+  // card: horses with zero career starts at today's exact distance, zero
+  // career turf starts on a turf card, no recorded workout within 30 days
+  // of the race, no work at today's actual track in their last 6 works,
+  // or beaten more than 10 lengths last time out, each measurably reduced
+  // the model's systematic negative bias on actual winners when tested.
+  // Days since last WORK matters more than days since last RACE for
+  // spotting a horse that's gone quiet — two long-layoff winners on the
+  // same card (80 and 207 days off) had frequent recent works at the
+  // actual track, while the clearest miss had a 51-day gap since its last
+  // visible work, all of it at a training center rather than the raceday
+  // track. A pace/running-style adjustment (lone speed bonus, duel
+  // penalty) was also tried and tested worse in aggregate on the same
+  // data — several closers beat clear lone-speed horses on that card —
+  // so pace/run-style is surfaced as information only below, not folded
+  // into the score. Same caveat as everything else here: validated on a
+  // small number of real cards, not a large fitted sample.
+  const DIST_ZERO_PENALTY = 0.10;
+  const TURF_DEBUT_PENALTY = 0.10; // zero career turf starts, racing on turf today — validated same way as distance
+  const STALE_WORK_DAYS = 30;      // no recorded workout within this many days of the race
+  const STALE_WORK_PENALTY = 0.10;
+  const NO_TRACK_WORK_PENALTY = 0.05; // none of the last 6 works were at today's actual track
+  const BAD_LAST_MARGIN = 10;      // beaten lengths threshold, most recent race
+  const BAD_LAST_PENALTY = 0.10;
+  out.forEach(h => {
+    if (h.distStarts === 0){
+      const ppNum = parseFloat(h.score);
+      if (!isNaN(ppNum) && ppNum > 0){
+        h.score = String(Math.round(ppNum * (1 - DIST_ZERO_PENALTY) * 100) / 100);
+        h.distAdjusted = true;
+      }
+    }
+    if (/^[Tt]$/.test(h.surface) && h.turfStarts === 0){
+      const ppNum = parseFloat(h.score);
+      if (!isNaN(ppNum) && ppNum > 0){
+        h.score = String(Math.round(ppNum * (1 - TURF_DEBUT_PENALTY) * 100) / 100);
+        h.distAdjusted = true;
+      }
+    }
+    if (h.daysSinceWork != null && h.daysSinceWork > STALE_WORK_DAYS){
+      const ppNum = parseFloat(h.score);
+      if (!isNaN(ppNum) && ppNum > 0){
+        h.score = String(Math.round(ppNum * (1 - STALE_WORK_PENALTY) * 100) / 100);
+        h.distAdjusted = true;
+      }
+    }
+    if (h.worksAtTrack === 0){
+      const ppNum = parseFloat(h.score);
+      if (!isNaN(ppNum) && ppNum > 0){
+        h.score = String(Math.round(ppNum * (1 - NO_TRACK_WORK_PENALTY) * 100) / 100);
+        h.distAdjusted = true;
+      }
+    }
+    if (h.lastFinMargin != null && h.lastFinMargin > BAD_LAST_MARGIN){
+      const ppNum = parseFloat(h.score);
+      if (!isNaN(ppNum) && ppNum > 0){
+        h.score = String(Math.round(ppNum * (1 - BAD_LAST_PENALTY) * 100) / 100);
+        h.distAdjusted = true;
+      }
+    }
+  });
+
+  // Blend trainer/jockey current-meet win% into Prime Power, relative to the
+  // field average for that race (a horse's own connections numbers only mean
+  // something next to who else is in today's race). Validated against a
+  // known-outcome card: real signal on some races (e.g. a trainer with the
+  // field's best meet win% going on to win), but a genuine miss on others
+  // (winners with poor connections numbers do happen) — net modestly
+  // positive, not a fix on its own. CONNECTIONS_WEIGHT is a hand-picked,
+  // conservative value, same caveat as every other heuristic in this tool.
+  const CONNECTIONS_WEIGHT = 4;
+  const byRace = {};
+  out.forEach(h => { (byRace[h.race] = byRace[h.race] || []).push(h); });
+  Object.values(byRace).forEach(group => {
+    const withTrn = group.filter(h => h.trnPct != null);
+    const withJky = group.filter(h => h.jkyPct != null);
+    if (!withTrn.length && !withJky.length) return;
+    const avgTrn = withTrn.length ? withTrn.reduce((s,h)=>s+h.trnPct,0)/withTrn.length : 0;
+    const avgJky = withJky.length ? withJky.reduce((s,h)=>s+h.jkyPct,0)/withJky.length : 0;
+    group.forEach(h => {
+      if (h.trnPct == null && h.jkyPct == null) return;
+      const trnPart = h.trnPct != null ? (h.trnPct - avgTrn) : 0;
+      const jkyPart = h.jkyPct != null ? (h.jkyPct - avgJky) : 0;
+      const connFactor = (trnPart + jkyPart) / 2; // percentage points relative to field
+      const ppNum = parseFloat(h.score);
+      if (!isNaN(ppNum) && ppNum > 0){
+        h.score = String(Math.round(ppNum * (1 + (connFactor/100) * CONNECTIONS_WEIGHT) * 100) / 100);
+        h.connAdjusted = true;
+      }
+    });
+  });
+
+  // Head-to-head: within each of today's races, check whether one horse's
+  // own past-race record names another horse in today's field as the
+  // winner, 2nd, or 3rd — that's a confirmed prior meeting, and comparing
+  // the two horses' finish positions in that shared race says who won it.
+  // Matching by name off ONE horse's own record (rather than requiring
+  // both horses to independently still carry the same date/track/race# in
+  // their own 10-back window) reaches further back: a horse that races
+  // less often keeps an older rival's name in its Top Finishers data long
+  // after that rival's own record has aged past it. Still bounded by the
+  // file only carrying 10 races back per horse — a meeting neither side's
+  // last 10 starts touches is invisible here even if it happened.
+  // Informational only, not folded into scoring yet — one confirmed case
+  // isn't enough to calibrate a weight against real outcomes the way the
+  // other adjustments were.
+  const byRaceH2H = {};
+  out.forEach(h => { (byRaceH2H[h.race] = byRaceH2H[h.race] || []).push(h); });
+  Object.values(byRaceH2H).forEach(group => {
+    // Only check matchups among the field's top-rated horses — pairwise
+    // history across an entire 8-10 horse field produces a wall of mostly
+    // irrelevant text. This is what actually answers "how does our top
+    // pick stack up against the others we rate highly."
+    const topRated = group.filter(h => !isNaN(parseFloat(h.score)) && parseFloat(h.score) > 0)
+      .slice().sort((a,b) => parseFloat(b.score) - parseFloat(a.score)).slice(0, 3);
+    const favByOdds = group.filter(h => !isNaN(parseFloat(h.odds)))
+      .slice().sort((a,b) => parseFloat(a.odds) - parseFloat(b.odds))[0];
+    const relevant = topRated.slice();
+    if (favByOdds && !relevant.includes(favByOdds)) relevant.push(favByOdds);
+
+    // Look up whether horse b's name appears as winner/2nd/3rd in any of
+    // horse a's own past races — this only needs ONE side to still carry
+    // that race in its 10-back window, not both, so it reaches further
+    // back than matching on shared date/track/race# alone.
+    function findMeeting(a, b){
+      const bName = (b.horse || '').toUpperCase();
+      for (const m of (a.pastMeets || [])){
+        let bPos = null;
+        if (m.winner === bName) bPos = 1;
+        else if (m.second === bName) bPos = 2;
+        else if (m.third === bName) bPos = 3;
+        if (bPos != null){
+          const aPos = parseInt(m.finPos, 10);
+          if (!isNaN(aPos) && aPos !== bPos) return {m, aPos, bPos};
+        }
+      }
+      return null;
+    }
+
+    const notes = [];
+    const seen = new Set();
+    for (let i = 0; i < relevant.length; i++){
+      for (let j = i+1; j < relevant.length; j++){
+        const a = relevant[i], b = relevant[j];
+        const found = findMeeting(a, b) || (() => {
+          const r = findMeeting(b, a);
+          return r ? {m: r.m, aPos: r.bPos, bPos: r.aPos} : null;
+        })();
+        if (!found) continue;
+        const key = `${found.m.date}-${found.m.track}-${found.m.raceNum}-${a.horse}-${b.horse}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const winner = found.aPos < found.bPos ? a : b;
+        const loser = found.aPos < found.bPos ? b : a;
+        const wPos = Math.min(found.aPos, found.bPos);
+        const lPos = Math.max(found.aPos, found.bPos);
+        const d = `${found.m.date.slice(4,6)}/${found.m.date.slice(6,8)}/${found.m.date.slice(2,4)}`;
+        notes.push(`${winner.horse} beat ${loser.horse} (${d}, ${found.m.track} R${found.m.raceNum}: ${wPos}${ordinalSuffix(wPos)} vs ${lPos}${ordinalSuffix(lPos)})`);
+      }
+    }
+    if (notes.length){
+      group.forEach(h => { h.h2hNote = notes.slice(0, 2).join(' · '); });
+    }
+  });
+  out.forEach(h => { delete h.pastMeets; }); // scratch data, not needed past this point
+
+  return out;
+}
+
+function ordinalSuffix(n){
+  const s = ['th','st','nd','rd'], v = n % 100;
+  return s[(v-20)%10] || s[v] || s[0];
+}
+
+document.getElementById('drfInput').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const statusEl = document.getElementById('drfStatus');
+  statusEl.textContent = 'Reading file…';
+  statusEl.className = 'status';
+  const reader = new FileReader();
+  reader.onload = ev => {
+    let extracted;
+    try {
+      extracted = parseBrisnetSingleFile(ev.target.result);
+    } catch (err){
+      statusEl.textContent = 'Could not parse this file as a Brisnet Single-File data file. Confirm it\'s the "Single File" format (not "Multi File" or "ALLWAYS") and hasn\'t been re-saved/edited by another program.';
+      statusEl.className = 'status err';
+      return;
+    }
+    if (!extracted.length){
+      statusEl.textContent = 'No rows recognized. Confirm this is Brisnet\'s "Single File" comma-delimited format.';
+      statusEl.className = 'status err';
+      return;
+    }
+    extracted.forEach(h => rows.push(newRow(h)));
+    renderRows();
+    const raceCount = new Set(extracted.map(h => h.race)).size;
+    const withOdds = extracted.filter(h => parseOdds(h.odds) != null).length;
+    if (withOdds === 0){
+      statusEl.textContent = `Imported ${extracted.length} entries across ${raceCount} race(s) — but this file has no morning-line odds for any horse (fields 43/44 are blank in the data). That's usually because it was pulled before Brisnet published odds for this card; try re-downloading closer to post time. Prime Power, surface fit, and class move DID come through, so you can add odds by hand in the table below and still compute.`;
+      statusEl.className = 'status err';
+    } else if (withOdds < extracted.length){
+      statusEl.textContent = `Imported ${extracted.length} entries across ${raceCount} race(s). ${extracted.length - withOdds} horse(s) are missing morning-line odds and won't be scored until you fill them in below. Everything else came through from the data.`;
+      statusEl.className = 'status ok';
+    } else {
+      statusEl.textContent = `Imported ${extracted.length} entries across ${raceCount} race(s), with Prime Power, surface fit, class move, and trainer/jockey meet-stat blending pulled directly from the data. Check the table below.`;
+      statusEl.className = 'status ok';
+    }
+  };
+  reader.onerror = () => {
+    statusEl.textContent = 'Could not read the file.';
+    statusEl.className = 'status err';
+  };
+  reader.readAsText(file, 'ISO-8859-1');
+});
+
+const csvInput = document.getElementById('csvInput');
+const csvStatus = document.getElementById('csvStatus');
+const csvMapper = document.getElementById('csvMapper');
+const mapSelects = {
+  race: document.getElementById('mapRace'),
+  post: document.getElementById('mapPost'),
+  horse: document.getElementById('mapHorse'),
+  odds: document.getElementById('mapOdds'),
+  score: document.getElementById('mapScore'),
+  surface: document.getElementById('mapSurface'),
+  classMove: document.getElementById('mapClass'),
+};
+
+csvInput.addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  if (typeof Papa === 'undefined'){
+    csvStatus.textContent = 'The CSV reader library did not load (likely a blocked or slow connection to cdnjs.cloudflare.com). Try reloading the page.';
+    csvStatus.className = 'status err';
+    return;
+  }
+  csvStatus.textContent = 'Parsing…';
+  csvStatus.className = 'status';
+  Papa.parse(file, {
+    header: true,
+    skipEmptyLines: true,
+    complete: res => {
+      if (!res.data.length){
+        csvStatus.textContent = 'No rows found in that file.';
+        csvStatus.className = 'status err';
+        return;
+      }
+      lastCsvData = res.data;
+      const fields = res.meta.fields || [];
+      csvStatus.textContent = `Found ${res.data.length} rows, ${fields.length} columns. Map the columns below.`;
+      csvStatus.className = 'status ok';
+      populateMapper(fields);
+      csvMapper.classList.add('show');
+    },
+    error: err => {
+      csvStatus.textContent = 'Could not parse that file: ' + err.message;
+      csvStatus.className = 'status err';
+    }
+  });
+});
+
+function populateMapper(fields){
+  const guess = {
+    race: /race/i, post: /post|pp|program|#|num/i, horse: /horse|name/i,
+    odds: /odds|ml|morning/i, score: /power|rating|speed|score|figure|fig/i,
+    surface: /surface|turf|dirt|trf|fst\b/i, classMove: /class|move|drop|rise/i
+  };
+  Object.entries(mapSelects).forEach(([key, sel]) => {
+    sel.innerHTML = '<option value="">— none —</option>' +
+      fields.map(f => `<option value="${escAttr(f)}">${f}</option>`).join('');
+    const match = fields.find(f => guess[key].test(f));
+    if (match) sel.value = match;
+  });
+}
+
+document.getElementById('importCsvBtn').addEventListener('click', () => {
+  if (!lastCsvData) return;
+  const m = Object.fromEntries(Object.entries(mapSelects).map(([k,s]) => [k, s.value]));
+  if (!m.horse || !m.odds){
+    csvStatus.textContent = 'Horse and Odds columns are required.';
+    csvStatus.className = 'status err';
+    return;
+  }
+  let added = 0;
+  lastCsvData.forEach(r => {
+    const horse = (r[m.horse] || '').trim();
+    if (!horse) return;
+    rows.push(newRow({
+      race: m.race ? (r[m.race]||'').trim() : '1',
+      post: m.post ? (r[m.post]||'').trim() : '',
+      horse,
+      odds: m.odds ? (r[m.odds]||'').trim() : '',
+      score: m.score ? (r[m.score]||'').trim() : '',
+      surfaceRating: m.surface ? (r[m.surface]||'').trim() : '',
+      classMove: m.classMove ? (r[m.classMove]||'').trim().toLowerCase() : ''
+    }));
+    added++;
+  });
+  renderRows();
+  csvStatus.textContent = `Imported ${added} rows into the table below.`;
+  csvStatus.className = 'status ok';
+});
+
+/* ---------------- PDF ---------------- */
+const pdfInput = document.getElementById('pdfInput');
+const pdfStatus = document.getElementById('pdfStatus');
+
+pdfInput.addEventListener('change', async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  if (typeof pdfjsLib === 'undefined'){
+    pdfStatus.textContent = 'The PDF reader library did not load (likely a blocked or slow connection to cdnjs.cloudflare.com). Try reloading the page, or use the CSV upload / manual rows instead.';
+    pdfStatus.className = 'status err';
+    return;
+  }
+  pdfStatus.textContent = 'Reading PDF… this can take a while on a phone since it runs on the main thread — give it a minute before assuming it\'s stuck.';
+  pdfStatus.className = 'status';
+  try{
+    const buf = await file.arrayBuffer();
+    // disableWorker skips trying (and failing) to spin up a real background
+    // Worker, which is commonly blocked in sandboxed in-app browsers — this
+    // avoids the "fake worker" fallback warning and just runs synchronously.
+    const pdf = await pdfjsLib.getDocument({data: buf, disableWorker: true}).promise;
+    let fullText = '';
+    for (let p = 1; p <= pdf.numPages; p++){
+      const page = await pdf.getPage(p);
+      const content = await page.getTextContent();
+      fullText += content.items.map(it => it.str).join('\n') + '\n';
+    }
+    const extracted = extractFromProgramText(fullText);
+    if (!extracted.length){
+      pdfStatus.textContent = 'Read the PDF but could not recognize a program layout. Try CSV instead, or add rows manually.';
+      pdfStatus.className = 'status err';
+      return;
+    }
+    extracted.forEach(h => rows.push(newRow(h)));
+    renderRows();
+    pdfStatus.textContent = `Extracted ${extracted.length} entries across ${new Set(extracted.map(h=>h.race)).size} race(s). Double-check names/odds below — PDF layouts vary.`;
+    pdfStatus.className = 'status ok';
+  } catch(err){
+    pdfStatus.textContent = 'Could not read that PDF: ' + err.message;
+    pdfStatus.className = 'status err';
+  }
+});
+
+function extractFromProgramText(text){
+  // Split into race blocks on "Race <n>" headings.
+  const raceHeadRe = /\bRace\s+(\d{1,2})\b/g;
+  const marks = [];
+  let m;
+  while ((m = raceHeadRe.exec(text)) !== null){
+    marks.push({race: m[1], index: m.index});
+  }
+  if (!marks.length) return [];
+  const blocks = marks.map((mk, i) => {
+    // The race's surface/class token sits on the same line, just BEFORE the
+    // "Race N" text itself (e.g. "...Clm 7500b 1 Mile (T) ... Race 1"), so
+    // look a little to the left of the marker to catch it.
+    const lineStart = text.lastIndexOf('\n', mk.index) + 1;
+    const headerLine = text.slice(lineStart, mk.index + 20);
+    return {
+      race: mk.race,
+      text: text.slice(mk.index, i+1 < marks.length ? marks[i+1].index : text.length),
+      isTurf: /\(T\)|\(Turf\)/i.test(headerLine),
+      todayClassRank: classRank(headerLine)
+    };
+  });
+
+  const horseRe = /(\d{1,2})\s*\n\s*([A-Z][A-Za-z0-9'.,()\/&\- ]{2,55}?)\s*\n\s*Own\s*:\s*[^\n]+\n\s*(\d{1,3}\/\d{1,2}|\*?\d+\.\d{1,2}|EVEN|EVN)\b/g;
+  const powerRe = /Prime Power:\s*([\d.]+)/;
+  const seen = new Set();
+  const out = [];
+
+  // Coarse class tier — Mdn/maiden-claiming lowest, straight claiming next,
+  // allowance/optional-claiming above that. Stakes and anything unrecognized
+  // is left unranked (null) rather than guessed.
+  function classRank(str){
+    if (/\bMdn\b|\bMC\d/.test(str)) return 1;
+    if (/\bClm/.test(str)) return 2;
+    if (/\bOC\b|\bAlw/.test(str)) return 3;
+    return null;
+  }
+
+  blocks.forEach(block => {
+    let hm;
+    horseRe.lastIndex = 0;
+    while ((hm = horseRe.exec(block.text)) !== null){
+      const post = hm[1];
+      let horse = hm[2].replace(/\s*\([^)]*\)\s*$/, '').trim();
+      const odds = hm[3];
+      if (!horse || /^(own|dam|sire|brdr|trnr)$/i.test(horse)) continue;
+      const key = block.race + '|' + horse.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      // Wide-enough window to reach past the stats grid into the first past-race line.
+      const windowText = block.text.slice(hm.index, hm.index + 1600);
+      const pm = windowText.match(powerRe);
+
+      // Surface-fit: pull the Trf (if today's race is turf) or Fst (if
+      // dirt/main track) figure from the horse's own stats grid.
+      let surfaceRating = '';
+      const surfKw = block.isTurf ? 'Trf' : 'Fst';
+      const surfRe = new RegExp(surfKw + '\\s*\\([^)]*\\)[^\\n]*\\$[\\d,]+\\s+(\\d+)');
+      const sm = windowText.match(surfRe);
+      if (sm) surfaceRating = sm[1];
+
+      // Class move: coarse tier comparison between today's race and the
+      // horse's most recent start. Only fires when both sides land in a
+      // recognized tier (Mdn/Clm/OC-Alw) — anything else is left blank
+      // rather than guessed, since claiming-price-level nuance isn't
+      // reliably extractable from this text.
+      let classMove = '';
+      if (block.todayClassRank != null){
+        const anchorIdx = windowText.indexOf('DATE TRK DIST RACETYPE');
+        const afterAnchor = anchorIdx >= 0 ? windowText.slice(anchorIdx) : '';
+        const recentMatch = afterAnchor.match(/\b(Mdn|MC\d|Clm|OC|Alw)\S*/);
+        const recentRank = recentMatch ? classRank(recentMatch[0]) : null;
+        if (recentRank != null){
+          if (block.todayClassRank < recentRank) classMove = 'down';
+          else if (block.todayClassRank > recentRank) classMove = 'up';
+        }
+      }
+
+      out.push({
+        race: block.race,
+        post,
+        horse,
+        odds,
+        score: pm ? pm[1] : '',
+        surfaceRating,
+        classMove
+      });
+    }
+  });
+  return out;
+}
+
+document.getElementById('extractPasteBtn').addEventListener('click', () => {
+  const statusEl = document.getElementById('pdfPasteStatus');
+  const text = document.getElementById('pdfPasteText').value;
+  if (!text.trim()){
+    statusEl.textContent = 'Paste some program text first.';
+    statusEl.className = 'status err';
+    return;
+  }
+  const extracted = extractFromProgramText(text);
+  if (!extracted.length){
+    statusEl.textContent = 'Could not recognize a program layout in that text. Brisnet-style sheets work best; try including the "Own:" lines.';
+    statusEl.className = 'status err';
+    return;
+  }
+  extracted.forEach(h => rows.push(newRow(h)));
+  renderRows();
+  statusEl.textContent = `Extracted ${extracted.length} entries across ${new Set(extracted.map(h=>h.race)).size} race(s). Check the table below.`;
+  statusEl.className = 'status ok';
+});
+
+/* ---------------- COMPUTE ---------------- */
+function parseOdds(str){
+  if (!str) return null;
+  let s = String(str).trim().toUpperCase().replace('*','');
+  if (s === 'EVEN' || s === 'EVN') return 2.0;
+  if (/^\d+(\.\d+)?\/\d+(\.\d+)?$/.test(s)){
+    const [n,d] = s.split('/').map(Number);
+    if (!d) return null;
+    return (n/d) + 1;
+  }
+  if (/^\d+(\.\d+)?$/.test(s)){
+    return parseFloat(s) + 1;
+  }
+  return null;
+}
+
+document.getElementById('computeBtn').addEventListener('click', () => {
+  const races = {};
+  rows.forEach(r => {
+    if (!r.horse || !r.horse.trim()) return;
+    const raceKey = (r.race || '1').trim() || '1';
+    if (!races[raceKey]) races[raceKey] = [];
+    const decimalOdds = parseOdds(r.odds);
+    const scoreNum = (r.score !== '' && !isNaN(parseFloat(r.score))) ? parseFloat(r.score) : null;
+    const surfaceNum = (r.surfaceRating !== '' && r.surfaceRating != null && !isNaN(parseFloat(r.surfaceRating))) ? parseFloat(r.surfaceRating) : null;
+    const classRaw = (r.classMove || '').toLowerCase();
+    const classMove = /down|drop/.test(classRaw) ? 'down' : /up|rise/.test(classRaw) ? 'up' : '';
+
+    // Blend the overall rating with a surface/distance-specific rating when
+    // supplied (today's-conditions fit), then nudge for a class move. Both
+    // are modest, hand-set heuristics — not fitted to real outcomes yet.
+    const SURFACE_WEIGHT = 0.35;   // how much weight the surface-specific figure gets vs overall
+    const CLASS_DROP_BOOST = 1.08; // class droppers often outrun their overall figure
+    const CLASS_RISE_PENALTY = 0.92; // class risers often underperform their overall figure
+    let effectiveScore = scoreNum;
+    let adjusted = false;
+    if (scoreNum != null && surfaceNum != null && surfaceNum > 0){
+      effectiveScore = (1 - SURFACE_WEIGHT) * scoreNum + SURFACE_WEIGHT * surfaceNum;
+      adjusted = true;
+    }
+    if (effectiveScore != null && classMove === 'down'){
+      effectiveScore *= CLASS_DROP_BOOST;
+      adjusted = true;
+    } else if (effectiveScore != null && classMove === 'up'){
+      effectiveScore *= CLASS_RISE_PENALTY;
+      adjusted = true;
+    }
+
+    races[raceKey].push({
+      post: r.post, horse: r.horse.trim(), oddsStr: r.odds,
+      decimalOdds, score: effectiveScore, rawScore: scoreNum,
+      surfaceRating: surfaceNum, classMove, adjusted: adjusted || !!r.connAdjusted || !!r.distAdjusted,
+      runStyle: r.runStyle || '', quirin: (r.quirin !== '' && r.quirin != null && !isNaN(parseFloat(r.quirin))) ? parseFloat(r.quirin) : null,
+      distStarts: (r.distStarts !== '' && r.distStarts != null && !isNaN(parseFloat(r.distStarts))) ? parseFloat(r.distStarts) : null,
+      turfStarts: (r.turfStarts !== '' && r.turfStarts != null && !isNaN(parseFloat(r.turfStarts))) ? parseFloat(r.turfStarts) : null,
+      surfaceToday: r.surface || '',
+      daysSinceWork: (r.daysSinceWork !== '' && r.daysSinceWork != null && !isNaN(parseFloat(r.daysSinceWork))) ? parseFloat(r.daysSinceWork) : null,
+      worksAtTrack: (r.worksAtTrack !== '' && r.worksAtTrack != null && !isNaN(parseFloat(r.worksAtTrack))) ? parseFloat(r.worksAtTrack) : null,
+      lastFinMargin: (r.lastFinMargin !== '' && r.lastFinMargin != null && !isNaN(parseFloat(r.lastFinMargin))) ? parseFloat(r.lastFinMargin) : null,
+      h2hNote: r.h2hNote || ''
+    });
+  });
+
+  const raceKeys = Object.keys(races);
+  if (!raceKeys.length){
+    alert('Add at least one horse with odds before computing.');
+    return;
+  }
+
+  const allPlays = [];
+  const raceSummaries = [];
+
+  raceKeys.forEach(rk => {
+    const horses = races[rk].filter(h => h.decimalOdds != null);
+    if (!horses.length) return;
+    const totalImplied = horses.reduce((s,h) => s + 1/h.decimalOdds, 0);
+    const scored = horses.filter(h => h.score != null && h.score > 0);
+    // Model probability uses score^RATING_POWER rather than a raw linear share.
+    // A pure linear share (power=1) spreads probability too evenly across a
+    // field whose ratings sit in a narrow range (e.g. 90-140), which showed up
+    // as a real, repeated pattern across multiple cards: the model came out
+    // systematically *negative* on horses that went on to win, especially
+    // short-priced ones the market had strong conviction on. Squaring the
+    // score concentrates model probability more the way real win-probability
+    // distributions tend to concentrate — validated against two known-outcome
+    // cards to reduce (not eliminate) that bias without just converging to
+    // "always back the top rating." Still a heuristic, not a fitted value.
+    const RATING_POWER = 2;
+    const totalScore = scored.reduce((s,h) => s + Math.pow(h.score, RATING_POWER), 0);
+
+    horses.forEach(h => {
+      h.marketProb = (1/h.decimalOdds) / totalImplied;
+      h.modelProb = (totalScore > 0 && h.score != null && h.score > 0) ? Math.pow(h.score, RATING_POWER) / totalScore : null;
+      h.edge = h.modelProb != null ? h.modelProb - h.marketProb : null;
+    });
+
+    const overround = totalImplied; // 1.00 = no house edge in this simplified view
+    let topEdgeHorse = null;
+    horses.forEach(h => {
+      if (h.edge != null && (!topEdgeHorse || h.edge > topEdgeHorse.edge)) topEdgeHorse = h;
+    });
+    // Separate from "value" — the field's single highest-rated horse, regardless
+    // of price. Edge can filter this horse out entirely when the market is even
+    // more confident in it than the model is (a legitimately strong horse the
+    // crowd has correctly bet down hard). That's still worth showing: it's a
+    // different question ("who's simply best") than edge answers ("who's priced
+    // wrong"), and the two can point at different horses or the same one.
+    let topRatedHorse = null;
+    horses.forEach(h => {
+      if (h.score != null && h.score > 0 && (!topRatedHorse || h.score > topRatedHorse.score)) topRatedHorse = h;
+    });
+    const favorite = horses.reduce((a,b) => (a.decimalOdds < b.decimalOdds ? a : b));
+
+    // --- Play / caution / pass recommendation ---
+    // Thresholds are heuristic, not fitted to a large sample — see methodology note.
+    const MIN_EDGE = 0.04;       // top edge below this is noise, not signal
+    const MIN_GAP = 0.03;        // top pick needs real separation from the next-best edge
+    const STRONG_GAP = 0.08;     // a gap this wide overrides a favorite-disagreement caution
+    const FAVORITE_DISAGREE = -0.06; // model this far below market on the favorite = market may know something the rating doesn't. Tightened from -8% after real-outcome testing: -8% missed a case where the favorite's edge was -6.6% and the top-edge pick went unplaced; -6% catches it without demoting the one validated win on record (which had a much wider margin).
+    let recommendation = {status: 'pass', reason: 'No rating data supplied for this race — nothing to grade edge against.'};
+    if (totalScore > 0){
+      const byEdge = horses.filter(h => h.edge != null).slice().sort((a,b) => b.edge - a.edge);
+      const top = byEdge[0];
+      const second = byEdge[1];
+      const gap = top && second ? top.edge - second.edge : (top ? top.edge : 0);
+      const favoriteDisagreement = favorite.edge != null && favorite.edge <= FAVORITE_DISAGREE && favorite !== top;
+      const topName = `<b>${escHtml(top ? top.horse : '')}</b>`;
+      const favName = `<b>${escHtml(favorite.horse)}</b>`;
+      const secondName = second ? escHtml(second.horse) : 'the next horse';
+      if (!top || top.edge < MIN_EDGE){
+        recommendation = {status: 'pass', reason: `Best edge is only ${top ? pct(top.edge) : '0%'} — too thin to separate from noise.`};
+      } else if (gap < MIN_GAP){
+        recommendation = {status: 'pass', reason: `${topName} and ${secondName} are within ${pct(gap)} of each other — no real separation.`};
+      } else if (favoriteDisagreement && gap < STRONG_GAP){
+        recommendation = {status: 'caution', reason: `Model likes ${topName}, but the market has hammered ${favName} to ${escHtml(favorite.oddsStr)} anyway (${pct(favorite.edge)} edge) — the crowd may be pricing something the rating doesn't see, and the gap isn't wide enough to override that.`};
+      } else {
+        const overrideNote = favoriteDisagreement ? ` — wide enough to override the favorite getting bet down anyway.` : '.';
+        recommendation = {status: 'play', reason: `${topName} clears the next-best horse by ${pct(gap)}${overrideNote}`};
+      }
+    }
+
+    const rankedByEdge = horses.filter(h => h.edge != null).slice().sort((a,b) => b.edge - a.edge);
+
+    // Informational only — run style and Quirin speed points describe the
+    // likely pace shape (who's fast early, whether a duel is plausible), and
+    // debut-at-distance flags first-time-at-this-trip horses. Tried folding
+    // this into the score automatically and it didn't validate (see the DRF
+    // parser notes), so it's shown as raw signal for your own read instead,
+    // same way a real form sheet would present it.
+    let paceNote = '';
+    if (totalScore > 0){
+      const parts = [];
+      const h2h = horses.find(h => h.h2hNote);
+      if (h2h) parts.push(`Head-to-head: ${h2h.h2hNote}`);
+      const withQuirin = horses.filter(h => h.quirin != null).slice().sort((a,b) => b.quirin - a.quirin);
+      if (withQuirin.length){
+        const speedList = withQuirin.slice(0, 3).map(h => `${escHtml(h.horse)} (${h.quirin})`).join(', ');
+        parts.push(`Early speed (Quirin pts, higher = faster gate): ${speedList}`);
+      }
+      const debutAtDistance = horses.filter(h => h.distStarts === 0).map(h => h.horse);
+      if (debutAtDistance.length){
+        parts.push(`First time at today's distance: ${debutAtDistance.map(escHtml).join(', ')}`);
+      }
+      const debutOnTurf = horses.filter(h => /^[Tt]$/.test(h.surfaceToday || '') && h.turfStarts === 0).map(h => h.horse);
+      if (debutOnTurf.length){
+        parts.push(`Zero career turf starts: ${debutOnTurf.map(escHtml).join(', ')}`);
+      }
+      const stale = horses.filter(h => h.daysSinceWork != null && h.daysSinceWork > 30).map(h => `${escHtml(h.horse)} (${h.daysSinceWork}d)`);
+      if (stale.length){
+        parts.push(`No recent workout (30+ days since last work): ${stale.join(', ')}`);
+      }
+      const badLast = horses.filter(h => h.lastFinMargin != null && h.lastFinMargin > 10).map(h => `${escHtml(h.horse)} (beaten ${h.lastFinMargin}L)`);
+      if (badLast.length){
+        parts.push(`Beaten big last time out: ${badLast.join(', ')}`);
+      }
+      if (parts.length) paceNote = parts.join(' · ');
+    }
+
+    raceSummaries.push({
+      race: rk, fieldSize: horses.length, overround,
+      topEdgeHorse, topRatedHorse, favorite, hasRatings: totalScore > 0, recommendation, rankedByEdge, paceNote
+    });
+
+    horses.forEach(h => {
+      if (h.edge != null){
+        allPlays.push({race: rk, ...h, racePlayStatus: recommendation.status});
+      }
+    });
+  });
+
+  allPlays.sort((a,b) => b.edge - a.edge);
+  const playablePlays = allPlays.filter(p => p.racePlayStatus === 'play');
+  const bestPlays = playablePlays.slice(0, 10);
+  const passedCount = raceSummaries.filter(rs => rs.hasRatings && rs.recommendation.status !== 'play').length;
+
+  raceSummaries.sort((a,b) => {
+    if (a.hasRatings && b.hasRatings) return (b.topEdgeHorse?.edge||0) - (a.topEdgeHorse?.edge||0);
+    if (a.hasRatings !== b.hasRatings) return a.hasRatings ? -1 : 1;
+    return a.overround - b.overround;
+  });
+
+  // Keep the full per-race field around (unsorted within race) so the
+  // post-position / edge toggle can re-render without recomputing.
+  computedRaces = raceKeys
+    .filter(rk => races[rk].some(h => h.decimalOdds != null))
+    .map(rk => {
+      const horses = races[rk].filter(h => h.decimalOdds != null);
+      const hasRatings = horses.some(h => h.modelProb != null);
+      const overround = horses.reduce((s,h) => s + 1/h.decimalOdds, 0);
+      return {race: rk, horses, hasRatings, overround};
+    })
+    .sort((a,b) => Number(a.race) - Number(b.race));
+
+  renderResults(bestPlays, raceSummaries, passedCount);
+  renderFullField(currentSort);
+  document.getElementById('resultsScoreSection').style.display = 'block';
+});
+
+function renderFullField(sortMode){
+  currentSort = sortMode;
+  document.getElementById('sortByEdgeBtn').classList.toggle('active', sortMode === 'edge');
+  document.getElementById('sortByPostBtn').classList.toggle('active', sortMode === 'post');
+
+  const fieldSection = document.getElementById('fieldSection');
+  const container = document.getElementById('fieldTables');
+  if (!computedRaces.length){
+    fieldSection.style.display = 'none';
+    return;
+  }
+  fieldSection.style.display = 'block';
+
+  container.innerHTML = computedRaces.map(rc => {
+    const horses = rc.horses.slice().sort((a,b) => {
+      if (sortMode === 'post') return (Number(a.post)||99) - (Number(b.post)||99);
+      // edge mode: rank by edge if ratings exist, else by market probability
+      if (rc.hasRatings) return (b.edge ?? -Infinity) - (a.edge ?? -Infinity);
+      return b.marketProb - a.marketProb;
+    });
+    const favPost = horses.reduce((a,b) => (a.decimalOdds != null && (b.decimalOdds == null || a.decimalOdds < b.decimalOdds)) ? a : b).post;
+    const rows = horses.map(h => {
+      const edgeCell = h.edge != null
+        ? `<span class="field-edge ${h.edge>=0?'pos':'neg'}">${h.edge>=0?'+':''}${pct(h.edge)}</span>`
+        : `<span class="field-edge dash">—</span>`;
+      const modelCell = h.modelProb != null ? pct(h.modelProb) : '—';
+      const adjMark = h.adjusted ? ` <span class="fit-mark" title="Rating blended with surface fit, class move, and/or trainer/jockey meet stats">†</span>` : '';
+      const isFav = h.post === favPost;
+      const nameCell = isFav ? `<b>${escHtml(h.horse)}</b>` : escHtml(h.horse);
+      return `
+        <tr>
+          <td><span class="field-badge">${escAttr(h.post || '–')}</span></td>
+          <td class="name">${nameCell}${adjMark}</td>
+          <td>${escAttr(h.oddsStr)}</td>
+          <td>${pct(h.marketProb)}</td>
+          <td>${modelCell}</td>
+          <td>${edgeCell}</td>
+        </tr>`;
+    }).join('');
+    return `
+      <div class="field-race">
+        <div class="field-race-head">
+          <strong>Race ${escAttr(rc.race)}</strong>
+          <span class="race-metric">${horses.length} runners · book ${pct(rc.overround)}${rc.hasRatings ? '' : ' · no ratings supplied'}</span>
+        </div>
+        <table class="field-table">
+          <thead><tr><th>Post</th><th>Horse</th><th>Odds</th><th>Market %</th><th>Model %</th><th>Edge</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  }).join('');
+}
+
+document.getElementById('sortByEdgeBtn').addEventListener('click', () => renderFullField('edge'));
+document.getElementById('sortByPostBtn').addEventListener('click', () => renderFullField('post'));
+
+function pct(x){ return (x*100).toFixed(1) + '%'; }
+
+// Turns the edge ranking into concrete win / exacta / trifecta-box structures.
+// No place or show — those don't get suggested at all. Straight vs. box on the
+// exacta is decided by how wide the gap is between the top two: a clear gap
+// means we trust the order enough to save half the cost on a straight bet;
+// a thin gap means box both ways rather than guess which one crosses first.
+const EXACTA_STRAIGHT_GAP = 0.06;
+function buildBetSuggestion(rs){
+  const ranked = rs.rankedByEdge || [];
+  const status = rs.recommendation.status;
+  if (status === 'pass' || !ranked.length){
+    return `<div class="bet-suggestion bet-none">No confident structure here — sit this race out rather than force a bet into it.</div>`;
+  }
+  const nm = h => `<b>${escHtml(h.horse)}</b> (${escAttr(h.oddsStr)})`;
+  const lines = [];
+
+  if (status === 'play'){
+    const top = ranked[0], second = ranked[1], third = ranked[2];
+    lines.push(`<div class="bet-line"><span class="bet-tag">WIN</span> ${nm(top)}</div>`);
+    if (second){
+      const gap = top.edge - second.edge;
+      if (gap >= EXACTA_STRAIGHT_GAP){
+        lines.push(`<div class="bet-line"><span class="bet-tag">EXACTA</span> ${nm(top)} over ${nm(second)}, straight — clear enough gap (${pct(gap)}) to trust the order.</div>`);
+      } else {
+        lines.push(`<div class="bet-line"><span class="bet-tag">EXACTA</span> box ${nm(top)} / ${nm(second)} — gap is only ${pct(gap)}, not enough to commit to one order.</div>`);
+      }
+    }
+    if (third){
+      lines.push(`<div class="bet-line"><span class="bet-tag">TRIFECTA</span> box ${nm(top)} / ${nm(second)} / ${nm(third)} — 6 combos per unit.</div>`);
+    }
+  } else if (status === 'caution'){
+    const top = ranked[0];
+    const fav = rs.favorite;
+    lines.push(`<div class="bet-line"><span class="bet-tag skip">SKIP WIN</span> the disagreement with the favorite isn't one we'd bet straight on.</div>`);
+    lines.push(`<div class="bet-line"><span class="bet-tag">EXACTA</span> box ${nm(top)} / ${nm(fav)} — covers our pick and the horse the market actually backed.</div>`);
+    const third = ranked.find(h => h.horse !== fav.horse && h.horse !== top.horse);
+    if (third){
+      lines.push(`<div class="bet-line"><span class="bet-tag">TRIFECTA</span> box ${nm(top)} / ${nm(fav)} / ${nm(third)} — 6 combos per unit.</div>`);
+    }
+  }
+  return `<div class="bet-suggestion">${lines.join('')}</div>`;
+}
+
+
+function renderResults(bestPlays, raceSummaries, passedCount){
+  const board = document.getElementById('bestPlaysBoard');
+  const resultsSection = document.getElementById('resultsSection');
+  const racesSection = document.getElementById('racesSection');
+  const racesList = document.getElementById('racesList');
+  const methodology = document.getElementById('methodology');
+
+  resultsSection.style.display = 'block';
+  racesSection.style.display = 'block';
+  methodology.style.display = 'block';
+  methodology.innerHTML = '<strong>Reading the numbers:</strong> "Market %" is the odds-implied win probability after removing the field\'s overround. "Model %" comes from squaring each horse\'s rating before taking its share of the field total — a raw linear share spreads probability too evenly across closely-rated fields, which showed up as a real bias against short-priced favorites across multiple test cards. "Edge" is Model % minus Market %. Races get a PLAY / CAUTION / PASS call based on how strong and separated that edge is — see the race cards below for why. A † next to a horse\'s name means its rating was blended with a surface/distance-specific figure, nudged for a class move (drop/rise), and/or (for Brisnet data-file imports) adjusted for trainer/jockey current-meet win% relative to the field. All of these are starting heuristics validated against a small number of real cards, not fitted to a large sample — expect them to keep getting tuned.';
+
+  if (!raceSummaries.length){
+    const noOddsMsg = '<p style="color:#B9C9BE;font-size:13px;">Nothing to show — none of the entries have usable odds, so no race could be scored at all. This usually means the odds column came in empty (common with data files pulled before morning lines are published) or the odds format wasn\'t recognized. Check the table above and fill in odds, then recompute.</p>';
+    board.innerHTML = noOddsMsg;
+    racesList.innerHTML = '';
+    resultsSection.scrollIntoView({behavior:'smooth', block:'start'});
+    return;
+  }
+
+  const passedNote = passedCount > 0
+    ? `<p style="color:#B9C9BE;font-size:12.5px;margin:0 0 12px;">${passedCount} rated race${passedCount>1?'s':''} recommended a pass or caution — see "Best races" below for why. Only clear plays show here.</p>`
+    : '';
+
+  if (!bestPlays.length){
+    board.innerHTML = passedNote + '<p style="color:#B9C9BE;font-size:13px;">No race cleared the bar for a recommended play right now — either no ratings were supplied, edges were too thin, or the market and model disagreed on the favorite. Check "Best races" below for the reasoning per race.</p>';
+  } else {
+    board.innerHTML = passedNote + bestPlays.map(p => `
+      <div class="play-row">
+        <div class="badge">${escAttr(p.post || '–')}</div>
+        <div>
+          <div class="play-name">${escHtml(p.horse)}</div>
+          <div class="play-sub">RACE ${escAttr(p.race)}</div>
+        </div>
+        <div class="play-odds">${escAttr(p.oddsStr)}</div>
+        <div class="play-model">mkt ${pct(p.marketProb)}<br>mdl ${pct(p.modelProb)}</div>
+        <div class="play-edge ${p.edge >= 0 ? 'pos' : 'neg'}">${p.edge >= 0 ? '+' : ''}${pct(p.edge)}</div>
+      </div>
+    `).join('');
+  }
+
+  racesList.innerHTML = raceSummaries.map(rs => {
+    const bookPct = pct(rs.overround);
+    const rec = rs.recommendation;
+    const badgeClass = rec.status === 'play' ? 'rec-play' : rec.status === 'caution' ? 'rec-caution' : 'rec-pass';
+    const badgeLabel = rec.status.toUpperCase();
+    let pickLine = '';
+    let topRatedLine = '';
+    if (rs.hasRatings && rs.topEdgeHorse){
+      pickLine = `<div class="race-pick">Top edge: <b>${escHtml(rs.topEdgeHorse.horse)}</b> at ${escAttr(rs.topEdgeHorse.oddsStr)} (${rs.topEdgeHorse.edge>=0?'+':''}${pct(rs.topEdgeHorse.edge)} edge) — market favorite is <b>${escHtml(rs.favorite.horse)}</b> at ${escAttr(rs.favorite.oddsStr)}.</div>`;
+      if (rs.topRatedHorse && rs.topRatedHorse.horse !== rs.topEdgeHorse.horse){
+        topRatedLine = `<div class="race-pick" style="color:var(--ink-soft);">Highest-rated in the field: <b>${escHtml(rs.topRatedHorse.horse)}</b> at ${escAttr(rs.topRatedHorse.oddsStr)} (${rs.topRatedHorse.edge>=0?'+':''}${pct(rs.topRatedHorse.edge)} edge) — no market-relative value at this price, but it's the field's top rating regardless.</div>`;
+      }
+    } else {
+      pickLine = `<div class="race-pick">No ratings supplied for this race — favorite by odds is <b>${escHtml(rs.favorite.horse)}</b> at ${escAttr(rs.favorite.oddsStr)}.</div>`;
+    }
+    const betSuggestion = rs.hasRatings ? buildBetSuggestion(rs) : '';
+    const paceLine = rs.paceNote ? `<div class="pace-note">${rs.paceNote}</div>` : '';
+    return `
+      <div class="race-card">
+        <div class="race-card-top">
+          <strong>Race ${escAttr(rs.race)}</strong>
+          <span class="rec-badge ${badgeClass}">${badgeLabel}</span>
+          <span class="race-metric">${rs.fieldSize} runners · book ${bookPct}</span>
+        </div>
+        ${pickLine}
+        ${topRatedLine}
+        <div class="race-reason">${rec.reason}</div>
+        ${paceLine}
+        ${betSuggestion}
+      </div>
+    `;
+  }).join('');
+
+  resultsSection.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function escHtml(s){
+  return String(s==null?'':s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+}
+
+/* ---------------- RESULTS SCORING ---------------- */
+function parseResultsText(text){
+  const ordinals = {FIRST:1,SECOND:2,THIRD:3,FOURTH:4,FIFTH:5,SIXTH:6,SEVENTH:7,EIGHTH:8,NINTH:9,TENTH:10,
+    ELEVENTH:11,TWELFTH:12};
+  const headRe = /\b(FIRST|SECOND|THIRD|FOURTH|FIFTH|SIXTH|SEVENTH|EIGHTH|NINTH|TENTH|ELEVENTH|TWELFTH)\s+RACE\b/g;
+  const marks = [];
+  let m;
+  while ((m = headRe.exec(text)) !== null) marks.push({race: ordinals[m[1]], index: m.index});
+  if (!marks.length) return {};
+  const blocks = marks.map((mk,i) => ({
+    race: mk.race,
+    text: text.slice(mk.index, i+1 < marks.length ? marks[i+1].index : text.length)
+  }));
+  // Matches lines like: " 2- EOS HEY BUCKO . . . . . . . . . 4.40 2.80 2.20"
+  const lineRe = /^\s*(\d{1,2})-\s*([A-Z0-9' \-]+?)\s*(?:\.\s?){2,}\s*([\d.\s]+?)\s*$/;
+  const results = {};
+  blocks.forEach(b => {
+    const lines = b.text.split(/\r?\n/);
+    const finishers = [];
+    for (const line of lines){
+      if (finishers.length >= 3) break;
+      const lm = line.match(lineRe);
+      if (!lm) continue;
+      const nums = lm[3].trim().split(/\s+/).filter(Boolean).map(Number);
+      const idx = finishers.length;
+      const entry = {post: lm[1], name: lm[2].trim()};
+      if (idx === 0){ entry.finish = 'win'; entry.win = nums[0]; entry.place = nums[1]; entry.show = nums[2]; }
+      else if (idx === 1){ entry.finish = 'place'; entry.place = nums[0]; entry.show = nums[1]; }
+      else { entry.finish = 'show'; entry.show = nums[0]; }
+      finishers.push(entry);
+    }
+    if (finishers.length) results[b.race] = finishers;
+  });
+  return results;
+}
+
+function normName(s){
+  return String(s||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+}
+
+document.getElementById('scoreResultsBtn').addEventListener('click', () => {
+  const statusEl = document.getElementById('resultsStatus');
+  const text = document.getElementById('resultsPaste').value;
+  if (!text.trim()){
+    statusEl.textContent = 'Paste a results chart first.';
+    statusEl.className = 'status err';
+    return;
+  }
+  if (!computedRaces.length){
+    statusEl.textContent = 'Compute value first (step 2) so there are picks to score.';
+    statusEl.className = 'status err';
+    return;
+  }
+  const results = parseResultsText(text);
+  const raceNumsFound = Object.keys(results);
+  if (!raceNumsFound.length){
+    statusEl.textContent = 'Could not find any recognizable "$2 Mutuel Prices" lines in that text. Check the format and try again.';
+    statusEl.className = 'status err';
+    return;
+  }
+
+  const scored = [];
+  computedRaces.forEach(rc => {
+    const res = results[rc.race];
+    if (!res) return; // no result pasted for this race
+    // Top pick = highest edge if rated, else market favorite.
+    const horses = rc.horses.slice().sort((a,b) => rc.hasRatings ? (b.edge ?? -Infinity) - (a.edge ?? -Infinity) : b.marketProb - a.marketProb);
+    const pick = horses[0];
+    if (!pick) return;
+    const pickKey = normName(pick.horse);
+    const win = res.find(r => normName(r.name) === pickKey && r.finish === 'win');
+    const place = res.find(r => normName(r.name) === pickKey && r.finish === 'place');
+    const show = res.find(r => normName(r.name) === pickKey && r.finish === 'show');
+    let outcome, payout = 0;
+    if (win){ outcome = 'win'; payout = win.win; }
+    else if (place){ outcome = 'place'; payout = 0; }
+    else if (show){ outcome = 'show'; payout = 0; }
+    else { outcome = 'miss'; payout = 0; }
+    scored.push({
+      race: rc.race, horse: pick.horse, oddsStr: pick.oddsStr, edge: pick.edge,
+      hasRatings: rc.hasRatings, outcome, payout
+    });
+  });
+
+  if (!scored.length){
+    statusEl.textContent = 'None of the races in your pasted text matched a race you computed picks for.';
+    statusEl.className = 'status err';
+    return;
+  }
+
+  statusEl.textContent = `Scored ${scored.length} race(s) against the pasted results.`;
+  statusEl.className = 'status ok';
+  renderScoreboard(scored);
+});
+
+function renderScoreboard(scored){
+  const wins = scored.filter(s => s.outcome === 'win').length;
+  const itm = scored.filter(s => s.outcome === 'win' || s.outcome === 'place' || s.outcome === 'show').length;
+  const staked = scored.length * 2;
+  const returned = scored.reduce((s,x) => s + (x.outcome === 'win' ? x.payout : 0), 0);
+  const roi = staked > 0 ? ((returned - staked) / staked) * 100 : 0;
+
+  const board = document.getElementById('scoreboard');
+  board.innerHTML = `
+    <div class="score-summary">
+      <div class="score-stat"><div class="num">${scored.length}</div><div class="lbl">Races scored</div></div>
+      <div class="score-stat"><div class="num">${wins}/${scored.length}</div><div class="lbl">Top pick won</div></div>
+      <div class="score-stat"><div class="num">${itm}/${scored.length}</div><div class="lbl">Top pick hit board</div></div>
+      <div class="score-stat"><div class="num ${roi>=0?'roi-pos':'roi-neg'}">${roi>=0?'+':''}${roi.toFixed(1)}%</div><div class="lbl">ROI, $2 to win</div></div>
+    </div>
+    ${scored.map(s => {
+      const tag = s.outcome === 'win' ? `<span class="score-tag win">Won · $${s.payout.toFixed(2)}</span>`
+        : s.outcome === 'place' ? `<span class="score-tag place">Placed</span>`
+        : s.outcome === 'show' ? `<span class="score-tag show">Showed</span>`
+        : `<span class="score-tag miss">Unplaced or worse</span>`;
+      const edgeStr = s.hasRatings && s.edge != null ? ` · edge ${s.edge>=0?'+':''}${pct(s.edge)}` : ' · market favorite (no ratings)';
+      return `<div class="score-row">
+        <div class="sr-left">Race ${escAttr(s.race)}: <b>${escHtml(s.horse)}</b> (${escAttr(s.oddsStr)})${edgeStr}</div>
+        ${tag}
+      </div>`;
+    }).join('')}
+    <p style="font-size:12px;color:var(--ink-soft);margin-top:10px;">"Placed" and "showed" count toward the hit-board rate but not ROI, since a $2 win bet on a horse that ran 2nd or 3rd returns $0 — swap in place/show betting if that's your actual strategy and re-read these by hand.</p>
+  `;
+}
+
+renderRows();
+</script>
+</body>
+</html>
