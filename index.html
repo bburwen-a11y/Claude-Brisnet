@@ -2769,7 +2769,14 @@ function pickFor(rs){
   // the record was scored that way. byMarket re-sorts on whichever odds column
   // is active, so once final odds are entered it would silently start picking a
   // different horse and filter B could never fail. Select on the morning line.
-  const mlOf = x => parseOdds(x.odds);
+  // BUG FIX 2026-08-28: this read x.odds, which does not exist on the real
+  // horse objects — the pipeline stores the morning line as mlOddsStr. That
+  // made mlOf() return null for every horse, emptied `priced`, left fav null,
+  // and the null dereference below threw before the pick list ever rendered
+  // — the whole Picks tab went blank. My own test script masked this because
+  // it hand-built horses with a field literally named `odds`; the real
+  // pipeline never has one. Caught on today's live card (SAR 8/28).
+  const mlOf = x => parseOdds(x.mlOddsStr);
   const priced = (rs.horses || []).filter(x => mlOf(x) != null);
   const fav = priced.length ? priced.reduce((a, b) => (mlOf(b) < mlOf(a) ? b : a)) : null;
   const el = earningsLeader(horses);
@@ -2821,7 +2828,14 @@ function pickFor(rs){
   // (fires only when it FAILS the filters) is exactly what a slicing artifact
   // looks like, and it is flagged as such on the card.
   const ML_MAX = 2.5;
-  const mlDec = parseOdds(fav.odds);                      // decimal
+  // Same class of bug as mlOf() above, same date, found by running the actual
+  // browser handlers end-to-end rather than a hand-built test object — the
+  // first fix only covered mlOf; this line made the identical mistake one
+  // scope down, so filter A (mlOK) was silently false for every horse and
+  // every rank-1 case fell through to "suppressed" while rank-2 cases fired
+  // as price plays regardless of their real price. SAR 8/28 showed 3 price
+  // plays and zero primaries where 3 primaries were expected.
+  const mlDec = parseOdds(fav.mlOddsStr);                 // decimal
   const mlPrice = mlDec == null ? null : mlDec - 1;       // "to one", what 2.5 means
   const mlOK = mlPrice != null && mlPrice <= ML_MAX;
   // The market check needs real final odds. Before they are entered the pick IS
@@ -2837,7 +2851,7 @@ function pickFor(rs){
     const second = el.ranked.find(r => r.eps < favEps);
     if (filtersPass) return Object.assign({line: 'primary', tier: 1, second, nearTie: false}, base);
     const why = [];
-    if (!mlOK) why.push(`its morning line is ${escHtml(fav.odds)} — above 2.5, and those went 3-for-14`);
+    if (!mlOK) why.push(`its morning line is ${escHtml(fav.oddsStr)} — above 2.5, and those went 3-for-14`);
     if (stillFav === false) why.push('the money has moved to another horse, and those went 8-for-31');
     return {none: `<b>${escHtml(fav.horse)}</b> is the earnings leader and the market's choice, but ${why.join(', and ')}. That combination went 2-for-18 across 97 picks. No pick.`};
   }
@@ -3850,6 +3864,6 @@ document.getElementById('downloadReportBtn').addEventListener('click', saveRepor
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board · build 2026-08-28-b</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board · build 2026-08-28-d</div>
 </body>
 </html>
