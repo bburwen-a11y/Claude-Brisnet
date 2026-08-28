@@ -186,7 +186,7 @@
 let rows = [];
 let computedRaces = [];
 
-/* --- RESTORED EQUIBASE RSS SCRATCH PARSER LOGIC --- */
+/* --- EQUIBASE RSS SCRATCH PARSER LOGIC --- */
 document.getElementById('rssInput').addEventListener('change', e => {
   const file = e.target.files[0];
   if (!file) return;
@@ -234,10 +234,10 @@ function processRssText(xmlText){
       const scratchMatch = content.match(/Race\s*([0-9]+).*?#\s*([0-9]+)/i) || content.match(/Scratch.*?:?\s*#?([0-9]+)/i);
 
       if (scratchMatch){
-        const raceNum = scratchMatch[1];
-        const postNum = scratchMatch[2];
+        const raceNum = String(scratchMatch[1]);
+        const postNum = String(scratchMatch[2]);
 
-        const target = rows.find(r => r.race === raceNum && r.post === postNum);
+        const target = rows.find(r => String(r.race) === raceNum && String(r.post) === postNum);
         if (target){
           target.scratched = true;
           scratchCount++;
@@ -261,7 +261,7 @@ function processRssText(xmlText){
   }
 }
 
-/* --- BRISNET DRF/CSV PARSER LOGIC --- */
+/* --- FIXED BRISNET DRF/CSV PARSER LOGIC --- */
 document.getElementById('brisnetInput').addEventListener('change', function(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -281,24 +281,41 @@ function parseBrisnetFile(contents) {
 
   lines.forEach(line => {
     if (!line.trim()) return;
-    const fields = line.split(/,(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)/).map(f => f.replace(/^"|"$/g, '').trim());
+    
+    // Split CSV while respecting quoted strings
+    const fields = line.split(/,(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)/)
+                        .map(f => f.replace(/^"|"$/g, '').trim());
 
-    if (fields.length >= 10) {
-      const race = fields[2] || fields[0];
-      const post = fields[3] || fields[1];
-      const horse = fields[9] || fields[2] || "Unknown Horse";
-      const odds = fields[24] || fields[10] || "5/1";
+    if (fields.length >= 3) {
+      // Race Number mapping fallback
+      const race = String(fields[2] || fields[0] || "1");
       
-      let score = "100";
-      for (let i = 11; i < fields.length; i++) {
-        if (!isNaN(parseFloat(fields[i])) && parseFloat(fields[i]) > 50 && parseFloat(fields[i]) < 160) {
-          score = fields[i];
-          break;
+      // Post Position mapping fallback
+      const post = String(fields[3] || fields[1] || "1");
+      
+      // Horse Name mapping (Index 9 for standard single-data, index 2, or index 1)
+      let horse = fields[9] || fields[2] || fields[1] || "";
+      horse = horse.replace(/[^a-zA-Z0-9\s'.-]/g, '').trim();
+
+      // Morning Line Odds mapping
+      let odds = fields[24] || fields[26] || fields[10] || "5/1";
+      if (!odds || odds === "0" || odds === "0/0") odds = "5/1";
+
+      // Speed / Prime Power Rating mapping
+      let score = fields[115] || fields[126] || "100";
+      if (isNaN(parseFloat(score)) || parseFloat(score) <= 0) {
+        score = "100";
+        for (let i = 10; i < fields.length; i++) {
+          const val = parseFloat(fields[i]);
+          if (!isNaN(val) && val >= 50 && val <= 165) {
+            score = String(val);
+            break;
+          }
         }
       }
 
-      if (race && horse) {
-        newRows.push({ race: String(race), post: String(post), horse, odds, score, scratched: false });
+      if (horse && horse.length > 0) {
+        newRows.push({ race, post, horse, odds: String(odds), score: String(score), scratched: false });
         parsedCount++;
       }
     }
@@ -306,11 +323,11 @@ function parseBrisnetFile(contents) {
 
   if (parsedCount > 0) {
     rows = newRows;
-    statusEl.textContent = `Successfully imported ${parsedCount} entries from Brisnet file!`;
+    statusEl.textContent = `Successfully imported ${parsedCount} horses!`;
     statusEl.className = 'status ok';
     computeCard();
   } else {
-    statusEl.textContent = 'Could not read Brisnet structure. Verify DRF/CSV format.';
+    statusEl.textContent = 'Could not read horse names. Check CSV column layout.';
     statusEl.className = 'status err';
   }
 }
