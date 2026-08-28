@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Overlay Board Report & Handicapping Tool</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+<style>
+  :root {
+    --bg-color: #0f172a;
+    --card-bg: #1e293b;
+    --accent-color: #3b82f6;
+    --accent-hover: #2563eb;
+    --text-main: #f8fafc;
+    --text-muted: #94a3b8;
+    --border-color: #334155;
+    --green: #22c55e;
+    --red: #ef4444;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg-color);
+    color: var(--text-main);
+    margin: 0;
+    padding: 20px;
+  }
+  .container { max-width: 1200px; margin: 0 auto; }
+  h1, h2, h3 { color: var(--text-main); }
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; }
+  button, label.btn-file {
+    background: var(--accent-color);
+    color: #fff;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+    display: inline-block;
+  }
+  button:hover, label.btn-file:hover { background: var(--accent-hover); }
+  input[type="file"] { display: none; }
+  textarea, input[type="text"], input[type="number"], select {
+    width: 100%;
+    background: #0f172a;
+    border: 1px solid var(--border-color);
+    color: #fff;
+    padding: 8px;
+    border-radius: 4px;
+    box-sizing: border-box;
+    margin-bottom: 10px;
+  }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  th, td { border: 1px solid var(--border-color); padding: 8px; text-align: left; }
+  th { background: #0f172a; }
+  .status { font-size: 0.9em; margin-top: 5px; }
+  .status.ok { color: var(--green); }
+  .status.err { color: var(--red); }
+  .tabbar { display: flex; gap: 10px; border-bottom: 2px solid var(--border-color); padding-bottom: 10px; margin-bottom: 20px; }
+  .tabbar button { background: transparent; color: var(--text-muted); border: 1px solid var(--border-color); }
+  .tabbar button.on { background: var(--accent-color); color: #fff; border-color: var(--accent-color); }
+  .field-edge.pos { color: var(--green); font-weight: bold; }
+  .field-edge.neg { color: var(--red); }
+  body.clean .diag-col, body.clean .raw-col { display: none; }
+  .ticket-box { background: #0f172a; border: 1px dashed var(--accent-color); padding: 15px; font-family: monospace; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Overlay Board Report & Handicapping Suite</h1>
+
+  <!-- Inputs Section -->
+  <div class="card">
+    <h2>1. Data Import & Input</h2>
+    <div class="grid">
+      <div>
+        <h3>Import Program PDF / Text</h3>
+        <label class="btn-file">Choose PDF File <input type="file" id="pdfInput" accept="application/pdf"></label>
+        <div id="pdfStatus" class="status"></div>
+        <textarea id="pdfPasteText" rows="3" placeholder="Or paste program text here..."></textarea>
+        <button id="extractPasteBtn">Parse Text</button>
+        <div id="pdfPasteStatus" class="status"></div>
+      </div>
+      <div>
+        <h3>Equibase Scratches RSS XML</h3>
+        <label class="btn-file">Choose RSS XML <input type="file" id="rssInput" accept=".xml,.rss"></label>
+        <textarea id="rssPaste" rows="3" placeholder="Or paste RSS XML content..."></textarea>
+        <button id="applyRssBtn">Apply Scratches</button>
+        <div id="rssStatus" class="status"></div>
+        <div id="rssReport"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Computation & Storage Controls -->
+  <div class="card">
+    <button id="computeBtn" style="font-size: 1.1em; padding: 10px 20px;">Compute Card Edges</button>
+    <button id="saveLocalBtn" style="background:#059669;">Save Session</button>
+    <button id="loadLocalBtn" style="background:#0891b2;">Load Session</button>
+    <button id="clearLocalBtn" style="background:#dc2626;">Clear All</button>
+    <span id="storageStatus" class="status"></span>
+  </div>
+
+  <!-- UI Toggles & Navigation -->
+  <div id="tabbar" class="tabbar">
+    <button data-tab="field" class="on">Field View & Edges</button>
+    <button data-tab="cards">Race Cards</button>
+    <button data-tab="exotics">Exotics Builder</button>
+  </div>
+
+  <!-- Field View & Edges Section -->
+  <div id="fieldSection">
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h2>Field Analysis & Edge Calculation</h2>
+        <div>
+          <label><input type="checkbox" id="cleanToggle"> Clean View</label>
+          <label><input type="checkbox" id="diagToggle"> Diagnostic Mode</label>
+        </div>
+      </div>
+      <div id="fieldTables"></div>
+    </div>
+  </div>
+
+  <!-- Race Cards Section -->
+  <div id="resultsSection" style="display:none;">
+    <div class="card">
+      <h2>Race Cards Summary</h2>
+      <div id="raceNav"></div>
+      <div id="raceCardList"></div>
+    </div>
+  </div>
+
+  <!-- Exotics Ticket Builder Section -->
+  <div id="exoticsSection" style="display:none;">
+    <div class="card">
+      <h2>Exotic Wager Ticket Builder</h2>
+      <div class="grid">
+        <div>
+          <label>Wager Type:</label>
+          <select id="wagerType">
+            <option value="EXACTA">Exacta Box / Key</option>
+            <option value="TRIFECTA">Trifecta Box / Key</option>
+            <option value="PICK4">Pick 4 Ticket</option>
+          </select>
+          <label>Base Bet ($):</label>
+          <input type="number" id="baseBet" value="1.00" step="0.50">
+          <button id="generateTicketBtn">Generate Ticket</button>
+        </div>
+        <div>
+          <h3>Generated Wagering Structure</h3>
+          <div id="ticketOutput" class="ticket-box">Select parameters and click 'Generate Ticket'</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+let rows = [];
+let computedRaces = [];
+
+/* --- Data Storage Helper Functions --- */
+function saveState() {
+  localStorage.setItem('overlay_rows', JSON.stringify(rows));
+  const status = document.getElementById('storageStatus');
+  status.textContent = 'Session saved locally!';
+  status.className = 'status ok';
+}
+
+function loadState() {
+  const data = localStorage.getItem('overlay_rows');
+  const status = document.getElementById('storageStatus');
+  if (data) {
+    rows = JSON.parse(data);
+    status.textContent = `Loaded ${rows.length} horses from storage.`;
+    status.className = 'status ok';
+    computeCard();
+  } else {
+    status.textContent = 'No saved data found.';
+    status.className = 'status err';
+  }
+}
+
+document.getElementById('saveLocalBtn').addEventListener('click', saveState);
+document.getElementById('loadLocalBtn').addEventListener('click', loadState);
+document.getElementById('clearLocalBtn').addEventListener('click', () => {
+  localStorage.removeItem('overlay_rows');
+  rows = [];
+  computedRaces = [];
+  document.getElementById('fieldTables').innerHTML = '';
+  document.getElementById('storageStatus').textContent = 'Cleared all saved data.';
+  document.getElementById('storageStatus').className = 'status ok';
+});
+
+/* --- Extracted PDF & Text Handling --- */
+function parseProgramText(text) {
+  const results = [];
+  const lines = text.split(/\r\n|\n|\r/);
+  let currentRace = '1';
+  const horseLineRegex = /^\s*([0-9]{1,2})\s+([A-Za-z0-9'\s\.\-]+?)\s+([0-9]{1,2}[\/-][0-9]{1,2}|[0-9]{1,2})\s+([0-9]{2,3}\.[0-9])?/;
+
+  lines.forEach(line => {
+    const raceMatch = line.match(/RACE\s*([0-9]{1,2})/i);
+    if (raceMatch) currentRace = raceMatch[1];
+    const horseMatch = line.match(horseLineRegex);
+    if (horseMatch) {
+      results.push({
+        race: currentRace,
+        post: horseMatch[1],
+        horse: horseMatch[2].trim(),
+        odds: horseMatch[3].replace('-', '/'),
+        score: horseMatch[4] || '100',
+        scratched: false
+      });
+    }
+  });
+  return results;
+}
+
+document.getElementById('extractPasteBtn').addEventListener('click', () => {
+  const text = document.getElementById('pdfPasteText').value;
+  if (!text.trim()) return;
+  rows = parseProgramText(text);
+  computeCard();
+});
+
+/* --- Calculation Engine --- */
+function parseOdds(str) {
+  if (!str) return 10;
+  if (str.includes('/')) {
+    const p = str.split('/');
+    return parseFloat(p[0]) / parseFloat(p[1]);
+  }
+  return parseFloat(str) || 10;
+}
+
+function computeCard() {
+  const races = {};
+  rows.filter(r => !r.scratched).forEach(r => {
+    (races[r.race] = races[r.race] || []).push(r);
+  });
+
+  computedRaces = [];
+  Object.entries(races).forEach(([raceNum, horseList]) => {
+    let totalRawProb = 0;
+    let totalRating = 0;
+
+    const horses = horseList.map(h => {
+      const decOdds = parseOdds(h.odds);
+      const rawProb = 1 / (decOdds + 1);
+      totalRawProb += rawProb;
+      const validRating = parseFloat(h.score) || 0;
+      totalRating += validRating;
+      return { ...h, usedOdds: decOdds, rawProb, validRating };
+    });
+
+    horses.forEach(h => {
+      h.mktProb = h.rawProb / totalRawProb;
+      h.ratingProb = totalRating > 0 ? (h.validRating / totalRating) : h.mktProb;
+      h.edge = h.ratingProb - h.mktProb;
+    });
+
+    computedRaces.push({ raceNum, horses });
+  });
+
+  renderFieldTables();
+  renderRaceCards();
+}
+
+document.getElementById('computeBtn').addEventListener('click', computeCard);
+
+/* --- UI Rendering --- */
+function renderFieldTables() {
+  const container = document.getElementById('fieldTables');
+  container.innerHTML = '';
+  computedRaces.forEach(r => {
+    let rowsHtml = '';
+    r.horses.sort((a,b) => b.edge - a.edge).forEach(h => {
+      const edgePct = (h.edge * 100).toFixed(1);
+      const edgeClass = h.edge > 0 ? 'pos' : 'neg';
+      rowsHtml += `<tr>
+        <td>#${h.post}</td>
+        <td>${h.horse}</td>
+        <td>${h.usedOdds.toFixed(2)}/1</td>
+        <td class="diag-col">${(h.mktProb*100).toFixed(1)}%</td>
+        <td class="raw-col">${h.validRating}</td>
+        <td><span class="field-edge ${edgeClass}">${edgePct}%</span></td>
+      </tr>`;
+    });
+    container.innerHTML += `<h3>Race ${r.raceNum}</h3>
+      <table><thead><tr><th>Post</th><th>Horse</th><th>Odds</th><th class="diag-col">Mkt %</th><th class="raw-col">Score</th><th>Edge</th></tr></thead>
+      <tbody>${rowsHtml}</tbody></table>`;
+  });
+}
+
+function renderRaceCards() {
+  const container = document.getElementById('raceCardList');
+  container.innerHTML = '';
+  computedRaces.forEach(r => {
+    let html = `<div class="card"><h3>Race ${r.raceNum} Top Edges</h3>`;
+    r.horses.slice(0, 3).forEach(h => {
+      html += `<div>#${h.post} ${h.horse} - Edge: ${(h.edge*100).toFixed(1)}%</div>`;
+    });
+    container.innerHTML += html + `</div>`;
+  });
+}
+
+/* --- Exotics Ticket Builder --- */
+document.getElementById('generateTicketBtn').addEventListener('click', () => {
+  const type = document.getElementById('wagerType').value;
+  const base = parseFloat(document.getElementById('baseBet').value) || 1.0;
+  const out = document.getElementById('ticketOutput');
+
+  if (!computedRaces.length) {
+    out.textContent = "Please import and compute race data first.";
+    return;
+  }
+
+  let ticketText = `=== EXOTIC WAGERING TICKET ===\nType: ${type}\nBase Bet: $${base.toFixed(2)}\n------------------------------\n`;
+
+  if (type === 'EXACTA') {
+    computedRaces.forEach(r => {
+      const sorted = [...r.horses].sort((a,b) => b.edge - a.edge);
+      if (sorted.length >= 2) {
+        const key = sorted[0].post;
+        const withHorses = sorted.slice(1, 4).map(h => h.post).join(',');
+        ticketText += `R${r.raceNum} Exacta Key: #${key} WITH #${withHorses}\n`;
+      }
+    });
+  } else if (type === 'TRIFECTA') {
+    computedRaces.forEach(r => {
+      const sorted = [...r.horses].sort((a,b) => b.edge - a.edge);
+      if (sorted.length >= 3) {
+        const top3 = sorted.slice(0, 3).map(h => h.post).join(',');
+        ticketText += `R${r.raceNum} Trifecta Box: #${top3}\n`;
+      }
+    });
+  } else if (type === 'PICK4') {
+    ticketText += "Pick 4 Ticket (Top Edge per Race):\n";
+    computedRaces.slice(0, 4).forEach(r => {
+      const sorted = [...r.horses].sort((a,b) => b.edge - a.edge);
+      const picks = sorted.slice(0, 2).map(h => h.post).join(',');
+      ticketText += `R${r.raceNum}: [${picks}] `;
+    });
+    ticketText += `\n`;
+  }
+
+  out.textContent = ticketText;
+});
+
+/* --- Tab Switching & View Toggles --- */
+document.querySelectorAll('#tabbar button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#tabbar button').forEach(b => b.classList.remove('on'));
+    btn.classList.add('on');
+    const tab = btn.dataset.tab;
+    document.getElementById('fieldSection').style.display = tab === 'field' ? 'block' : 'none';
+    document.getElementById('resultsSection').style.display = tab === 'cards' ? 'block' : 'none';
+    document.getElementById('exoticsSection').style.display = tab === 'exotics' ? 'block' : 'none';
+  });
+});
+
+document.getElementById('cleanToggle').addEventListener('change', e => {
+  document.body.classList.toggle('clean', e.target.checked);
+});
+</script>
+</body>
+</html>
