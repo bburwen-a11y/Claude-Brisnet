@@ -33,7 +33,7 @@
     padding: 20px;
     margin-bottom: 20px;
   }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; }
   button, label.btn-file {
     background: var(--accent-color);
     color: #fff;
@@ -77,23 +77,27 @@
 
   <!-- Inputs Section -->
   <div class="card">
-    <h2>1. Program & Scratches Import</h2>
+    <h2>1. Data Imports (Brisnet DRF/CSV, PDF & Scratches)</h2>
     <div class="grid">
+      <!-- NEW BRISNET FILE UPLOADER -->
+      <div>
+        <h3>Import Brisnet (.DRF / .CSV)</h3>
+        <label class="btn-file">Choose Brisnet File <input type="file" id="brisnetInput" accept=".drf,.csv,.txt"></label>
+        <div id="brisnetStatus" class="status">Upload a Brisnet single/multi file format.</div>
+      </div>
       <div>
         <h3>Import Program PDF / Text</h3>
         <label class="btn-file">Choose PDF File <input type="file" id="pdfInput" accept="application/pdf"></label>
         <div id="pdfStatus" class="status"></div>
-        <textarea id="pdfPasteText" rows="3" placeholder="Or paste program text (e.g., 1 HorseName 5/2 115.4)..."></textarea>
+        <textarea id="pdfPasteText" rows="2" placeholder="Or paste program text..."></textarea>
         <button id="extractPasteBtn">Parse Text</button>
-        <div id="pdfPasteStatus" class="status"></div>
       </div>
       <div>
         <h3>Equibase Scratches RSS XML</h3>
         <label class="btn-file">Choose RSS XML <input type="file" id="rssInput" accept=".xml,.rss"></label>
-        <textarea id="rssPaste" rows="3" placeholder="Or paste RSS XML content..."></textarea>
+        <textarea id="rssPaste" rows="2" placeholder="Or paste RSS XML..."></textarea>
         <button id="applyRssBtn">Apply Scratches</button>
         <div id="rssStatus" class="status"></div>
-        <div id="rssReport"></div>
       </div>
     </div>
   </div>
@@ -181,6 +185,66 @@
 let rows = [];
 let computedRaces = [];
 
+/* --- BRISNET DRF/CSV PARSER LOGIC --- */
+document.getElementById('brisnetInput').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    const text = evt.target.result;
+    parseBrisnetFile(text);
+  };
+  reader.readAsText(file);
+});
+
+function parseBrisnetFile(contents) {
+  const statusEl = document.getElementById('brisnetStatus');
+  const lines = contents.split(/\r\n|\n|\r/);
+  let parsedCount = 0;
+  const newRows = [];
+
+  lines.forEach(line => {
+    if (!line.trim()) return;
+    
+    // Parse CSV line handling quotes
+    const fields = line.split(/,(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)/).map(f => f.replace(/^"|"$/g, '').trim());
+
+    // Standard Brisnet Single/Multi DRF files feature:
+    // Field 1: Track, Field 2: Date, Field 3: Race Number, Field 4: Post Position, Field 10: Horse Name, Field 25: Morning Line Odds
+    if (fields.length >= 10) {
+      const race = fields[2] || fields[0]; // Race Number
+      const post = fields[3] || fields[1]; // Post Position
+      const horse = fields[9] || fields[2] || "Unknown Horse"; // Horse Name
+      const odds = fields[24] || fields[10] || "5/1"; // Morning Line Odds
+      
+      // Look for Prime Power or Speed rating columns if available, default to 100
+      let score = "100";
+      for (let i = 11; i < fields.length; i++) {
+        if (!isNaN(parseFloat(fields[i])) && parseFloat(fields[i]) > 50 && parseFloat(fields[i]) < 160) {
+          score = fields[i];
+          break;
+        }
+      }
+
+      if (race && horse) {
+        newRows.push({ race, post, horse, odds, score, scratched: false });
+        parsedCount++;
+      }
+    }
+  });
+
+  if (parsedCount > 0) {
+    rows = newRows;
+    statusEl.textContent = `Successfully imported ${parsedCount} entries from Brisnet file!`;
+    statusEl.className = 'status ok';
+    computeCard();
+  } else {
+    statusEl.textContent = 'Could not read Brisnet structure. Verify DRF/CSV format.';
+    statusEl.className = 'status err';
+  }
+}
+
 /* --- Data Persistence --- */
 function saveState() {
   localStorage.setItem('overlay_rows', JSON.stringify(rows));
@@ -214,42 +278,10 @@ document.getElementById('clearLocalBtn').addEventListener('click', () => {
   document.getElementById('storageStatus').className = 'status ok';
 });
 
-/* --- Parsing Program Text --- */
-function parseProgramText(text) {
-  const results = [];
-  const lines = text.split(/\r\n|\n|\r/);
-  let currentRace = '1';
-  const horseLineRegex = /^\s*([0-9]{1,2})\s+([A-Za-z0-9'\s\.\-]+?)\s+([0-9]{1,2}[\/-][0-9]{1,2}|[0-9]{1,2})\s+([0-9]{2,3}\.[0-9])?/;
-
-  lines.forEach(line => {
-    const raceMatch = line.match(/RACE\s*([0-9]{1,2})/i);
-    if (raceMatch) currentRace = raceMatch[1];
-    const horseMatch = line.match(horseLineRegex);
-    if (horseMatch) {
-      results.push({
-        race: currentRace,
-        post: horseMatch[1],
-        horse: horseMatch[2].trim(),
-        odds: horseMatch[3].replace('-', '/'),
-        score: horseMatch[4] || '100',
-        scratched: false
-      });
-    }
-  });
-  return results;
-}
-
-document.getElementById('extractPasteBtn').addEventListener('click', () => {
-  const text = document.getElementById('pdfPasteText').value;
-  if (!text.trim()) return;
-  rows = parseProgramText(text);
-  computeCard();
-});
-
 /* --- Mathematical Edge Engine --- */
 function parseOdds(str) {
   if (!str) return 10;
-  if (str.includes('/')) {
+  if (String(str).includes('/')) {
     const p = str.split('/');
     return parseFloat(p[0]) / parseFloat(p[1]);
   }
@@ -281,8 +313,6 @@ function computeCard() {
       h.ratingProb = totalRating > 0 ? (h.validRating / totalRating) : h.mktProb;
       h.edge = h.ratingProb - h.mktProb;
       
-      // Full Kelly Formula: f* = (bp - q) / b
-      // b = decimal odds, p = model probability, q = 1 - p
       const b = h.usedOdds;
       const p = h.ratingProb;
       const q = 1 - p;
