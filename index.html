@@ -69,6 +69,7 @@
   .field-edge.neg { color: var(--red); }
   body.clean .diag-col, body.clean .raw-col { display: none; }
   .ticket-box { background: #0f172a; border: 1px dashed var(--accent-color); padding: 15px; font-family: monospace; white-space: pre-wrap; line-height: 1.5; }
+  .rss-info { background: #0284c7; color: #fff; padding: 10px; border-radius: 4px; margin-top: 10px; font-size: 0.9em; }
 </style>
 </head>
 <body>
@@ -79,7 +80,6 @@
   <div class="card">
     <h2>1. Data Imports (Brisnet DRF/CSV, PDF & Scratches)</h2>
     <div class="grid">
-      <!-- NEW BRISNET FILE UPLOADER -->
       <div>
         <h3>Import Brisnet (.DRF / .CSV)</h3>
         <label class="btn-file">Choose Brisnet File <input type="file" id="brisnetInput" accept=".drf,.csv,.txt"></label>
@@ -95,9 +95,10 @@
       <div>
         <h3>Equibase Scratches RSS XML</h3>
         <label class="btn-file">Choose RSS XML <input type="file" id="rssInput" accept=".xml,.rss"></label>
-        <textarea id="rssPaste" rows="2" placeholder="Or paste RSS XML..."></textarea>
+        <textarea id="rssPaste" rows="2" placeholder="Or paste RSS XML content..."></textarea>
         <button id="applyRssBtn">Apply Scratches</button>
         <div id="rssStatus" class="status"></div>
+        <div id="rssReport"></div>
       </div>
     </div>
   </div>
@@ -185,6 +186,81 @@
 let rows = [];
 let computedRaces = [];
 
+/* --- RESTORED EQUIBASE RSS SCRATCH PARSER LOGIC --- */
+document.getElementById('rssInput').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => processRssText(ev.target.result);
+  reader.readAsText(file);
+});
+
+document.getElementById('applyRssBtn').addEventListener('click', () => {
+  const text = document.getElementById('rssPaste').value;
+  if (!text.trim()){
+    document.getElementById('rssStatus').textContent = 'Please paste RSS XML content first.';
+    document.getElementById('rssStatus').className = 'status err';
+    return;
+  }
+  processRssText(text);
+});
+
+function processRssText(xmlText){
+  const statusEl = document.getElementById('rssStatus');
+  const reportEl = document.getElementById('rssReport');
+  statusEl.textContent = 'Parsing scratches...';
+  statusEl.className = 'status';
+  reportEl.innerHTML = '';
+
+  try {
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+    const items = xmlDoc.getElementsByTagName("item");
+
+    if (!items.length){
+      statusEl.textContent = 'No scratch items found in the XML/RSS provided.';
+      statusEl.className = 'status err';
+      return;
+    }
+
+    let scratchCount = 0;
+    const reports = [];
+
+    Array.from(items).forEach(item => {
+      const title = item.getElementsByTagName("title")[0]?.textContent || '';
+      const description = item.getElementsByTagName("description")[0]?.textContent || '';
+      const content = title + ' ' + description;
+
+      const scratchMatch = content.match(/Race\s*([0-9]+).*?#\s*([0-9]+)/i) || content.match(/Scratch.*?:?\s*#?([0-9]+)/i);
+
+      if (scratchMatch){
+        const raceNum = scratchMatch[1];
+        const postNum = scratchMatch[2];
+
+        const target = rows.find(r => r.race === raceNum && r.post === postNum);
+        if (target){
+          target.scratched = true;
+          scratchCount++;
+          reports.push(`Scratched R${raceNum} #${postNum} (${target.horse})`);
+        }
+      }
+    });
+
+    computeCard();
+    statusEl.textContent = `Applied ${scratchCount} scratch(es) to current card.`;
+    statusEl.className = 'status ok';
+
+    if (reports.length){
+      reportEl.innerHTML = `<div class="rss-info"><b>Applied Changes:</b><br>${reports.join('<br>')}</div>`;
+    }
+
+  } catch (err){
+    console.error(err);
+    statusEl.textContent = 'Error parsing XML/RSS text.';
+    statusEl.className = 'status err';
+  }
+}
+
 /* --- BRISNET DRF/CSV PARSER LOGIC --- */
 document.getElementById('brisnetInput').addEventListener('change', function(e) {
   const file = e.target.files[0];
@@ -192,8 +268,7 @@ document.getElementById('brisnetInput').addEventListener('change', function(e) {
 
   const reader = new FileReader();
   reader.onload = function(evt) {
-    const text = evt.target.result;
-    parseBrisnetFile(text);
+    parseBrisnetFile(evt.target.result);
   };
   reader.readAsText(file);
 });
@@ -206,19 +281,14 @@ function parseBrisnetFile(contents) {
 
   lines.forEach(line => {
     if (!line.trim()) return;
-    
-    // Parse CSV line handling quotes
     const fields = line.split(/,(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)/).map(f => f.replace(/^"|"$/g, '').trim());
 
-    // Standard Brisnet Single/Multi DRF files feature:
-    // Field 1: Track, Field 2: Date, Field 3: Race Number, Field 4: Post Position, Field 10: Horse Name, Field 25: Morning Line Odds
     if (fields.length >= 10) {
-      const race = fields[2] || fields[0]; // Race Number
-      const post = fields[3] || fields[1]; // Post Position
-      const horse = fields[9] || fields[2] || "Unknown Horse"; // Horse Name
-      const odds = fields[24] || fields[10] || "5/1"; // Morning Line Odds
+      const race = fields[2] || fields[0];
+      const post = fields[3] || fields[1];
+      const horse = fields[9] || fields[2] || "Unknown Horse";
+      const odds = fields[24] || fields[10] || "5/1";
       
-      // Look for Prime Power or Speed rating columns if available, default to 100
       let score = "100";
       for (let i = 11; i < fields.length; i++) {
         if (!isNaN(parseFloat(fields[i])) && parseFloat(fields[i]) > 50 && parseFloat(fields[i]) < 160) {
@@ -228,7 +298,7 @@ function parseBrisnetFile(contents) {
       }
 
       if (race && horse) {
-        newRows.push({ race, post, horse, odds, score, scratched: false });
+        newRows.push({ race: String(race), post: String(post), horse, odds, score, scratched: false });
         parsedCount++;
       }
     }
@@ -245,7 +315,7 @@ function parseBrisnetFile(contents) {
   }
 }
 
-/* --- Data Persistence --- */
+/* --- DATA PERSISTENCE --- */
 function saveState() {
   localStorage.setItem('overlay_rows', JSON.stringify(rows));
   const status = document.getElementById('storageStatus');
@@ -278,7 +348,7 @@ document.getElementById('clearLocalBtn').addEventListener('click', () => {
   document.getElementById('storageStatus').className = 'status ok';
 });
 
-/* --- Mathematical Edge Engine --- */
+/* --- MATHEMATICAL EDGE ENGINE --- */
 function parseOdds(str) {
   if (!str) return 10;
   if (String(str).includes('/')) {
@@ -329,7 +399,7 @@ function computeCard() {
 
 document.getElementById('computeBtn').addEventListener('click', computeCard);
 
-/* --- Field & Cards UI Rendering --- */
+/* --- UI RENDERING --- */
 function renderFieldTables() {
   const container = document.getElementById('fieldTables');
   container.innerHTML = '';
@@ -365,7 +435,7 @@ function renderRaceCards() {
   });
 }
 
-/* --- Bet Sizing & Exotics Engine --- */
+/* --- BET SIZING & EXOTICS ENGINE --- */
 document.getElementById('generateTicketBtn').addEventListener('click', () => {
   const wagerType = document.getElementById('wagerType').value;
   const bankroll = parseFloat(document.getElementById('bankroll').value) || 1000;
@@ -437,7 +507,7 @@ document.getElementById('generateTicketBtn').addEventListener('click', () => {
   out.textContent = ticketText;
 });
 
-/* --- Tab Switching & View Toggles --- */
+/* --- TAB SWITCHING & TOGGLES --- */
 document.querySelectorAll('#tabbar button').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('#tabbar button').forEach(b => b.classList.remove('on'));
