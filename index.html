@@ -2509,11 +2509,13 @@ function buildTiebreakRead(rs){
 
 // Quirin speed points read RELATIONALLY. The raw number is dead (SP>=6 won
 // 15.6% vs a 14.1% baseline in sprints; SP>=5 actually 12.5%). The
-// field-relative version is where signal appeared: highest in the field 7/34 =
-// 20.6%, and splitting by whether the lead is contested gives lone-ish (top
-// SP >=5 and >=2 clear) 3/10 = 30% against top-but-contested 4/24 = 16.7% at
-// -30.4% ROI. Binding constraint is rarity — a clean lone-speed setup showed
-// up in 3 of 23 sprints, so this needs ~25-30 more cards. Display only.
+// field-relative version is where signal appeared. UPDATED 2026-08-28 on a
+// bigger, priced sample — 180 races / 19 paired cards: lone speed (top
+// Quirin, >=2 clear of 2nd) won 22.9% vs a 22.5% implied rate but returned
+// +30.0% flat-$2, against -6.0% for top-but-contested and -28.8% field-wide.
+// First replication of the earlier 27-race look (which found the same
+// direction on only 3 clean cases). Still display only — 48 cases at this
+// setup's ~27% frequency, due another check after five more cards.
 function speedShape(horses){
   const withSP = horses.filter(h => h.quirin != null).slice().sort((a,b) => b.quirin - a.quirin);
   if (!withSP.length) return null;
@@ -3002,6 +3004,23 @@ function buildReadPanel(rs){
     if (sup.length){
       lines.push(`<div class="bet-line"><span class="bet-tag place">BET DOWN</span> ${sup.slice(0,4).map(h => horseLabel(h)).join(' · ')}</div>`);
     }
+  }
+
+  // Lone speed. Added 2026-08-28. Tested twice now: an earlier look at 27
+  // races found the right direction but the setup only occurred in ~13% of
+  // sprints (n=3), too thin to trust. Retested on 180 races across 19 paired
+  // cards with real prices attached: lone speed (top Quirin, 2+ clear of the
+  // next) won 22.9% against a 22.5% field-derived implied rate — essentially
+  // even on hit rate — but returned +30.0% flat-$2, against -6.0% for a top
+  // Quirin horse that is CONTESTED and -28.8% for the field at large. That
+  // gap between hit rate and ROI means these horses are priced only slightly
+  // short of fair and pay when they land. It is the second signal in this
+  // project (after shipping) to survive a price test rather than fail one.
+  // Still just 48 cases at this setup's frequency — display only, and due
+  // another look after five more cards.
+  const shape = speedShape(horses);
+  if (shape && shape.lone){
+    lines.push(`<div class="bet-line"><span class="bet-tag place">LONE SPEED</span> ${horseLabel(shape.top)} — ${shape.top.quirin} speed pts, ${shape.gap} clear of ${shape.second ? escHtml(shape.second.horse) : 'the field'}.</div>`);
   }
 
   if (!lines.length){
@@ -3831,6 +3850,6 @@ document.getElementById('downloadReportBtn').addEventListener('click', saveRepor
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board · build 2026-08-28-a</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board · build 2026-08-28-b</div>
 </body>
 </html>
