@@ -637,6 +637,33 @@
   .clean-toggle input{width:auto; accent-color:var(--board-950);}
   .clean-toggle.on{background:var(--board-950); color:var(--paper);}
 
+  .jky-cell{margin-top:3px;}
+  .jky{font-size:11px; color:var(--ink-soft); font-family:var(--mono); letter-spacing:.01em;}
+  .jky-rec{color:var(--ink-soft); opacity:.85;}
+  .jky-unknown{font-style:italic;}
+  .jky-change{
+    display:inline-block; font-size:11px; font-family:var(--mono); line-height:1.5;
+    background:#FFF3D0; border:1px solid #D8B24C; border-left:3px solid #C08A1E;
+    border-radius:3px; padding:3px 7px; color:#4A3A12;
+  }
+  .jky-flag{
+    font-weight:800; letter-spacing:.06em; font-size:9.5px; text-transform:uppercase;
+    background:#C08A1E; color:#fff; border-radius:8px; padding:1px 6px; margin-right:5px;
+  }
+  .jky-was{opacity:.7; margin-left:5px; text-decoration:line-through;}
+  .rider-block{
+    border:1px solid #D8B24C; background:#FFFBEF; border-radius:3px;
+    padding:9px 12px; margin:10px 0;
+  }
+  .rider-head{
+    font-size:10.5px; font-weight:800; letter-spacing:.08em; text-transform:uppercase;
+    color:#8A6414; margin-bottom:6px;
+  }
+  .rider-row{margin:4px 0; font-size:12.5px;}
+  .rider-note{margin-top:8px;}
+  .pick-jky{margin-top:8px; font-size:12px; color:var(--ink-soft);}
+  .pp-conn{font-size:12px; color:var(--ink-soft); margin:4px 0 8px;}
+
   .disclaimer{
     font-size:12px; color:var(--ink-soft); line-height:1.6; padding-top:18px;
     border-top:1px solid var(--paper-line); margin-top:36px;
@@ -714,7 +741,7 @@
       <p style="font-size:12.5px; color:var(--ink-soft); margin:-6px 0 12px;"><b>ML odds</b> comes in with the file. <b>Final</b> starts empty — fill it in at the track; it never overwrites the morning line. <b>Surface fit</b> and <b>Class</b> are optional. Tick <b>Scr</b> for a scratch and rebuild the card: scratched horses drop out and the field renormalizes.</p>
       <div class="scratch-panel">
         <h3>Apply scratches from the Equibase feed</h3>
-        <p>Load your entries first, then choose the track’s <b>Changes &amp; Scratches</b> feed or paste it below. Scratches are ticked automatically by race and program number. Rider changes are reported, never applied.</p>
+        <p>Load your entries first, then choose the track’s <b>Changes &amp; Scratches</b> feed or paste it below. Scratches are ticked automatically by race and program number. Rider changes are flagged on the card, with the new rider’s meet record where the file has one.</p>
         <label class="file-btn" for="rssInput">Choose RSS file</label>
         <input type="file" id="rssInput">
         <textarea id="rssPaste" rows="3" placeholder="…or paste the feed XML here" style="margin-top:10px;"></textarea>
@@ -863,7 +890,7 @@ const rowsBody = document.getElementById('rowsBody');
 const emptyNote = document.getElementById('emptyNote');
 
 function newRow(partial){
-  return Object.assign({id: rowId++, race:'', post:'', horse:'', odds:'', finalOdds:'', score:'', surfaceRating:'', classMove:'', trackCode:'', raceDateYmd:'', ltStarts:null, ltWins:null, ltPlaces:null, ltShows:null, ltEarn:null, raceDistYds:'', raceType:'', raceClaim:'', raceClassTxt:'', scratched:false, connAdjusted:false, runStyle:'', quirin:'', distStarts:'', distAdjusted:false, turfStarts:'', surface:'', daysSinceWork:'', worksAtTrack:'', lastFinMargin:'', h2hNote:'', tjStarts:'', tjWins:'', keyStats:[], rawPP:'', claimedLastRace:false, lastFinComment:'', hadTrouble:false, recentWorks:[], ppRaces:[], ppWorks:[]}, partial);
+  return Object.assign({id: rowId++, race:'', post:'', horse:'', odds:'', finalOdds:'', score:'', surfaceRating:'', classMove:'', trackCode:'', raceDateYmd:'', ltStarts:null, ltWins:null, ltPlaces:null, ltShows:null, ltEarn:null, raceDistYds:'', raceType:'', raceClaim:'', raceClassTxt:'', scratched:false, connAdjusted:false, runStyle:'', quirin:'', distStarts:'', distAdjusted:false, turfStarts:'', surface:'', daysSinceWork:'', worksAtTrack:'', lastFinMargin:'', h2hNote:'', jockey:'', jkyStarts:null, jkyWins:null, jkyPlaces:null, jkyShows:null, trainer:'', trnStarts:null, trnWins:null, riderChange:null, tjStarts:'', tjWins:'', keyStats:[], rawPP:'', claimedLastRace:false, lastFinComment:'', hadTrouble:false, recentWorks:[], ppRaces:[], ppWorks:[]}, partial);
 }
 
 function renderRows(){
@@ -1155,6 +1182,13 @@ function parseBrisnetSingleFile(text){
       raceDateYmd: get(2),
       trnPct: (num(29) && num(30) != null) ? (num(30)/num(29)*100) : null,
       jkyPct: (num(35) && num(36) != null) ? (num(36)/num(35)*100) : null,
+      // Named connections and their CURRENT-MEET record, straight from the file.
+      // Spec: 28 trainer, 29-32 trainer sts/w/p/s at the meet; 33 jockey,
+      // 35-38 jockey sts/w/p/s at the meet. Display only — nothing is scored.
+      trainer: titleCase(get(28)),
+      trnStarts: num(29), trnWins: num(30), trnPlaces: num(31), trnShows: num(32),
+      jockey: titleCase(get(33)),
+      jkyStarts: num(35), jkyWins: num(36), jkyPlaces: num(37), jkyShows: num(38),
       runStyle: get(210),
       quirin: num(211),
       distStarts: num(65),
@@ -1368,7 +1402,7 @@ document.getElementById('drfInput').addEventListener('change', e => {
       statusEl.textContent = `Imported ${extracted.length} entries across ${raceCount} race(s)${forCard}.${dateWarn} ${extracted.length - withOdds} horse(s) are missing morning-line odds and won't be scored until you fill them in below.`;
       statusEl.className = 'status ok';
     } else {
-      statusEl.textContent = `Imported ${extracted.length} entries across ${raceCount} race(s)${forCard}.${dateWarn} Prime Power, surface fit, race conditions, class move and trainer/jockey meet stats came through. Mark scratches in the Scr column before computing; the Final column stays empty until you fill it in at the track.`;
+      statusEl.textContent = `Imported ${extracted.length} entries across ${raceCount} race(s)${forCard}.${dateWarn} Prime Power, surface fit, race conditions, class move and jockey/trainer meet records came through. Mark scratches in the Scr column before computing; the Final column stays empty until you fill it in at the track.`;
       statusEl.className = 'status ok';
     }
   };
@@ -1575,6 +1609,18 @@ function applyChangesFeed(text){
     row.scratched = true;
     applied++;
   });
+
+  // Rider changes ARE applied to the display: the row records who is riding
+  // now, and the new rider's meet record is looked up from the rest of the
+  // card. Nothing about the rating changes — it never used the jockey.
+  const riderApplied = [], riderUnmatched = [];
+  feed.riders.forEach(rc => {
+    const row = rows.find(r => String(r.race).trim() === rc.race &&
+                               String(r.post).trim() === rc.post);
+    if (!row){ riderUnmatched.push(rc); return; }
+    row.riderChange = {from: rc.from, to: rc.to};
+    riderApplied.push(rc);
+  });
   renderRows();
 
   const parts = [];
@@ -1587,8 +1633,16 @@ function applyChangesFeed(text){
   }
 
   if (feed.riders.length){
-    parts.push(`<div class="rss-warn">⚠ <b>${feed.riders.length} rider change${feed.riders.length===1?'':'s'} — reported, NOT applied.</b> The rating blend uses each jockey's current-meet win rate straight from the data file, so these horses are still being scored on the rider who came off. There is no way to recompute that here for a rider the file has no stats for. Judge these by hand:<br>` +
-      feed.riders.map(r => `R${escHtml(r.race)} #${escHtml(r.post)} ${escHtml(r.horse)}: ${escHtml(r.from)} → ${escHtml(r.to)}`).join('<br>') + `</div>`);
+    const line = r => {
+      const sub = lookupJockey(r.to);
+      const rec = sub ? meetRecord(sub.starts, sub.wins, sub.places, sub.shows) : null;
+      const tail = rec ? ` (${rec.txt} at this meet${sub.mounts ? `, ${sub.mounts} other mount${sub.mounts === 1 ? '' : 's'} today` : ''})`
+                       : ` (no meet record for this rider in the file)`;
+      return `R${escHtml(r.race)} #${escHtml(r.post)} ${escHtml(r.horse)}: ${escHtml(r.from)} → <b>${escHtml(r.to)}</b>${tail}`;
+    };
+    parts.push(`<div class="rss-warn">⚑ <b>${feed.riders.length} rider change${feed.riders.length===1?'':'s'}</b>, flagged on the card. The new rider's current-meet record is shown where he has another mount today; the rating is unaffected either way, since it never used the jockey.<br>` +
+      feed.riders.map(line).join('<br>') +
+      (riderUnmatched.length ? `<br><i>${riderUnmatched.length} change had no matching row.</i>` : '') + `</div>`);
   }
 
   if (feed.conditions.length){
@@ -1962,6 +2016,10 @@ document.getElementById('computeBtn').addEventListener('click', () => {
       worksAtTrack: (r.worksAtTrack !== '' && r.worksAtTrack != null && !isNaN(parseFloat(r.worksAtTrack))) ? parseFloat(r.worksAtTrack) : null,
       lastFinMargin: (r.lastFinMargin !== '' && r.lastFinMargin != null && !isNaN(parseFloat(r.lastFinMargin))) ? parseFloat(r.lastFinMargin) : null,
       h2hNote: r.h2hNote || '',
+      jockey: r.jockey || '', jkyStarts: r.jkyStarts, jkyWins: r.jkyWins,
+      jkyPlaces: r.jkyPlaces, jkyShows: r.jkyShows,
+      trainer: r.trainer || '', trnStarts: r.trnStarts, trnWins: r.trnWins,
+      riderChange: r.riderChange || null,
       tjStarts: (r.tjStarts !== '' && r.tjStarts != null && !isNaN(parseFloat(r.tjStarts))) ? parseFloat(r.tjStarts) : null,
       tjWins: (r.tjWins !== '' && r.tjWins != null && !isNaN(parseFloat(r.tjWins))) ? parseFloat(r.tjWins) : null,
       keyStats: r.keyStats || [],
@@ -2446,6 +2504,107 @@ function speedCell(h, shape){
   return `<span class="sp-plain">${h.quirin}</span>`;
 }
 
+/* ---------------- JOCKEYS ---------------- */
+// Names arrive in two formats. The data file writes them surname-first with an
+// initial ("Ortiz Jr I"); the Equibase feed writes them out in full ("Irad
+// Ortiz Jr"). Match on surname plus initial, where the surname is the last
+// token unless that token is a single letter, in which case it is the first.
+const JKY_SUFFIX = new Set(['JR','SR','II','III','IV','JR.','SR.']);
+function nameParts(s){
+  const clean = String(s || '').toUpperCase().replace(/[^A-Z ]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!clean) return null;
+  const toks = clean.split(' ').filter(t => !JKY_SUFFIX.has(t));
+  if (!toks.length) return null;
+  const last = toks[toks.length - 1];
+  const surname = (toks.length > 1 && last.length === 1) ? toks[0] : last;
+  const initials = toks.filter(t => t !== surname).map(t => t[0]);
+  return {surname, initials};
+}
+function sameJockey(a, b){
+  const A = nameParts(a), B = nameParts(b);
+  if (!A || !B) return false;
+  if (A.surname !== B.surname) return false;
+  if (!A.initials.length || !B.initials.length) return true;
+  return A.initials.some(i => B.initials.includes(i));
+}
+
+// Every jockey named anywhere on the loaded card, with the current-meet record
+// the file carries for them. This is what makes a rider change readable: the
+// substitute's meet stats are not on the horse's own row, but if he rides
+// anything else today they are somewhere in the same file.
+function cardJockeyIndex(){
+  const idx = [];
+  rows.forEach(r => {
+    if (!r.jockey) return;
+    let e = idx.find(x => sameJockey(x.name, r.jockey));
+    if (!e){
+      e = {name: r.jockey, starts: r.jkyStarts, wins: r.jkyWins,
+           places: r.jkyPlaces, shows: r.jkyShows, mounts: 0};
+      idx.push(e);
+    }
+    if (e.starts == null && r.jkyStarts != null){
+      e.starts = r.jkyStarts; e.wins = r.jkyWins; e.places = r.jkyPlaces; e.shows = r.jkyShows;
+    }
+    if (!r.scratched) e.mounts++;
+  });
+  return idx;
+}
+function lookupJockey(name){
+  if (!name) return null;
+  return cardJockeyIndex().find(x => sameJockey(x.name, name)) || null;
+}
+
+// "148-27-19-14 · 18%" — starts, wins, places, shows at the current meet.
+function meetRecord(starts, wins, places, shows){
+  if (starts == null || starts <= 0) return null;
+  const bits = [starts, wins, places, shows].filter(v => v != null).join('-');
+  const pctWin = wins != null ? Math.round(wins / starts * 100) : null;
+  return {txt: bits + (pctWin != null ? ` \u00b7 ${pctWin}%` : ''), pct: pctWin, starts};
+}
+function jockeyMeet(h){
+  return meetRecord(h.jkyStarts, h.jkyWins, h.jkyPlaces, h.jkyShows);
+}
+function trainerMeet(h){
+  return meetRecord(h.trnStarts, h.trnWins, null, null);
+}
+
+// One line for the rider, and the whole point of it: when the rider has
+// CHANGED, the line shows the horse's new jockey and the new jockey's record
+// at this meet, not the one the file was built with.
+function jockeyLine(h, opts){
+  opts = opts || {};
+  const rc = h.riderChange;
+  if (rc){
+    const sub = lookupJockey(rc.to);
+    const rec = sub ? meetRecord(sub.starts, sub.wins, sub.places, sub.shows) : null;
+    const stat = rec
+      ? `<span class="jky-rec">${rec.txt} this meet</span>${sub.mounts ? `<span class="jky-rec"> \u00b7 ${sub.mounts} other mount${sub.mounts === 1 ? '' : 's'} today</span>` : ''}`
+      : `<span class="jky-rec jky-unknown">no meet record in this file</span>`;
+    return `<span class="jky-change" title="Rider change from the Equibase feed. Stats shown are the new rider's current-meet record, found elsewhere on today's card.">
+      <span class="jky-flag">RIDER CHANGE</span>
+      <b>${escHtml(rc.to)}</b> ${stat}
+      <span class="jky-was">was ${escHtml(rc.from)}</span></span>`;
+  }
+  if (!h.jockey) return '';
+  const rec = jockeyMeet(h);
+  return `<span class="jky"${opts.title === false ? '' : ' title="Jockey, with wins at the current meet as the data file supplies them"'}>${escHtml(h.jockey)}${rec ? ` <span class="jky-rec">${rec.txt}</span>` : ''}</span>`;
+}
+
+function riderChangeNote(h){
+  if (!h || !h.riderChange) return '';
+  return `<div class="rider-note">${jockeyLine(h)}</div>`;
+}
+
+// Race-card block: every rider change in the race, in one place.
+function buildRiderChangeBlock(rs){
+  const changed = (rs.horses || []).filter(h => h.riderChange);
+  if (!changed.length) return '';
+  return `<div class="rider-block">
+    <div class="rider-head">Rider change${changed.length === 1 ? '' : 's'}</div>
+    ${changed.map(h => `<div class="rider-row"><span class="cp-horse">#${escHtml(h.post || '?')} ${escHtml(h.horse)}</span> ${jockeyLine(h)}</div>`).join('')}
+  </div>`;
+}
+
 function horseLabel(h){
   return `<b>#${escHtml(h.post || '?')} ${escHtml(h.horse)}</b> (${escHtml(h.oddsStr)})`;
 }
@@ -2714,6 +2873,7 @@ function buildPick(rs){
       ${head}
       <div>Top career earnings in the field at <b>${money(p.eps)} per start</b>${epsBasis(h)}${second ? ` (next best ${escHtml(second.h.horse)} at ${money(second.eps)}${gap && gap >= 1.5 ? `, a ${gap.toFixed(1)}× gap` : ''})` : ''}, <b>and</b> the market's choice.</div>
       ${marketNote}
+      ${h.jockey || h.riderChange ? `<div class="pick-jky">${h.riderChange ? '' : 'Jockey '}${jockeyLine(h)}</div>` : ''}
       ${blindSpotNote(rs)}
       ${driftDowngrade(h)}
     </div>`;
@@ -2725,6 +2885,7 @@ function buildPick(rs){
     <div>The market's choice, and <b>second in the field on career earnings at ${money(p.eps)} per start</b>${epsBasis(p.h)} — behind ${escHtml(lead.h.horse)} at ${money(lead.eps)}, who the crowd does not make favourite.${p.nearTie ? ` Those two are within 5% of each other, which is not really a first and a second — on this measure they are level.` : ''}</div>
     <div class="price-warn"><b>Unproven line.</b> Fires only where the Pick filters fail, and is scored separately.</div>
     ${marketNote}
+    ${p.h.jockey || p.h.riderChange ? `<div class="pick-jky">${p.h.riderChange ? '' : 'Jockey '}${jockeyLine(p.h)}</div>` : ''}
     ${blindSpotNote(rs)}
     ${driftDowngrade(p.h)}
   </div>`;
@@ -2824,6 +2985,7 @@ function renderRaceCard(raceSummaries, scratchedCount){
         ${readLine}
         ${buildTiebreakRead(rs)}
         ${buildMatchupBlock(rs.horses || [], (rs.horses && rs.horses.length) ? rs.horses[0].raceDistYds : null)}
+        ${buildRiderChangeBlock(rs)}
         ${buildContenderBlock(rs)}
         ${buildCommonCompanyBlock(rs.horses || [], (rs.horses && rs.horses.length) ? rs.horses[0].raceDistYds : null)}
         ${buildReadPanel(rs)}
@@ -3008,6 +3170,7 @@ function buildBestOfDay(raceSummaries){
       : [];
     picks.push({rs, h: p.h, eps: p.eps, tier: p.tier, line: p.line, marketKnown: p.marketKnown,
                 drifting: p.h.drift != null && p.h.drift > 0.25,
+                riderChanged: !!p.h.riderChange,
                 others, fieldSize: (rs.horses || []).filter(x => x.decimalOdds != null).length});
   });
   if (!picks.length) return '';
@@ -3025,7 +3188,7 @@ function buildBestOfDay(raceSummaries){
       <span class="bo-rank">${i + 1}</span>
       <span class="bo-main">
         <span class="bo-horse">${escHtml(p.h.horse)}</span>
-        <br><span class="bo-meta"><a class="race-jump" data-jump="${escAttr(p.rs.race)}" title="Tap to see every runner in this race">Race ${escHtml(p.rs.race)}</a> · #${escHtml(p.h.post || '?')} · ${escHtml(p.h.oddsStr)} · ${money(p.eps)} per start${p.line === 'primary' ? ', top in the field' : ', 2nd in the field'}${p.marketKnown ? '' : ' · market check pending'}${p.drifting ? ' · DRIFTING, stand down' : ''}</span>
+        <br><span class="bo-meta"><a class="race-jump" data-jump="${escAttr(p.rs.race)}" title="Tap to see every runner in this race">Race ${escHtml(p.rs.race)}</a> · #${escHtml(p.h.post || '?')} · ${escHtml(p.h.oddsStr)} · ${money(p.eps)} per start${p.line === 'primary' ? ', top in the field' : ', 2nd in the field'}${p.marketKnown ? '' : ' · market check pending'}${p.drifting ? ' · DRIFTING, stand down' : ''}${p.riderChanged ? ' · RIDER CHANGE' : ''}</span>
         ${p.others.length ? `<br><span class="bo-with">with ${p.others.map(o => `#${escHtml(o.post || '?')} ${escHtml(o.horse)} ${escHtml(o.oddsStr)}`).join(' · ')}</span>`
                           : (p.fieldSize ? '<br><span class="bo-with">no other contender</span>' : '')}
       </span>
@@ -3100,7 +3263,7 @@ function renderFullField(sortMode){
       return `
         <tr>
           <td><span class="field-badge">${escHtml(h.post || '–')}</span></td>
-          <td class="name">${nameCell}${adjMark}</td>
+          <td class="name">${nameCell}${adjMark}${(() => { const jl = jockeyLine(h); return jl ? `<div class="jky-cell">${jl}</div>` : ''; })()}</td>
           <td title="${escAttr(oddsTitle)}">${escHtml(h.oddsStr)}</td>
           <td>${fmtMove(h)}</td>
           <td>${formArrow(h)}</td>
@@ -3198,6 +3361,13 @@ function ppHorseBlock(h, race, standalone){
     : `<h3 class="pp-head" style="font-size:16px;">#${escHtml(h.post || '?')} ${escHtml(h.horse)} <span style="font-family:var(--mono);font-size:12.5px;font-weight:400;">${oddsBit}</span></h3>`;
   return `${head}
     <div class="pp-sub">${standalone ? `Race ${escHtml(race)}` : ''}${h.rawPP != null ? `${standalone ? ' · ' : ''}Prime Power ${h.rawPP}` : ''}${h.surfaceRating != null ? ` · surface fit <b class="pp-adj">${h.surfaceRating}</b>` : ''}${h.classMove === 'down' ? ' · <b class="pp-adj">class drop</b>' : h.classMove === 'up' ? ' · <b class="pp-adj">class rise</b>' : ''}${h.runStyle ? ` · run style ${escHtml(h.runStyle)}` : ''}${h.quirin != null ? ` · Quirin ${h.quirin}` : ''}${h.distStarts != null ? ` · starts at today's distance: ${h.distStarts}` : ''}${h.daysSinceWork != null ? ` · last work ${h.daysSinceWork}d ago` : ''}</div>
+    ${(() => {
+      const jl = jockeyLine(h);
+      const tr = trainerMeet(h);
+      const trBit = h.trainer ? `<span class="jky">${escHtml(h.trainer)}${tr ? ` <span class="jky-rec">${tr.txt}</span>` : ''}</span>` : '';
+      if (!jl && !trBit) return '';
+      return `<div class="pp-conn">${jl ? 'Jockey ' + jl : ''}${jl && trBit ? ' &nbsp;·&nbsp; ' : ''}${trBit ? 'Trainer ' + trBit : ''}</div>`;
+    })()}
     ${ppRecordLine(h)}
     ${races ? `<div class="pp-section">Last ${(h.ppRaces||[]).length} starts${h.ltStarts != null && h.ltStarts > (h.ppRaces||[]).length ? ` <span style="text-transform:none;letter-spacing:0;font-weight:400;">(of ${h.ltStarts} career — the data file carries 10)</span>` : ''}</div>
     <div class="pp-table-wrap"><table class="pp-table"><thead><tr><th>Date</th><th>Trk</th><th>Dist</th><th>Class</th><th>Fin</th><th>Btn</th><th>Trip comment</th><th>Race winner</th></tr></thead><tbody>${races}</tbody></table></div>` : `<p class="pp-sub">No past races in the data file — first-time starter.</p>`}
@@ -3535,6 +3705,6 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board · build 2026-08-29-a</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board · build 2026-08-29-b</div>
 </body>
 </html>
