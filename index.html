@@ -637,15 +637,6 @@
   .clean-toggle input{width:auto; accent-color:var(--board-950);}
   .clean-toggle.on{background:var(--board-950); color:var(--paper);}
 
-  /* CLEAN COPY: everything that is about this tool's own track record —
-     ROI, hit rates, build history, tuning notes — is marked .rec-detail and
-     disappears here. The picks and the honest one-line disclaimer stay. */
-  body.clean .rec-detail{display:none !important;}
-  body.clean .raw-col,
-  body.clean .toprated-bet,
-  body.clean #resultsScoreSection,
-  body.clean .score-compare{display:none !important;}
-
   .disclaimer{
     font-size:12px; color:var(--ink-soft); line-height:1.6; padding-top:18px;
     border-top:1px solid var(--paper-line); margin-top:36px;
@@ -665,7 +656,7 @@
   <header>
     <p class="eyebrow">Handicapping utility · odds &amp; ratings, no black box</p>
     <h1><span class="flap">O</span><span class="flap">v</span><span class="flap">e</span><span class="flap">r</span><span class="flap">l</span><span class="flap">a</span><span class="flap">y</span> <span class="flap">B</span><span class="flap">o</span><span class="flap">a</span><span class="flap">r</span><span class="flap">d</span></h1>
-    <p class="tagline">Upload a data file or program PDF. Overlay Board organises a full card into readable past performances, tracks scratches and money moves, and shows the handful of signals that survived testing — with what each one is actually worth.</p>
+    <p class="tagline">Upload a data file or program PDF. Overlay Board lays out the whole card: past performances, scratches, money moves, and where the board likes a horse.</p>
   </header>
 
   <main>
@@ -675,14 +666,14 @@
       <div class="upload-grid four-col">
         <div class="upload-card">
           <h3>Brisnet data file</h3>
-          <p>The .DRF file from Brisnet's "Single File" comma-delimited data product — headerless, ~1,435 fields per horse. Reads post, horse, morning-line odds, Prime Power, a surface-specific speed figure, race conditions, and an exact claiming-price class-move directly from the structured data — no guessing. <b>If .drf files show up grayed out in your file picker</b>, that's your phone/browser not recognizing the extension, not this tool — just rename the file to end in .csv before picking it. The parser reads the file's content, never its name, so this is completely safe and changes nothing about how it's read. If your download is a .zip, unzip it first (or send me the .zip directly and I'll pull it out for you).</p>
+          <p>Brisnet’s "Single File" export. If .drf looks greyed out in the picker, rename it to .csv — the parser reads the contents, not the name. Unzip a .zip first.</p>
           <label class="file-btn" for="drfInput">Choose .DRF / .csv</label>
           <input type="file" id="drfInput" accept=".drf,.csv,.txt,text/csv,text/plain,text/*">
           <div class="status" id="drfStatus"></div>
         </div>
         <div class="upload-card">
           <h3>CSV file</h3>
-          <p>Any spreadsheet export with race, horse, and odds columns. A rating column (speed figure, power rank, your own number) is optional but unlocks value ranking.</p>
+          <p>Any spreadsheet with race, horse and odds columns. Map the columns after choosing the file.</p>
           <label class="file-btn" for="csvInput">Choose CSV</label>
           <input type="file" id="csvInput" accept=".csv">
           <div class="status" id="csvStatus"></div>
@@ -700,14 +691,14 @@
         </div>
         <div class="upload-card">
           <h3>Program PDF</h3>
-          <p>Built for brisnet-style past-performance sheets. It extracts post #, horse name, morning-line odds, Prime Power, a today's-surface rating, and a coarse class-move signal where the text supports it. Runs entirely in-browser — on some phones/in-app browsers this can be slow or blocked; if it hangs, use "Paste text" instead.</p>
+          <p>Brisnet-style past-performance sheet. Runs in the browser; if it hangs on a phone, use Paste text instead.</p>
           <label class="file-btn" for="pdfInput">Choose PDF</label>
           <input type="file" id="pdfInput" accept=".pdf">
           <div class="status" id="pdfStatus"></div>
         </div>
         <div class="upload-card">
           <h3>Paste text</h3>
-          <p>Zero dependencies, works everywhere. Open the PDF in your phone's viewer, select all / copy the text, and paste it here. Same extraction as the PDF option, no library required.</p>
+          <p>Open the PDF, select all, copy, paste here. Same extraction as the PDF option and works everywhere.</p>
           <textarea id="pdfPasteText" rows="4" placeholder="Paste program text here…"></textarea>
           <div class="table-actions" style="margin-top:10px;">
             <button class="small-btn" id="extractPasteBtn">Extract from pasted text →</button>
@@ -720,10 +711,10 @@
     <!-- STEP 2: TABLE -->
     <section class="no-print">
       <h2><span class="step-num">2</span> Check &amp; edit entries</h2>
-      <p style="font-size:12.5px; color:var(--ink-soft); margin:-6px 0 12px;"><b>ML odds</b> is the morning line — it comes in with the file. <b>Final</b> is the live tote board, and it starts empty on purpose: you fill it in at the track. Typing a final price never overwrites the morning line, so the tool can compare the two and show you which horses got bet down. "Surface fit" is optional — the horse's rating specific to today's surface/distance (e.g. the Trf or Dis figure from the PP, not the overall Prime Power). "Class" is optional — whether today is a step down or up from recent company. <b>"Scr" marks a scratch</b> — check it when the track posts changes and hit Compute again: a scratched horse is left out of every calculation, and the remaining field's odds-implied probabilities renormalize automatically.</p>
+      <p style="font-size:12.5px; color:var(--ink-soft); margin:-6px 0 12px;"><b>ML odds</b> comes in with the file. <b>Final</b> starts empty — fill it in at the track; it never overwrites the morning line. <b>Surface fit</b> and <b>Class</b> are optional. Tick <b>Scr</b> for a scratch and rebuild the card: scratched horses drop out and the field renormalizes.</p>
       <div class="scratch-panel">
         <h3>Apply scratches from the Equibase feed</h3>
-        <p>Load your entries first, then bring in the track's <b>Changes &amp; Scratches</b> feed: choose the file, or open it in your browser and paste the text below. Every scratched horse gets ticked in the Scr column automatically, matched on race and program number, and the card recomputes. <b>If the file picker greys the .rss file out</b>, that's your phone not recognizing the extension — paste the text instead, or rename it to end in .txt. The feed also carries rider changes; those are <b>reported, never applied</b>, because the rating blend uses the jockey's meet win rate from the data file and there is no way to recompute it for a rider the file has never seen.</p>
+        <p>Load your entries first, then choose the track’s <b>Changes &amp; Scratches</b> feed or paste it below. Scratches are ticked automatically by race and program number. Rider changes are reported, never applied.</p>
         <label class="file-btn" for="rssInput">Choose RSS file</label>
         <input type="file" id="rssInput">
         <textarea id="rssPaste" rows="3" placeholder="…or paste the feed XML here" style="margin-top:10px;"></textarea>
@@ -742,7 +733,7 @@
               <th>Horse</th>
               <th style="width:88px">ML odds</th>
               <th style="width:88px" class="live-col" title="Live tote board — fill this in at the track">Final</th>
-              <th style="width:88px" title="Prime Power exactly as the data file supplies it. Every adjustment this tool used to apply was retired on 2026-08-24 — class move contradicted the market on both signs, head-to-head compounded without a cap onto horses that ran nowhere, and the surface blend was never tested alone. The inputs are still shown as labels on the past-performance view.">Rating</th>
+              <th style="width:88px" title="Prime Power exactly as the data file supplies it — no adjustments.">Rating</th>
               <th style="width:88px">Surface fit</th>
               <th style="width:70px">Class</th>
               <th style="width:44px" title="Scratched — excluded from compute">Scr</th>
@@ -765,8 +756,6 @@
     <div class="report-toolbar no-print" id="reportToolbar" style="display:none;">
         <button class="primary-btn" id="raceCardBtn">▤ Race card</button>
         <button class="ghost-btn" id="printBtn">🖨 Printable page</button>
-        <button class="ghost-btn" id="downloadReportBtn">⬇ Download report file</button>
-        <label class="clean-toggle" id="cleanToggleLabel"><input type="checkbox" id="cleanToggle"> Clean copy for sharing</label>
         <label class="clean-toggle" id="diagToggleLabel"><input type="checkbox" id="diagToggle"> Show diagnostics</label>
       </div>
     <div class="status no-print" id="printStatus"></div>
@@ -782,19 +771,19 @@
 
     <section id="picksSection" style="display:none;">
       <h2><span class="step-num">★</span> Where the board likes a horse</h2>
-      <div class="rss-info" style="margin:0 0 14px;">One rule, and it is the only place this tool names a horse: <b>the field's highest career earnings per start is also the market favourite.</b> Two measures that share no input agreeing on the same animal. Across 43 races it fired 20 times and that horse won 60%, against 30% for the same favourites without the earnings backing. Earnings per start on its own is <i>worse</i> than backing favourites (39.5% vs 44.2%), so the agreement is the whole signal. Found by looking rather than predicted, and 60% at short odds is thin against takeout — treat it as the best-supported thing here, not as a licence.</div>
+      <div class="rss-info" style="margin:0 0 14px;">One rule, and the only place this tool names a horse: <b>the field's highest career earnings per start is also the market favourite</b>, at a morning line of 2.5 or shorter, and still favourite at post.</div>
       <div id="pickList"></div>
     </section>
 
     <section id="printSection" style="display:none;">
       <h2><span class="step-num">🖨</span> Printable page</h2>
-      <div class="rss-info" style="margin:0 0 14px;">The whole card on one page — race cards, full field, picks and your saved bets. Use your browser's own <b>Share</b> or <b>Print</b> from here, or just scroll and read it. Nothing is downloaded.</div>
+      <div class="rss-info" style="margin:0 0 14px;">The whole card on one page — picks, race cards, full field and your saved bets. Use your browser's own <b>Print</b> or <b>Share</b> from here.</div>
       <div id="printView"></div>
     </section>
 
     <section id="betsSection" style="display:none;">
       <h2><span class="step-num">$</span> My bets</h2>
-      <div class="rss-info" style="margin:0 0 14px;">Picks you save are kept in this browser, so the record survives closing the tab. Fill in what each one did and the tally below is <b>your</b> strike rate, built from your own bets — not a number quoted from an analysis. Nothing is wagered here; this is a notebook.</div>
+      <div class="rss-info" style="margin:0 0 14px;">Saved picks stay in this browser. Fill in what each one did and the tally is your own record. Nothing is wagered here.</div>
       <div id="betTally"></div>
       <div id="betList"></div>
       <div class="table-actions" style="margin-top:14px;">
@@ -808,13 +797,11 @@
 
     <section id="resultsSection" style="display:none;">
       <h2><span class="step-num">3</span> Race card — every race, in race order</h2>
-      <div class="rss-info" style="margin:0 0 14px;"><b>This tool does not pick horses.</b> It used to, and the picks were measured to point the wrong way — across 316 scored runners the horses the model liked most won 6.2% and the ones it hated most won 35.5%. That model is gone. What is left is the market price as a benchmark, the few signals that survived testing (each shown with its record), and fast access to the past performances so you can read the race yourself.</div>
-      <p class="rec-detail" style="font-size:12.5px;color:var(--ink-soft);margin:-4px 0 12px;">Strips records and caveats from screen, print and download. Bets and the disclaimer stay.</p>
       <div class="sort-toggle no-print" role="group" aria-label="Which odds to compute from">
         <button class="toggle-btn active" id="oddsMLBtn" data-src="ml">Compute from: morning line</button>
         <button class="toggle-btn" id="oddsFinalBtn" data-src="final">Compute from: final odds</button>
       </div>
-      <p style="font-size:12.5px;color:var(--ink-soft);margin:-4px 0 14px;">This switch picks which column the math reads. <b>Morning line</b> uses the ML that came with the file. <b>Final odds</b> uses whatever you typed in the Final column, falling back to the ML for any horse you haven't updated — so at the track you can fill in just the race you're standing in front of, hit Compute, and read that one card. Final odds are also what makes the money-move column work, since drift is measured against the morning line.</p>
+      <p style="font-size:12.5px;color:var(--ink-soft);margin:-4px 0 14px;">Which column the math reads. <b>Final odds</b> falls back to the morning line for any horse you haven't updated, so you can fill in one race at a time.</p>
       <div class="race-nav no-print" id="raceNav"></div>
       <div id="raceCardList"></div>
     </section>
@@ -830,10 +817,10 @@
 
     <section id="resultsScoreSection" style="display:none;">
       <h2><span class="step-num">5</span> Score the benchmark against results</h2>
-      <div class="rss-info" style="margin:0 0 14px;">This grades the <b>market favourite</b> in each race, not a pick — the tool doesn't make picks. It is here to keep the benchmark honest and visible: expect a losing ROI, because takeout is 17-20%. Do not expect a stable strike rate — measured card by card across 107 races the favourite ranged from 9% to 78%, and the two halves of that pool averaged 21% and 47%. Any signal worth adding later has to beat this line, not beat zero.</div>
+      <div class="rss-info" style="margin:0 0 14px;">Grades the <b>market favourite</b> in each race — the benchmark, not a pick.</div>
       <div class="upload-card no-print">
         <h3>Paste a results chart</h3>
-        <p>Paste the text of a brisnet-style results chart (the "FIRST RACE… $2 Mutuel Prices…" pages). It only needs the win/place/show payout lines — copy as much of the chart as you have and drop it in below.</p>
+        <p>Paste a results chart. It only needs the "$2 Mutuel Prices" payout lines.</p>
         <textarea id="resultsPaste" rows="6" placeholder="FIRST RACE&#10;Canterbury Park&#10;$2 Mutuel Prices:&#10; 2- EOS HEY BUCKO . . . 4.40 2.80 2.20&#10; 5- IZA B SLICK . . . 5.40 3.20&#10; ..."></textarea>
         <div class="table-actions" style="margin-top:10px;">
           <button class="primary-btn" id="scoreResultsBtn">Score the benchmark →</button>
@@ -845,8 +832,8 @@
 
 
     <div class="disclaimer">
-      <strong>How to read this:</strong> odds get converted to an implied win probability and normalized across the field to strip out the track's built-in edge (the overround). If you supplied a rating column, that becomes a second, independent probability estimate by weighting each horse's share of the field's total rating — nothing fancier than that, and it's only as good as the rating you feed it. "Edge" is just the gap between the two. A positive edge means the rating thinks the horse is more likely to win than the odds imply; it is not a prediction of the outcome. This tool doesn't know track bias, scratches after your upload, trip trouble, or today's pace shape — mark scratches in the Scr column and recompute as changes come in, and read the past performances yourself before betting.<br><br>
-      This is an analytical aid, not advice, and it carries no guarantee of accuracy. Nothing here has been shown to beat the market. Wagering involves real financial risk. If gambling stops being fun or starts causing problems, the National Problem Gambling Helpline (1-800-522-4700) is free and confidential.
+      <strong>How to read this:</strong> odds are converted to an implied win probability and normalized across the field to strip out the track's built-in edge. The tool does not know track bias, late scratches, trip trouble or today's pace shape — mark scratches in the Scr column, rebuild, and read the past performances yourself before betting.<br><br>
+      This is an analytical aid, not advice, and it carries no guarantee of accuracy. Wagering involves real financial risk. If gambling stops being fun or starts causing problems, the National Problem Gambling Helpline (1-800-522-4700) is free and confidential.
     </div>
   </main>
 </div>
@@ -871,7 +858,6 @@ let lastCsvData = null;
 let lastDrfText = null;
 let computedRaces = [];   // full per-race horse data, kept around for re-sorting
 let currentSort = 'edge';
-let cleanMode = false;
 
 const rowsBody = document.getElementById('rowsBody');
 const emptyNote = document.getElementById('emptyNote');
@@ -1866,9 +1852,7 @@ function parseOdds(str){
 // the morning line for any horse you haven't updated yet — so you can fill in
 // one race at the track and recompute without touching the rest of the card.
 let oddsSourceMode = 'ml';
-// Pool concentration is still computed and shown as context, but nothing is
-// built on it any more — the market-ranked trifecta box it used to drive went
-// 3-for-10 at roughly breakeven, which is not a reason to buy a ticket.
+// Pool concentration is computed and shown as context only.
 
 ['oddsMLBtn','oddsFinalBtn'].forEach(id => {
   document.getElementById(id).addEventListener('click', function(){
@@ -1881,12 +1865,6 @@ let oddsSourceMode = 'ml';
   });
 });
 
-document.getElementById('cleanToggle').addEventListener('change', function(){
-  cleanMode = this.checked;
-  document.body.classList.toggle('clean', cleanMode);
-  document.getElementById('cleanToggleLabel').classList.toggle('on', cleanMode);
-});
-
 document.getElementById('diagToggle').addEventListener('change', function(){
   document.body.classList.toggle('diag', this.checked);
   document.getElementById('diagToggleLabel').classList.toggle('on', this.checked);
@@ -1896,19 +1874,9 @@ document.getElementById('raceCardBtn').addEventListener('click', () => {
   document.getElementById('resultsSection').scrollIntoView({behavior:'smooth', block:'start'});
 });
 
-// ---- SCRATCH-STALE RATINGS, fixed 2026-08-22 ----
-// The penalty stack, the connections blend and the head-to-head adjustment all
-// run ONCE, inside parseBrisnetSingleFile, across every horse in the uploaded
-// file. Ticking Scr only excluded a horse from the compute step — it never
-// re-ran any of that. So live ratings stayed measured against scratched
-// rivals: the connections blend averaged trainer/jockey percentages over
-// horses that never left the barn, and a runner could carry a +10% h2h boost
-// for having beaten one of them. SAR 8/21 R1 was the demonstration — five of
-// nine scratched, and Cugino sat below Capture the Flag only because of it.
-//
-// Rather than lift that logic out into a second copy that can drift from the
-// original, re-parse the file with the scratched lines removed. One pipeline,
-// one definition of the adjustments, and rawPP is untouched throughout.
+// Scratches: re-parse the file with scratched lines removed, so the
+// penalty stack, connections blend and head-to-head all recompute against
+// the horses actually running. One pipeline, one definition.
 function reScoreForScratches(){
   if (!lastDrfText) return;
   const scr = new Set(rows.filter(r => r.scratched)
@@ -1968,29 +1936,9 @@ document.getElementById('computeBtn').addEventListener('click', () => {
     const classRaw = (r.classMove || '').toLowerCase();
     const classMove = /down|drop/.test(classRaw) ? 'down' : /up|rise/.test(classRaw) ? 'up' : '';
 
-    // ---- ADJUSTED SCORE RETIRED (build 2026-08-24-d, Robert: "retire and show") ----
-    // The rating is now the vendor's Prime Power, untouched. Every weight that
-    // used to sit on top of it was assumed at build time and none ever earned
-    // its place:
-    //   CLASS MOVE +/-8%  — tested 2026-08-24 on 198 runners across GP 8/15,
-    //     8/17 and 8/22. Droppers (boosted) won 10.7%, the WORST group on the
-    //     card, and came 2.7 wins short of what their prices implied. Risers
-    //     (penalised) landed exactly on market expectation, 4 wins against 4.0
-    //     implied. Both signs contradicted. It was also derivable for only 60
-    //     of 198 runners, so it sat silently inert for 70% of the field.
-    //   HEAD-TO-HEAD +/-10%, UNCAPPED — Junction Road GP 8/17 R4 came out
-    //     +52.2% and finished 6th of 7; Title Role SAR 8/8 did the same at
-    //     +42.8%. Compounding with no ceiling is a defect, not a weighting.
-    //   SURFACE BLEND 35% — never tested alone, and the single biggest mover.
-    //     It is what dropped Team of Rivals to 4th on adjusted rating over a
-    //     surface he had already won on, in a race he then won.
-    // GP 8/17 R4 is the case for retiring the lot: raw said 130.86 vs 129.50,
-    // which honestly means "cannot split these two"; the stack manufactured a
-    // 30-point gap pointing at the horse that ran third.
-    // The inputs are NOT deleted — class move, surface rating, previous
-    // meetings and the penalty flags are all still parsed and now shown as
-    // labels. Same treatment as previous meetings and common company: visible,
-    // informative, scoring nothing.
+    // The rating is the vendor's Prime Power, untouched. The old adjustment
+    // stack (class move, head-to-head, surface blend) was retired 2026-08-24;
+    // its inputs are still parsed and shown as labels, but score nothing.
     const untouchedPP = (r.rawPP !== '' && r.rawPP != null && !isNaN(parseFloat(r.rawPP))) ? parseFloat(r.rawPP) : null;
     const ratingNum = untouchedPP != null ? untouchedPP : scoreNum;
     const effectiveScore = ratingNum;
@@ -2063,19 +2011,8 @@ document.getElementById('computeBtn').addEventListener('click', () => {
     });
     const favorite = horses.reduce((a,b) => (a.decimalOdds < b.decimalOdds ? a : b));
 
-    // ---- STATUS SYSTEM REMOVED, build 2026-08-12-d ----
-    // PLAY / CAUTION / PASS is gone, and so is the edge that drove it. Not
-    // retuned — removed. Two independent measurements found it pointing the
-    // WRONG WAY: across 316 scored runners the top edge decile won 6.2% while
-    // the bottom decile (the horses the model hated most) won 35.5%; and on
-    // SAR 8/12 the PASS races went 2-for-4 while PLAY+CAUTION went 1-for-5 at
-    // -42% ROI. A label that reliably points backward is worse than no label,
-    // because it costs you the races you would otherwise have read properly.
-    //
-    // What replaces it is nothing. This tool no longer names a horse. Market %
-    // is the benchmark (final-odds log-loss 1.679 vs 2.006 for knowing
-    // nothing, favorites ~30% across three independent samples), and the
-    // display below is here to help YOU read the race.
+    // No status label and no model pick. Market % is the benchmark; the
+    // displays below are here to help you read the race.
     const marketPick = horses.filter(h => h.marketProb != null)
                              .slice().sort((a,b) => b.marketProb - a.marketProb);
 
@@ -2354,28 +2291,10 @@ function findMatchups(horses){
   return out;
 }
 
-// ---- COMMON COMPANY (build 2026-08-22-e, Robert's ask) ----
-// The existing matchup finder needs two horses to have been in the SAME race.
-// This is the indirect version: two horses that never met, but both lost to
-// the SAME third horse. If A was beaten 1 3/4L by X and B was beaten 10 3/4L
-// by the same X, A rates nine lengths ahead of B through common company.
-//
-// The only opponent name the data file carries per past start is the WINNER
-// of that race (field 406+i), so a shared LOSS is the one link that can be
-// built. Beaten margins are the horse's own (field 736+i).
-//
-// MEASURED, one card only: on GP 8/22 this produced 17 pairwise orderings and
-// 13 of them held up in today's running — 76% against a 50% coin flip. That is
-// one card, the pairs inside a race are not independent of each other, and it
-// was looked at after the races were run. Thresholds were checked at 0.5L, 2L,
-// 3L and 5L of separation and the hit rate sat flat at 75% until the sample got
-// down to four comparisons, so no threshold is being tuned on it — a 1L floor
-// is used only to avoid calling a tie a verdict.
-//
-// DISPLAY ONLY, and deliberately so. The +/-10% head-to-head adjustment in the
-// scorer was validated on DIRECT meetings; widening what counts as a meeting is
-// not allowed to change scoring without its own test. Same rule that kept the
-// previous-meetings finder display-only.
+// ---- COMMON COMPANY ----
+// Indirect version of the matchup finder: two horses that never met but both
+// lost to the SAME third horse (field 406+i carries the winner of each past
+// start; beaten margins are field 736+i). Display only.
 function findCommonCompany(horses){
   const key = h => String(h || '').toUpperCase().replace(/\s*\([A-Z]{2,3}\)\s*$/, '').replace(/[^A-Z0-9]/g, '');
   const out = [];
@@ -2507,15 +2426,8 @@ function buildTiebreakRead(rs){
   </div>`;
 }
 
-// Quirin speed points read RELATIONALLY. The raw number is dead (SP>=6 won
-// 15.6% vs a 14.1% baseline in sprints; SP>=5 actually 12.5%). The
-// field-relative version is where signal appeared. UPDATED 2026-08-28 on a
-// bigger, priced sample — 180 races / 19 paired cards: lone speed (top
-// Quirin, >=2 clear of 2nd) won 22.9% vs a 22.5% implied rate but returned
-// +30.0% flat-$2, against -6.0% for top-but-contested and -28.8% field-wide.
-// First replication of the earlier 27-race look (which found the same
-// direction on only 3 clean cases). Still display only — 48 cases at this
-// setup's ~27% frequency, due another check after five more cards.
+// Quirin speed points read RELATIONALLY: lone speed means top Quirin and 2+
+// clear of the next horse. The raw number scores nothing.
 function speedShape(horses){
   const withSP = horses.filter(h => h.quirin != null).slice().sort((a,b) => b.quirin - a.quirin);
   if (!withSP.length) return null;
@@ -2538,24 +2450,10 @@ function horseLabel(h){
   return `<b>#${escHtml(h.post || '?')} ${escHtml(h.horse)}</b> (${escHtml(h.oddsStr)})`;
 }
 
-// ---- READABILITY RATING (build 2026-08-12-e) ----
-// GREEN / YELLOW / RED, and it is deliberately NOT a prediction. It rates
-// whether THIS TOOL CAN SEE the race — whether there is enough past-performance
-// data, at a comparable distance, on a surface whose figures mean anything, for
-// the displays below to be worth reading. It never says a race is beatable.
-//
-// Why it is built this way. The status system removed one build ago rated races
-// by model-vs-market disagreement and was measured pointing backward (top edge
-// decile 6.2%, bottom decile 35.5%). The race-level splits that DO separate on
-// 36 races are close to tautological: where the top three hold 70%+ of the pool
-// the favourite won 58% at a 1.88 median, and in the loosest races 0-for-2 at a
-// 7.72 median. That says the market is right when it is confident — it locates
-// favourites, not value. So this rates information availability, which is a
-// claim about the data in hand rather than about the outcome.
-//
-// OPINION, NOT A MEASUREMENT. The thresholds below are hand-set and have never
-// been tested against results, because "was this race readable" has no outcome
-// to test against. Scores nothing.
+// ---- READABILITY RATING ----
+// GREEN / YELLOW / RED. It rates whether the TOOL CAN SEE the race — enough
+// past performances, at a comparable distance, for the displays below to be
+// worth reading. Never a claim about the outcome. Hand-set, scores nothing.
 function readability(rs){
   const horses = rs.horses || [];
   const n = horses.length;
@@ -2591,12 +2489,6 @@ function readability(rs){
   else if (n >= 12) notes.push(`${n} runners — too many to read carefully`);
   else notes.push(`only ${n} runners`);
 
-  // 4. The bullet-work bonus point was REMOVED on 2026-08-13-b. It existed only
-  //    because bullets were thought to carry unpriced signal; that claim failed
-  //    its first blind test, so the point it earned goes with it. Nothing else
-  //    in the score changes, which means green now needs 7 of 8 rather than 7
-  //    of 9 — a slightly harder bar, which is the right direction to move when
-  //    a supporting input is withdrawn.
 
   // 5. Deductions.
   const turf = horses.some(h => /^[Tt]$/.test(h.surfaceToday || ''));
@@ -2618,25 +2510,13 @@ function readability(rs){
   return {level, pts, max, why: hardRed ? hardRed : notes.join(' · '), hardRed};
 }
 
-// FIELD CONCENTRATION — top-3 market share. Measured across 82 races: races the
-// agreement rule fires on average 38.8% top-choice share; races it declines
-// average 35.9%. A 2.9-point gap on one untested split — call it what it is,
-// a description of how settled the market looks, not a signal. Betting the
-// favourite specifically in the flatter races lost money (-10.2% over 51
-// races), so this names no horse and recommends nothing. Thresholds are a
-// judgement call, not a fitted line.
-// Thresholds are the actual top/bottom quintile of concentration across the
-// 85 races run through this tool as of 2026-08-20 (mean 58.9%, range 35-80%),
-// not an absolute cutoff. My first attempt used arbitrary numbers borrowed
-// from a different market regime and "flat" never fired once across 9 cards
-// — a tag that always says the same thing is worse than no tag. Rebased here;
-// will drift stale again as more cards come in, since it is a snapshot, not a
-// formula. Revisit after the next ~10 cards.
+// FIELD CONCENTRATION — top-3 share of the implied win probability.
+// Descriptive label only; thresholds are the top/bottom quintile seen so far.
 function concentrationTag(rs){
   const c = rs.concentration;
   if (c == null) return '';
-  if (c >= 0.68) return `<span class="market-tag" title="Top 3 choices hold ${pct(c)} of the implied win probability — among the more settled markets seen on this tool (top 20% of 85 races checked). Descriptive only, not a signal: the split has not been tested out of sample, and betting on this alone lost money in testing.">settled market · top 3 ${pct(c)}</span>`;
-  if (c <= 0.525) return `<span class="market-tag" title="Top 3 choices hold only ${pct(c)} of the implied win probability — among the more open markets seen on this tool (bottom 20% of 85 races checked). Descriptive only, not a signal: the split has not been tested out of sample, and betting on this alone lost money in testing.">flat market · top 3 ${pct(c)}</span>`;
+  if (c >= 0.68) return `<span class="market-tag" title="Top 3 choices hold ${pct(c)} of the implied win probability — a settled market. Descriptive only.">settled market · top 3 ${pct(c)}</span>`;
+  if (c <= 0.525) return `<span class="market-tag" title="Top 3 choices hold only ${pct(c)} of the implied win probability — an open market. Descriptive only.">flat market · top 3 ${pct(c)}</span>`;
   return '';
 }
 
@@ -2651,47 +2531,12 @@ const READ_GLOSS = {
   red: 'this tool cannot see this race — read the program yourself and ignore everything below'
 };
 
-// ---- THE ONE PLACE THIS TOOL NAMES A HORSE (build 2026-08-14-a) ----
-// The rule: the horse with the highest CAREER EARNINGS PER START in the field
-// is ALSO the market favourite. Two measures that do not share an input — one
-// from the horse's own record, one from the crowd's money — landing on the
-// same animal.
-//
-// MEASURED, 43 races across five cards (GP 8/9, SAR 8/9, GP 8/10, SAR 8/12,
-// SAR 8/13):
-//   rule fires in 20 of 43 races (47%)
-//   that horse won 12/20 = 60.0%, first-or-second 13/20 = 65.0%, flat ROI +27.9%
-//   the SAME favourites when they are NOT the earnings leader: 7/23 = 30.4%
-//   every favourite across all 43: 19/43 = 44.2%
-//
-// The honest caveats, which the panel prints too:
-//   - Earnings per start ALONE is WORSE than the market: 17/43 = 39.5% against
-//     the favourite's 44.2%. There is no pick here without the agreement.
-//   - This was found by looking at finished races, not predicted in advance.
-//     It is post hoc on 20 races and by-card it is lumpy: 3/3, 3/4, 3/5, 2/4,
-//     but 1/4 on SAR 8/9.
-//   - 60% winners at a median 2.39 is a thin margin over takeout. From here it
-//     is pre-registered and the scoreboard tracks it forward.
-// ---- IS EARNINGS PER START MEASURING ANYTHING HERE? (build 2026-08-24-b) ----
-// Robert's catch on GP 8/15 race 2, and it is the right one. Straight to Jail
-// led that field at $1,200 per start — earned by finishing 4th and 6th in two
-// maiden special weights. NOT ONE HORSE IN THAT FIELD HAD EVER FINISHED IN THE
-// TOP THREE. The five earnings figures were $280, $400, $400, $400 and $1,200,
-// all of it money for running 4th to 6th. Earnings per start is a proxy for the
-// class of company a horse has held its own in; with no top-three finish
-// anywhere in the field it is measuring which purse happened to pay down
-// furthest, and the rule should say nothing.
-//
-// So the gate is on the FIELD, not the leader. Requiring the LEADER to have a
-// win, or a board finish, or 3+ starts also throws out Real Gone (GP 8/22 R4,
-// one start, no board finish, won at $9.60) — every one of those variants
-// costs a winner and gains nothing. Field-level costs one pick across the two
-// scored cards and that pick lost: 11 picks / 7 winners becomes 10 / 7.
-//
-// STATED PLAINLY: dropping exactly one race is not evidence. The reason to keep
-// this is the reasoning, not the record — participation money is not class, and
-// that is true whatever the next card does. It is a floor for "the input means
-// something", not a filter tuned for winners.
+// ---- THE ONE PLACE THIS TOOL NAMES A HORSE ----
+// The rule: the field's highest CAREER EARNINGS PER START is ALSO the market
+// favourite. Two measures that share no input landing on the same horse.
+// fieldHasRealForm is a floor on the input: with no top-three finish anywhere
+// in the field, earnings per start is measuring which purse paid furthest
+// down rather than the class of company a horse has held, so it says nothing.
 function fieldHasRealForm(horses){
   return horses.reduce((n, h) => n + ((h.ltWins || 0) + (h.ltPlaces || 0) + (h.ltShows || 0)), 0) >= 1;
 }
@@ -2707,50 +2552,23 @@ function earningsLeader(horses){
   return {top: rated[0].h, eps: rated[0].eps, ranked: rated, coverage: rated.length};
 }
 
-// ---- TWO TIERS, build 2026-08-22-d ----
-// Tier 1  PICK      — the field's earnings-per-start leader IS the market favourite.
-// Tier 2  STAND-BY  — the market favourite is SECOND in the field on earnings
-//                     per start. Weaker, named anyway, tracked separately.
-//
-// What tier 2 costs, recorded here so it cannot be quietly forgotten. On the
-// 56-race derivation pool "favourite inside the earnings top two" fired 35
-// times and won 45.7%. But subtract the tier-1 races and the MARGINAL races
-// tier 2 adds went 3-for-11 = 27.3% — BELOW the 39.3% from backing every
-// favourite blind. On GP 8/22 it went 1-for-2 (Real Gone won at $9.60,
-// Laigina 2nd). It is separated, never blended into tier 1's number, and it
-// comes out if it is still under 35% after five cards.
-//
-// The readability RED gate no longer vetoes a pick. It was built to rate
-// whether the tool can SEE a race, and the rule needs only a career earnings
-// figure and a price — which a thin field still supplies. Audited across
-// SAR 8/12-8/14 the gate blocked 3 picks that went 2-for-3, and on GP 8/22
-// race 2 had only 2 of 5 runners carrying a career record, would have been
-// suppressed, and won. Depth of past performance also ran the wrong way on
-// that card: the ML favourite went 4/5 in the five THIN races and 2/5 in the
-// five deep ones. Readability stays as a label. It stops being a gate.
+// Rank 1 = the favourite IS the earnings leader. Rank 2 = the favourite is
+// second on earnings per start; kept as a separately scored Price play.
+// Readability is a label, not a gate — it never vetoes a pick.
 function ordinalOf(n){
   return n === 1 ? '1st' : n === 2 ? '2nd' : n === 3 ? '3rd' : n + 'th';
 }
 
-// What the earnings figure actually rests on. A number built from two starts
-// and no board finish reads very differently from one built from 24 starts and
-// five wins, and the pick card should not hide that behind a dollar figure.
-// Horses the comparison cannot see at all. A first-time starter has no
-// denominator, so it is not ranked and rejected — it is simply absent. SAR
-// 8/26 R1: three of seven were first-timers, the rule picked the earnings
-// leader of the other four, and a first-timer (Dotsy) won at 8-1. Measured
-// across 198 runners in 29 races, first-timers won 16.0% against a 14.4%
-// implied rate — the only group in that sample to beat its own price. An
-// earlier, smaller sample had them at 10% against a 13.1% baseline, so the
-// direction is unsettled. What is not in doubt is that they sit outside the
-// comparison entirely, so the pick is the best of a partial field.
+// What the earnings figure rests on, so a number built from two starts does
+// not read like one built from 24. First-time starters have no denominator
+// and sit outside the comparison entirely.
 function blindSpotNote(rs){
   const horses = (rs.horses || []);
   if (!horses.length) return '';
   const blind = horses.filter(h => !h.ltStarts);
   if (!blind.length) return '';
   const names = blind.map(h => `#${escHtml(h.post || '?')}`).join(' ');
-  return `<div class="blind-note"><b>${names} \u2014 first-time starter${blind.length === 1 ? '' : 's'}, no data, not in this comparison (${blind.length} of ${horses.length} runners).</b> First-timers won 16.0% across the 198 runners measured, against a 14.4% implied rate.</div>`;
+  return `<div class="blind-note"><b>${names} \u2014 first-time starter${blind.length === 1 ? '' : 's'}, no data, not in this comparison (${blind.length} of ${horses.length} runners).</b></div>`;
 }
 
 function epsBasis(h){
@@ -2765,17 +2583,9 @@ function epsBasis(h){
 
 function pickFor(rs){
   const horses = rs.horses || [];
-  // The rule has always selected the MORNING-LINE favourite — every number in
-  // the record was scored that way. byMarket re-sorts on whichever odds column
-  // is active, so once final odds are entered it would silently start picking a
-  // different horse and filter B could never fail. Select on the morning line.
-  // BUG FIX 2026-08-28: this read x.odds, which does not exist on the real
-  // horse objects — the pipeline stores the morning line as mlOddsStr. That
-  // made mlOf() return null for every horse, emptied `priced`, left fav null,
-  // and the null dereference below threw before the pick list ever rendered
-  // — the whole Picks tab went blank. My own test script masked this because
-  // it hand-built horses with a field literally named `odds`; the real
-  // pipeline never has one. Caught on today's live card (SAR 8/28).
+  // Select on the MORNING LINE. byMarket re-sorts on whichever odds column is
+  // active, so selecting from it would silently switch the pick to the final
+  // favourite once final odds are entered. Morning line is stored as mlOddsStr.
   const mlOf = x => parseOdds(x.mlOddsStr);
   const priced = (rs.horses || []).filter(x => mlOf(x) != null);
   const fav = priced.length ? priced.reduce((a, b) => (mlOf(b) < mlOf(a) ? b : a)) : null;
@@ -2784,12 +2594,8 @@ function pickFor(rs){
   if (!el) return {none: 'Not enough of this field has a career record to rank on earnings per start — usually a maiden field with first-time starters. A first-time starter carries no data at all, so the board says nothing here rather than guessing.'};
   if (!fav) return {none: 'No odds available for this race yet.'};
 
-  // Rank the favourite by VALUE, not by its position in a sorted array.
-  // Found the hard way on GP 8/22 race 4: Real Gone and Nofilterneeded both
-  // sat on exactly $2,000 per start, so whether the favourite counted as
-  // "second in the field" depended on which line came first in the data file.
-  // A tie is a tie — both horses hold rank 2, and the winner ($9.60) is only
-  // reached at all under value ranking.
+  // Rank the favourite by VALUE, not by array position, so tied earnings
+  // figures both hold the same rank.
   const favRow = el.ranked.find(r => r.h === fav);
   if (!favRow) return {none: `The market favourite (<b>${escHtml(fav.horse)}</b> at ${escHtml(fav.oddsStr)}) has no career record to rank on — earnings per start cannot see it. No pick.`};
   const favEps = favRow.eps;
@@ -2799,42 +2605,13 @@ function pickFor(rs){
   // Race 7 on GP 8/22 split $15,979 from $15,976 — three dollars.
   const nearTie = leader.eps > favEps && (leader.eps / favEps) < 1.05;
 
-  // ---- TWO FILTERS, added 2026-08-28 after scoring 97 picks on 19 paired cards ----
-  // The old tier 1 / tier 2 split was the wrong cut. Both tiers carried the same
-  // failure mode, and separating on it beats separating on earnings rank.
-  //
-  //   FILTER A — the pick's MORNING LINE must be 2.5 or shorter. A 4-1 morning
-  //   line favourite means the racing secretary could not split the race. Across
-  //   97 picks, ML above 2.5 went 3-for-14 (21.4%) and produced 6 of the 8 that
-  //   finished worse than third — Sharons Pharoah (8th of 8), Fletch's Rockette,
-  //   Slewty Princess, Al Mowashaah, Travel Happy, Timia, all ML 2.6 to 4.0.
-  //
-  //   FILTER B — the pick must STILL be the betting favourite at post time.
-  //   Picks the money walked away from went 8-for-31 (25.8%). This is a VETO on
-  //   our own selection, not a bet on drift — drift as a bet pays nothing, which
-  //   is settled.
-  //
-  // The four buckets, measured (97 picks, betting-favourite benchmark 41.1%):
-  //   rank 1 + both filters   46 picks  58.7% won  +6.9pts vs implied  ROI +17.5%
-  //   rank 1 + fails either   18 picks  11.1% won  -22.8pts            ROI -68.7%
-  //   rank 2 + both filters   14 picks  42.9% won   -2.7pts            ROI  -8.1%
-  //   rank 2 + fails either   19 picks  36.8% won  +11.3pts            ROI +52.9%
-  //
-  // So rank 1 with the filters is the primary line and rank 1 without them is
-  // the worst group in the sample. Rank 2 is kept only in its unfiltered form,
-  // as a separately-scored PRICE PLAY, and its number is not to be trusted yet:
-  // 19 observations, and tier 2's whole profit historically came from three
-  // horses — remove the top three prices and it turns negative. Its shape
-  // (fires only when it FAILS the filters) is exactly what a slicing artifact
-  // looks like, and it is flagged as such on the card.
+  // ---- TWO FILTERS ----
+  //   A — the pick's MORNING LINE must be 2.5 or shorter.
+  //   B — the pick must STILL be the betting favourite at post time.
+  // Rank 1 passing both is the Pick line. Rank 1 failing either is suppressed.
+  // Rank 2 fires only where the filters fail, as a Price play on its own line.
   const ML_MAX = 2.5;
-  // Same class of bug as mlOf() above, same date, found by running the actual
-  // browser handlers end-to-end rather than a hand-built test object — the
-  // first fix only covered mlOf; this line made the identical mistake one
-  // scope down, so filter A (mlOK) was silently false for every horse and
-  // every rank-1 case fell through to "suppressed" while rank-2 cases fired
-  // as price plays regardless of their real price. SAR 8/28 showed 3 price
-  // plays and zero primaries where 3 primaries were expected.
+  // parseOdds returns DECIMAL, so subtract 1 before comparing against 2.5.
   const mlDec = parseOdds(fav.mlOddsStr);                 // decimal
   const mlPrice = mlDec == null ? null : mlDec - 1;       // "to one", what 2.5 means
   const mlOK = mlPrice != null && mlPrice <= ML_MAX;
@@ -2851,15 +2628,15 @@ function pickFor(rs){
     const second = el.ranked.find(r => r.eps < favEps);
     if (filtersPass) return Object.assign({line: 'primary', tier: 1, second, nearTie: false}, base);
     const why = [];
-    if (!mlOK) why.push(`its morning line is ${escHtml(fav.oddsStr)} — above 2.5, and those went 3-for-14`);
-    if (stillFav === false) why.push('the money has moved to another horse, and those went 8-for-31');
-    return {none: `<b>${escHtml(fav.horse)}</b> is the earnings leader and the market's choice, but ${why.join(', and ')}. That combination went 2-for-18 across 97 picks. No pick.`};
+    if (!mlOK) why.push(`its morning line is ${escHtml(fav.oddsStr)}, above the 2.5 cut-off`);
+    if (stillFav === false) why.push('the money has moved to another horse');
+    return {none: `<b>${escHtml(fav.horse)}</b> is the earnings leader and the market's choice, but ${why.join(', and ')}. No pick.`};
   }
   if (rank === 2){
-    if (filtersPass) return {none: `<b>${escHtml(fav.horse)}</b> is second in the field on earnings per start, behind <b>${escHtml(leader.h.horse)}</b>. Measured at 42.9% on 14 picks and a losing return. No pick.`};
+    if (filtersPass) return {none: `<b>${escHtml(fav.horse)}</b> is second in the field on earnings per start, behind <b>${escHtml(leader.h.horse)}</b>. No pick.`};
     return Object.assign({line: 'price', tier: 2, leader, nearTie}, base);
   }
-  return {none: `The market favourite (<b>${escHtml(fav.horse)}</b> at ${escHtml(fav.oddsStr)}) is ${ordinalOf(rank)} in the field on earnings per start at ${money(favEps)}, behind <b>${escHtml(leader.h.horse)}</b> at ${money(leader.eps)}. Measured across 43 races that disagreement is where both do worst — the favourite wins 30% of those and the earnings leader 22%. No pick.`};
+  return {none: `The market favourite (<b>${escHtml(fav.horse)}</b> at ${escHtml(fav.oddsStr)}) is ${ordinalOf(rank)} in the field on earnings per start at ${money(favEps)}, behind <b>${escHtml(leader.h.horse)}</b> at ${money(leader.eps)}. The two measures disagree, so no pick.`};
 }
 
 // The one thing that can talk the board out of its own pick. Only live once
@@ -2870,29 +2647,10 @@ function driftDowngrade(h){
   return `<div class="pick-downgrade"><b>Stand down \u2014 drifted ${pctDrift}% off the morning line.</b></div>`;
 }
 
-// ---- CONTENDERS AND PRETENDERS (build 2026-08-24-e, Robert's ask) ----
-// Naming who CANNOT win is a far easier problem than naming who will, and it
-// is the one thing in this project that has replicated over and over: the dead
-// tail. Measured on 198 runners / 29 races across GP 8/15, 8/17 and 8/22 —
-//   ML 12-1 or longer:            cuts 23.2% of the field, ZERO winners lost
-//   outside the market's top five: cuts 26.8% of the field, ZERO winners lost
-// Both together keep 69.2% of the field and every one of the 29 winners.
-//
-// BE HONEST ABOUT WHO IS DOING THE WORK: that is the PRICE talking, not this
-// tool. Every FORM-based elimination tested on live-priced horses (ML under
-// 12-1) either did nothing or backfired —
-//   winless with 8+ starts:        those horses won 33.3% (base rate 19.1%)
-//   turf race, no turf start:      won 30.0%
-//   zero starts at today's trip:   won 21.7%, i.e. nothing
-// The single exception is being trounced last time: beaten 10L+ at a
-// comparable distance won 6.7% against a 19.1% base, n=15. That is why those
-// horses are flagged QUESTIONABLE rather than eliminated — the filter would
-// cut a further 6% of the field but it costs one of the 29 winners, and on one
-// winner there is no way to tell whether that is signal or a bad break.
-//
-// LIMITATION, stated on the card: this narrows a race to three or fewer in
-// only 6 of 29 races. In most races it says "the market's top five", which is
-// true, useful for cutting tickets, and not an insight.
+// ---- CONTENDERS AND PRETENDERS ----
+// Naming who cannot win is the easier problem. Cuts are made on PRICE (12-1
+// or longer, or outside the market's top five). Beaten 10L+ last comparable
+// start is flagged QUESTIONABLE rather than eliminated.
 function contenderSplit(rs){
   const horses = (rs.horses || []).filter(h => h.decimalOdds != null);
   if (horses.length < 4) return null;
@@ -2947,7 +2705,7 @@ function buildPick(rs){
 
   const marketNote = p.marketKnown
     ? `<div class="mkt-ok"><b>Market confirms it \u2014 still favourite at ${escHtml(p.h.oddsStr)}.</b></div>`
-    : `<div class="mkt-pending"><b>Market check pending.</b> Enter final odds before the off. If this horse is no longer favourite, the pick is withdrawn \u2014 abandoned picks went 8-for-31.</div>`;
+    : `<div class="mkt-pending"><b>Market check pending.</b> Enter final odds before the off \u2014 if this horse is no longer favourite, the pick is withdrawn.</div>`;
 
   if (p.line === 'primary'){
     const second = p.second;
@@ -2965,16 +2723,14 @@ function buildPick(rs){
   return `<div class="pick-card tier2">
     ${head}
     <div>The market's choice, and <b>second in the field on career earnings at ${money(p.eps)} per start</b>${epsBasis(p.h)} — behind ${escHtml(lead.h.horse)} at ${money(lead.eps)}, who the crowd does not make favourite.${p.nearTie ? ` Those two are within 5% of each other, which is not really a first and a second — on this measure they are level.` : ''}</div>
-    <div class="price-warn"><b>Unproven line \u2014 19 picks, 36.8%, and its whole return sits on three prices.</b> Fires only where the primary filters fail, which is what a slicing artifact looks like. Scored on its own line, five-card review.</div>
+    <div class="price-warn"><b>Unproven line.</b> Fires only where the Pick filters fail, and is scored separately.</div>
     ${marketNote}
     ${blindSpotNote(rs)}
     ${driftDowngrade(p.h)}
   </div>`;
 }
 
-// What replaced the bet lines. Nothing here names a horse to back. Each line
-// is something MEASURED on this project's own cards, with its record stated so
-// you can weigh it yourself — that is the whole point of the rebuild.
+// Per-race read panel. Nothing here names a horse to back.
 function buildReadPanel(rs){
   const horses = rs.horses || [];
   const lines = [];
@@ -2987,31 +2743,6 @@ function buildReadPanel(rs){
     lines.push(`<div class="bet-line"><span class="bet-tag">MARKET</span> ${horseLabel(fav)} is the favourite at ${pct(fav.marketProb)}${second ? `, ${gap != null && gap >= 0.10 ? 'clear of' : 'narrowly over'} ${escHtml(second.horse)} (${pct(second.marketProb)})` : ''}.</div>`);
   }
 
-  // Bullet works. This line used to read "the one signal measured not to be in
-  // the price". It no longer does, because the first card that was a genuine
-  // out-of-sample test of it came back the other way: SAR 8/13, 0-for-5 in this
-  // exact window (last 4 works at today's track inside 30 days), and 3-for-29
-  // = 10.3% against 24.0% for horses with no bullet when taken across the full
-  // 12-work history. The original was 20.7% against a 14.0% baseline over 27
-  // races. A result that REVERSES on its first replication is usually noise,
-  // not a weak confirmation, so the claim is withdrawn rather than softened.
-  // The horses are still listed — the marker is a real thing in the data and
-  // costs nothing to show — but it is now labelled as what it is.
-  const bullets = horses.filter(h => (h.recentWorks || []).some(w => w.isBullet));
-  if (bullets.length){
-    lines.push(`<div class="bet-line struck"><span class="bet-tag failed">BULLET WORK · CLAIM WITHDRAWN</span> ${bullets.map(h => horseLabel(h)).join(' · ')}</div>`);
-  }
-
-  // Stretching out: the most consistent negative found.
-  const stretch = horses.filter(h => {
-    const past = (h.ppRaces || []).filter(p => p.distYds);
-    if (!past.length || h.raceDistYds == null) return false;
-    return h.raceDistYds - Math.abs(past[0].distYds) >= 440;
-  });
-  if (stretch.length){
-    lines.push(`<div class="bet-line struck"><span class="bet-tag failed">STRETCHING OUT · CLAIM WITHDRAWN</span> ${stretch.map(h => horseLabel(h)).join(' · ')}</div>`);
-  }
-
   // Money move, only once final odds exist.
   if (rs.hasMoveData){
     const sup = (rs.supported || []).slice().sort((a,b) => a.drift - b.drift);
@@ -3020,18 +2751,7 @@ function buildReadPanel(rs){
     }
   }
 
-  // Lone speed. Added 2026-08-28. Tested twice now: an earlier look at 27
-  // races found the right direction but the setup only occurred in ~13% of
-  // sprints (n=3), too thin to trust. Retested on 180 races across 19 paired
-  // cards with real prices attached: lone speed (top Quirin, 2+ clear of the
-  // next) won 22.9% against a 22.5% field-derived implied rate — essentially
-  // even on hit rate — but returned +30.0% flat-$2, against -6.0% for a top
-  // Quirin horse that is CONTESTED and -28.8% for the field at large. That
-  // gap between hit rate and ROI means these horses are priced only slightly
-  // short of fair and pay when they land. It is the second signal in this
-  // project (after shipping) to survive a price test rather than fail one.
-  // Still just 48 cases at this setup's frequency — display only, and due
-  // another look after five more cards.
+  // Lone speed: top Quirin, 2+ clear of the next horse. Display only.
   const shape = speedShape(horses);
   if (shape && shape.lone){
     lines.push(`<div class="bet-line"><span class="bet-tag place">LONE SPEED</span> ${horseLabel(shape.top)} — ${shape.top.quirin} speed pts, ${shape.gap} clear of ${shape.second ? escHtml(shape.second.horse) : 'the field'}.</div>`);
@@ -3039,9 +2759,9 @@ function buildReadPanel(rs){
 
   if (!lines.length){
     return `<div class="ticket"><div class="ticket-head">Reading <a class="race-jump" data-jump="${escAttr(rs.race)}" title="Tap for every runner's past performances">race ${escHtml(rs.race)}</a></div>
-      <div class="bet-line">Nothing measured stands out in this race. The past performances are one tap away on the race number.</div></div>`;
+      <div class="bet-line">Nothing stands out in this race. The past performances are one tap away on the race number.</div></div>`;
   }
-  return `<div class="ticket"><div class="ticket-head">Reading <a class="race-jump" data-jump="${escAttr(rs.race)}" title="Tap for every runner's past performances">race ${escHtml(rs.race)}</a> — measured signals, no pick</div>${lines.join('')}</div>`;
+  return `<div class="ticket"><div class="ticket-head">Reading <a class="race-jump" data-jump="${escAttr(rs.race)}" title="Tap for every runner's past performances">race ${escHtml(rs.race)}</a></div>${lines.join('')}</div>`;
 }
 
 /* ---------------- RACE CARD ---------------- */
@@ -3133,13 +2853,8 @@ function readLevelFor(raceKey){
 }
 
 /* ---------------- BET LOG ---------------- */
-// The one piece of state this tool keeps. Everything else is recomputed from
-// the file you upload; a saved bet outlives the tab. Stored in this browser
-// only — no account, no server, and it travels via the export button.
-//
-// The point is not convenience. Every record quoted in this tool came from an
-// analysis done elsewhere; this is the only number the program can derive
-// itself, from bets you actually made, on the races you actually played.
+// The one piece of state this tool keeps — saved bets outlive the tab.
+// Stored in this browser only: no account, no server.
 const BET_KEY = 'overlay-board-bets-v1';
 const BET_RESULTS = ['', 'won', '2nd', '3rd', 'unplaced'];
 
@@ -3242,13 +2957,8 @@ function showTab(name){
     b.classList.toggle('on', b.dataset.tab === name));
 }
 
-// The day's selections, gathered at the top — what a handicapper's card looks
-// like. Ordering is by race number ONLY. Two ways of ranking picks against each
-// other were tested on the 21 fired so far and both came back backwards: the
-// BIGGEST earnings gaps won 40% while the smallest won 72.7%, and the shortest
-// prices won 50% against 63.6% for the longest. On ten-a-side splits that is
-// noise, and inventing a confidence order out of it is exactly how the edge
-// model was born. So they are listed, not ranked.
+// The day's selections, gathered at the top. Ordering is by race number ONLY
+// — no confidence order, because nothing tested has produced one.
 function cardTrack(){
   const t = rows.map(r => (r.trackCode || '').toUpperCase()).find(Boolean);
   return t || '';
@@ -3344,7 +3054,7 @@ function renderPicks(raceSummaries){
   document.getElementById('pickCount').textContent = n;
   list.innerHTML = n
     ? best + blocks.join('')
-    : `<div class="pick-none"><b>No picks on this card.</b> Tier 1 needs the field's earnings-per-start leader to also be the market favourite; tier 2 needs the favourite to be second on earnings per start. Neither happened in any race here, and a maiden or first-time-starter field cannot be ranked at all. Across 43 measured races tier 1 alone fires in about 47% of them, so a quiet card is unremarkable.</div>` + blocks.join('');
+    : `<div class="pick-none"><b>No picks on this card.</b> The rule needs the earnings-per-start leader to also be the market favourite, and a maiden or first-time-starter field cannot be ranked at all. A quiet card is normal.</div>` + blocks.join('');
   bindTapHandlers(list);
   list.querySelectorAll('button[data-bet]').forEach(btn =>
     btn.addEventListener('click', () => {
@@ -3415,7 +3125,7 @@ function renderFullField(sortMode){
         </div>
         ${sparseWarning}
         <table class="field-table">
-          <thead><tr><th>Post</th><th>Horse</th><th>Odds</th><th title="Final odds vs morning line — the 3.5x signal, though it is already in the price">Move</th><th title="Beaten-lengths direction over recent comparable starts. Display only.">Form</th><th title="Quirin speed points, read against the field. LONE = highest and at least 2 clear.">Speed</th><th title="Recent works at today's track. Green = bullet.">Works</th><th title="Odds-implied win probability, normalized. The best single predictor measured in this project.">Market %</th><th class="diag-col">Model %</th><th class="diag-col">Edge</th><th class="raw-col" title="Prime Power as supplied. Since 2026-08-24 this is also the rating — nothing is applied on top of it.">Raw PP</th></tr></thead>
+          <thead><tr><th>Post</th><th>Horse</th><th>Odds</th><th title="Final odds against the morning line">Move</th><th title="Beaten-lengths direction over recent comparable starts. Display only.">Form</th><th title="Quirin speed points, read against the field. LONE = highest and at least 2 clear.">Speed</th><th title="Recent works at today's track. Green = bullet.">Works</th><th title="Odds-implied win probability, normalized across the field">Market %</th><th class="diag-col">Model %</th><th class="diag-col">Edge</th><th class="raw-col" title="Prime Power as supplied by the data file">Raw PP</th></tr></thead>
           <tbody>${rowsHtml}</tbody>
         </table>
       </div>`;
@@ -3716,9 +3426,7 @@ document.getElementById('scoreResultsBtn').addEventListener('click', () => {
   computedRaces.forEach(rc => {
     const res = results[rc.race];
     if (!res) return;
-    // Grades the MARKET FAVOURITE, not a model pick — the tool no longer names
-    // a horse, and the favourite is the benchmark every signal here is measured
-    // against. Expect roughly 30% wins and a losing ROI; that is the bar.
+    // Grades the MARKET FAVOURITE as the benchmark, not a model pick.
     const horses = rc.horses.slice().sort((a,b) => b.marketProb - a.marketProb);
     const pick = horses[0];
     if (!pick) return;
@@ -3785,16 +3493,13 @@ document.getElementById('printBtn').addEventListener('click', () => {
   document.getElementById('printSection').scrollIntoView({behavior:'smooth', block:'start'});
   const st = document.getElementById('printStatus');
   if (st){
-    st.textContent = 'Card laid out on the Printable page tab — use your browser\u2019s Share or Print from there.';
+    st.textContent = 'Card laid out on the Printable page tab — use your browser\u2019s Print or Share from there.';
     st.className = 'status ok';
   }
 });
 
-// Shared by both the print and download buttons. window.print() is unreliable
-// on phones — some in-app browsers and file:// webviews make it a silent no-op,
-// which is exactly what Robert hit. So printing now goes through a real
-// document: open it in a tab if the browser allows, otherwise save it as a
-// file the OS can print or share.
+// Print goes through a real rendered page: window.print() is a silent no-op
+// in some phone browsers.
 function reportParts(){
   const now = new Date();
   const stamp = now.toLocaleString();
@@ -3806,11 +3511,11 @@ function reportParts(){
   const cardWho = cardTrack();
   const titleLine = [cardWho, cardWhen].filter(Boolean).join(' \u00b7 ');
   const header = `<header><p class="eyebrow">Overlay Board \u00b7 race card</p><h1 style="font-size:30px;">Race Card${titleLine ? ' \u2014 ' + escHtml(titleLine) : ''}</h1><p class="tagline">Generated ${stamp}. ${srcLine} Scratched horses were excluded before computing.</p>${scratchLine}</header>`;
-  const picksBlock = (!cleanMode && grab('pickList'))
+  const picksBlock = grab('pickList')
     ? `<section><h2>Picks</h2>${grab('pickList')}</section>` : '';
-  const betsBlock = (!cleanMode && (grab('betTally') || grab('betList')))
+  const betsBlock = (grab('betTally') || grab('betList'))
     ? `<section class="page-break"><h2>My bets</h2>${grab('betTally')}${grab('betList')}</section>` : '';
-  const scoreBlock = (!cleanMode && grab('scoreboard'))
+  const scoreBlock = grab('scoreboard')
     ? `<section class="page-break"><h2>Scored against results</h2>${grab('scoreboard')}</section>` : '';
   const inner = picksBlock + betsBlock +
     `<section class="page-break"><h2>Every race, in race order</h2>${grab('raceCardList')}</section>` +
@@ -3818,28 +3523,8 @@ function reportParts(){
   return {header, inner};
 }
 
-function buildReportHtml(){
-  const styleEl = document.querySelector('style');
-  const css = styleEl ? styleEl.textContent : '';
-  const now = new Date();
-  const stamp = now.toLocaleString();
-  const fileStamp = now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0') + '-' + String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0');
-  const grab = id => { const el = document.getElementById(id); return el ? el.innerHTML : ''; };
-  const scratchedNames = rows.filter(r => r.scratched && r.horse).map(r => `R${r.race} ${r.horse}`);
-  const scratchLine = scratchedNames.length ? `<p class="tagline">Marked scratched (excluded): ${escHtml(scratchedNames.join(', '))}</p>` : '';
-  const srcLine = oddsSourceMode === 'ml' ? 'Computed from morning-line odds.' : 'Computed from final odds where entered, morning line otherwise.';
-  // Clean copy: the tool's own scorecard never leaves the building. The
-  // body class carries the same CSS rules the on-screen view uses, and the
-  // the results-scoring block is simply not written out.
-  const bodyClass = cleanMode ? ' class="clean"' : '';
-  const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Overlay Board race card ${fileStamp}</title><style>${css}<\/style></head><body${bodyClass}><div class="wrap"><header><p class="eyebrow">Overlay Board · race card</p><h1 style="font-size:30px;">Race Card</h1><p class="tagline">Generated ${stamp}. ${srcLine} Scratched horses were excluded before computing.</p>${scratchLine}</header><main><section><h2>Every race, in race order</h2>${grab('raceCardList')}</section><section><h2>Full field, race by race</h2>${grab('fieldTables')}</section>${extras}<div class="disclaimer">Analytical aid, not advice. No guarantee of accuracy, and nothing here has been shown to beat the market. Wagering involves real financial risk. National Problem Gambling Helpline: 1-800-522-4700.</div></main></div></body></html>`;
-  return {html, fileStamp};
-}
-
-// Robert could not find the downloaded file and window.print() does nothing in
-// his browser, so the report also renders as its own page inside the app. No
-// popup, no download, no file manager — it is just there, and the browser's own
-// share or screenshot works on it.
+// The report also renders as its own page inside the app, so the browser's
+// own print or share works on it.
 function renderPrintView(){
   const {header, inner} = reportParts();
   const el = document.getElementById('printView');
@@ -3848,22 +3533,8 @@ function renderPrintView(){
   bindTapHandlers(el);
 }
 
-function saveReportFile(){
-  const {html, fileStamp} = buildReportHtml();
-  const blob = new Blob([html], {type: 'text/html'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `overlay-board-card-${fileStamp}.html`;
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 500);
-}
-
-document.getElementById('downloadReportBtn').addEventListener('click', saveReportFile);
-
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board · build 2026-08-28-d</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board · build 2026-08-29-a</div>
 </body>
 </html>
