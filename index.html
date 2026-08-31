@@ -637,6 +637,9 @@
   .clean-toggle input{width:auto; accent-color:var(--board-950);}
   .clean-toggle.on{background:var(--board-950); color:var(--paper);}
 
+  .pp-spd{font-family:var(--mono); font-weight:700;}
+  .spd-cell{font-family:var(--mono);}
+  .spd-best{color:var(--ink-soft); font-size:11px;}
   .jky-cell{margin-top:3px;}
   .jky{font-size:11px; color:var(--ink-soft); font-family:var(--mono); letter-spacing:.01em;}
   .jky-rec{color:var(--ink-soft); opacity:.85;}
@@ -890,7 +893,7 @@ const rowsBody = document.getElementById('rowsBody');
 const emptyNote = document.getElementById('emptyNote');
 
 function newRow(partial){
-  return Object.assign({id: rowId++, race:'', post:'', horse:'', odds:'', finalOdds:'', score:'', surfaceRating:'', classMove:'', trackCode:'', raceDateYmd:'', ltStarts:null, ltWins:null, ltPlaces:null, ltShows:null, ltEarn:null, raceDistYds:'', raceType:'', raceClaim:'', raceClassTxt:'', scratched:false, connAdjusted:false, runStyle:'', quirin:'', distStarts:'', distAdjusted:false, turfStarts:'', surface:'', daysSinceWork:'', worksAtTrack:'', lastFinMargin:'', h2hNote:'', jockey:'', jkyStarts:null, jkyWins:null, jkyPlaces:null, jkyShows:null, trainer:'', trnStarts:null, trnWins:null, riderChange:null, tjStarts:'', tjWins:'', keyStats:[], rawPP:'', claimedLastRace:false, lastFinComment:'', hadTrouble:false, recentWorks:[], ppRaces:[], ppWorks:[]}, partial);
+  return Object.assign({id: rowId++, race:'', post:'', horse:'', odds:'', finalOdds:'', score:'', surfaceRating:'', classMove:'', trackCode:'', raceDateYmd:'', ltStarts:null, ltWins:null, ltPlaces:null, ltShows:null, ltEarn:null, raceDistYds:'', raceType:'', raceClaim:'', raceClassTxt:'', scratched:false, connAdjusted:false, runStyle:'', quirin:'', distStarts:'', distAdjusted:false, turfStarts:'', surface:'', daysSinceWork:'', worksAtTrack:'', lastFinMargin:'', h2hNote:'', lastSpd:null, bestSpd:null, avgSpd3:null, jockey:'', jkyStarts:null, jkyWins:null, jkyPlaces:null, jkyShows:null, trainer:'', trnStarts:null, trnWins:null, riderChange:null, tjStarts:'', tjWins:'', keyStats:[], rawPP:'', claimedLastRace:false, lastFinComment:'', hadTrouble:false, recentWorks:[], ppRaces:[], ppWorks:[]}, partial);
 }
 
 function renderRows(){
@@ -1134,8 +1137,19 @@ function parseBrisnetSingleFile(text){
       const finTxt = get(616+i);
       const rawMargin = num(736+i);
       const wonIt = String(finTxt).trim() === '1';
-      ppRaces.push({date: d, track: get(276+i), raceNum: get(296+i), distYds: num(316+i), surf: get(326+i), fin: finTxt, margin: rawMargin, won: wonIt, lenBehind: (rawMargin == null ? null : (wonIt ? -rawMargin : rawMargin)), comment: get(396+i), winner: get(406+i), rtype: get(1086+i), claim: num(546+i), classTxt: get(536+i)});
+      ppRaces.push({date: d, track: get(276+i), raceNum: get(296+i), distYds: num(316+i), surf: get(326+i), fin: finTxt, margin: rawMargin, won: wonIt, lenBehind: (rawMargin == null ? null : (wonIt ? -rawMargin : rawMargin)), comment: get(396+i), winner: get(406+i), rtype: get(1086+i), claim: num(546+i), classTxt: get(536+i), spd: num(846+i), latePace: num(816+i)});
     }
+    // BRIS SPEED RATING, fields 846-855, one per past race. Identified from a
+    // real card (GP 8/31) rather than taken on trust: the pace blocks at 766,
+    // 776, 786 and 796 are distance-gated — a 4f figure only appears at 5.5f
+    // and up, a 6f figure only from a mile — while 846 is populated at every
+    // distance, correlates -0.82 with lengths behind, and its last-three mean
+    // correlates 0.87 with today's Prime Power. That is a final-time figure,
+    // not a fraction. Parsed and displayed; it scores nothing.
+    const spdFigs = ppRaces.map(r => r.spd).filter(v => v != null && v > 0);
+    const lastSpd = spdFigs.length ? spdFigs[0] : null;
+    const bestSpd = spdFigs.length ? Math.max(...spdFigs) : null;
+    const avgSpd3 = spdFigs.length ? Math.round(spdFigs.slice(0,3).reduce((a,b)=>a+b,0) / Math.min(3, spdFigs.length)) : null;
     const ppWorks = [];
     for (let i = 0; i < 12; i++){
       const wd = get(102+i);
@@ -1206,6 +1220,7 @@ function parseBrisnetSingleFile(text){
       lastFinComment,
       hadTrouble,
       recentWorks,
+      lastSpd, bestSpd, avgSpd3,
       last3Fins,
       ppRaces,
       ppWorks
@@ -1525,6 +1540,15 @@ function parseChangesFeed(text){
   if (titleMatch) out.track = titleMatch[1].toUpperCase();
   const pub = text.match(/<pubDate>([^<]+)<\/pubDate>/);
   if (pub) out.feedDate = pub[1].trim();
+  // The feed's own date, as YYYYMMDD, so it can be checked against the card.
+  // <dc:date> is ISO and unambiguous; pubDate is RFC-822 and needs parsing.
+  const iso = text.match(/<dc:date>\s*(\d{4})-(\d{2})-(\d{2})/);
+  if (iso){
+    out.feedYmd = iso[1] + iso[2] + iso[3];
+  } else if (out.feedDate){
+    const d = new Date(out.feedDate);
+    if (!isNaN(d)) out.feedYmd = d.getUTCFullYear() + String(d.getUTCMonth()+1).padStart(2,'0') + String(d.getUTCDate()).padStart(2,'0');
+  }
 
   // Every <description> in the document, decoded, then split on <br/>.
   const descRe = /<description>([\s\S]*?)<\/description>/gi;
@@ -1591,9 +1615,18 @@ function applyChangesFeed(text){
   if (feed.track && loadedTracks.length && !loadedTracks.includes(feed.track)){
     warns.push(`This is the <b>${escHtml(feed.track)}</b> feed, but the loaded card is <b>${escHtml(loadedTracks.join(', '))}</b>. Nothing was applied.`);
   }
+  // DATE GUARD. The track guard alone is not enough: an old feed for the RIGHT
+  // track applies cleanly by program number and scratches the wrong horses.
+  // A GP feed from two weeks ago sitting in the same folder as today's GP card
+  // is exactly the case that gets clicked by accident.
+  const loadedDates = [...new Set(rows.map(r => (r.raceDateYmd || '').trim()).filter(Boolean))];
+  if (feed.feedYmd && loadedDates.length && !loadedDates.includes(feed.feedYmd)){
+    const pretty = y => `${y.slice(4,6)}/${y.slice(6,8)}/${y.slice(0,4)}`;
+    warns.push(`This feed is dated <b>${escHtml(pretty(feed.feedYmd))}</b>, but the loaded card runs <b>${escHtml(loadedDates.map(pretty).join(', '))}</b>. Nothing was applied \u2014 program numbers would match the wrong horses.`);
+  }
   if (warns.length){
     reportEl.innerHTML = `<div class="rss-warn">⚠ ${warns.join('<br>')}</div>`;
-    statusEl.textContent = 'Track mismatch — no changes applied.';
+    statusEl.textContent = 'Feed does not match this card — no changes applied.';
     statusEl.className = 'status err';
     return;
   }
@@ -2016,6 +2049,9 @@ document.getElementById('computeBtn').addEventListener('click', () => {
       worksAtTrack: (r.worksAtTrack !== '' && r.worksAtTrack != null && !isNaN(parseFloat(r.worksAtTrack))) ? parseFloat(r.worksAtTrack) : null,
       lastFinMargin: (r.lastFinMargin !== '' && r.lastFinMargin != null && !isNaN(parseFloat(r.lastFinMargin))) ? parseFloat(r.lastFinMargin) : null,
       h2hNote: r.h2hNote || '',
+      lastSpd: r.lastSpd != null ? r.lastSpd : null,
+      bestSpd: r.bestSpd != null ? r.bestSpd : null,
+      avgSpd3: r.avgSpd3 != null ? r.avgSpd3 : null,
       jockey: r.jockey || '', jkyStarts: r.jkyStarts, jkyWins: r.jkyWins,
       jkyPlaces: r.jkyPlaces, jkyShows: r.jkyShows,
       trainer: r.trainer || '', trnStarts: r.trnStarts, trnWins: r.trnWins,
@@ -2505,27 +2541,39 @@ function speedCell(h, shape){
 }
 
 /* ---------------- JOCKEYS ---------------- */
-// Names arrive in two formats. The data file writes them surname-first with an
-// initial ("Ortiz Jr I"); the Equibase feed writes them out in full ("Irad
-// Ortiz Jr"). Match on surname plus initial, where the surname is the last
-// token unless that token is a single letter, in which case it is the first.
+// Names arrive in two orders. The data file writes SURNAME FIRST with the
+// given name spelled out and any suffix at the end — "OCASIO JONATHAN",
+// "MONTERREY PETER JR", "RIOS JESUS M" (verified against a real card). The
+// Equibase feed writes them the ordinary way round: "Jonathan Ocasio".
+//
+// So order tells us nothing and position-based surname guessing is wrong.
+// Compare the SETS of real words instead: two full names that share two words
+// are the same rider whichever way round they were written. Single letters are
+// held back as initials and only used when one side has just one real word
+// (the older "ORTIZ I" style), which is what keeps Irad Ortiz and Jose Ortiz
+// apart.
 const JKY_SUFFIX = new Set(['JR','SR','II','III','IV','JR.','SR.']);
 function nameParts(s){
   const clean = String(s || '').toUpperCase().replace(/[^A-Z ]/g, ' ').replace(/\s+/g, ' ').trim();
   if (!clean) return null;
-  const toks = clean.split(' ').filter(t => !JKY_SUFFIX.has(t));
+  const toks = clean.split(' ').filter(t => t && !JKY_SUFFIX.has(t));
   if (!toks.length) return null;
-  const last = toks[toks.length - 1];
-  const surname = (toks.length > 1 && last.length === 1) ? toks[0] : last;
-  const initials = toks.filter(t => t !== surname).map(t => t[0]);
-  return {surname, initials};
+  const words = toks.filter(t => t.length > 1);
+  const initials = toks.filter(t => t.length === 1).concat(words.map(w => w[0]));
+  return {words, initials};
 }
 function sameJockey(a, b){
   const A = nameParts(a), B = nameParts(b);
   if (!A || !B) return false;
-  if (A.surname !== B.surname) return false;
-  if (!A.initials.length || !B.initials.length) return true;
-  return A.initials.some(i => B.initials.includes(i));
+  const shared = A.words.filter(w => B.words.includes(w));
+  if (A.words.length >= 2 && B.words.length >= 2) return shared.length >= 2;
+  // One side carries a single word — surname only. Require it to match and the
+  // initials not to contradict.
+  if (!shared.length) return false;
+  const aInit = A.initials.filter(i => !shared.some(w => w[0] === i && A.words.length === 1));
+  const bInit = B.initials.filter(i => !shared.some(w => w[0] === i && B.words.length === 1));
+  if (!aInit.length || !bInit.length) return true;
+  return aInit.some(i => bInit.includes(i));
 }
 
 // Every jockey named anywhere on the loaded card, with the current-meet record
@@ -3269,6 +3317,7 @@ function renderFullField(sortMode){
           <td>${formArrow(h)}</td>
           <td>${speedCell(h, shape)}</td>
           <td>${renderWorkDots(h.recentWorks)}</td>
+          <td class="spd-cell">${h.lastSpd != null ? `${h.lastSpd}${h.bestSpd != null && h.bestSpd !== h.lastSpd ? ` <span class="spd-best">(${h.bestSpd})</span>` : ''}` : '—'}</td>
           <td>${pct(h.marketProb)}</td>
           <td class="diag-col">${modelCell}</td>
           <td class="diag-col">${edgeCell}</td>
@@ -3288,7 +3337,7 @@ function renderFullField(sortMode){
         </div>
         ${sparseWarning}
         <table class="field-table">
-          <thead><tr><th>Post</th><th>Horse</th><th>Odds</th><th title="Final odds against the morning line">Move</th><th title="Beaten-lengths direction over recent comparable starts. Display only.">Form</th><th title="Quirin speed points, read against the field. LONE = highest and at least 2 clear.">Speed</th><th title="Recent works at today's track. Green = bullet.">Works</th><th title="Odds-implied win probability, normalized across the field">Market %</th><th class="diag-col">Model %</th><th class="diag-col">Edge</th><th class="raw-col" title="Prime Power as supplied by the data file">Raw PP</th></tr></thead>
+          <thead><tr><th>Post</th><th>Horse</th><th>Odds</th><th title="Final odds against the morning line">Move</th><th title="Beaten-lengths direction over recent comparable starts. Display only.">Form</th><th title="Quirin speed points, read against the field. LONE = highest and at least 2 clear.">Speed</th><th title="Recent works at today's track. Green = bullet.">Works</th><th title="BRIS speed rating: most recent figure, with the horse's best in brackets. Display only — nothing here is scored on it.">Spd</th><th title="Odds-implied win probability, normalized across the field">Market %</th><th class="diag-col">Model %</th><th class="diag-col">Edge</th><th class="raw-col" title="Prime Power as supplied by the data file">Raw PP</th></tr></thead>
           <tbody>${rowsHtml}</tbody>
         </table>
       </div>`;
@@ -3350,7 +3399,7 @@ const PP_WORK_LIMIT = 4;
 
 function ppHorseBlock(h, race, standalone){
   const races = (h.ppRaces || []).map(p => `
-    <tr><td>${fmtPPDate(p.date)}</td><td>${escHtml(p.track||'')}</td><td>${fmtDistY(p.distYds)}${/^[Tt]$/.test(p.surf||'') ? '<span class="pp-turf" title="run on turf">T</span>' : ''}</td><td class="pp-class">${escHtml(p.classTxt || fmtClass(p.rtype, p.claim))}</td><td>${escHtml(p.fin||'')}</td><td>${p.margin != null ? (p.won ? '<span class="pp-wonby">won ' + p.margin + 'L</span>' : p.margin + 'L') : ''}</td><td>${escHtml((p.comment||'').slice(0,36))}</td><td>${escHtml(p.winner||'')}</td></tr>`).join('');
+    <tr><td>${fmtPPDate(p.date)}</td><td>${escHtml(p.track||'')}</td><td>${fmtDistY(p.distYds)}${/^[Tt]$/.test(p.surf||'') ? '<span class="pp-turf" title="run on turf">T</span>' : ''}</td><td class="pp-class">${escHtml(p.classTxt || fmtClass(p.rtype, p.claim))}</td><td>${escHtml(p.fin||'')}</td><td>${p.margin != null ? (p.won ? '<span class="pp-wonby">won ' + p.margin + 'L</span>' : p.margin + 'L') : ''}</td><td class="pp-spd">${p.spd != null && p.spd > 0 ? p.spd : ''}</td><td>${escHtml((p.comment||'').slice(0,36))}</td><td>${escHtml(p.winner||'')}</td></tr>`).join('');
   const works = (h.ppWorks || []).slice(0, PP_WORK_LIMIT).map(w => {
     const bullet = (w.time || '').trim().startsWith('-');
     return `${bullet ? '● ' : ''}${fmtPPDate(w.date)} ${escHtml(w.track||'')} ${escHtml((w.time||'').replace('-',''))} ${escHtml(w.desc||'')}`;
@@ -3360,7 +3409,7 @@ function ppHorseBlock(h, race, standalone){
     ? `<h3 class="pp-head">${escHtml(h.horse)} <span style="font-family:var(--mono);font-size:13px;font-weight:400;">post ${escHtml(h.post || '–')} · ${oddsBit}</span></h3>`
     : `<h3 class="pp-head" style="font-size:16px;">#${escHtml(h.post || '?')} ${escHtml(h.horse)} <span style="font-family:var(--mono);font-size:12.5px;font-weight:400;">${oddsBit}</span></h3>`;
   return `${head}
-    <div class="pp-sub">${standalone ? `Race ${escHtml(race)}` : ''}${h.rawPP != null ? `${standalone ? ' · ' : ''}Prime Power ${h.rawPP}` : ''}${h.surfaceRating != null ? ` · surface fit <b class="pp-adj">${h.surfaceRating}</b>` : ''}${h.classMove === 'down' ? ' · <b class="pp-adj">class drop</b>' : h.classMove === 'up' ? ' · <b class="pp-adj">class rise</b>' : ''}${h.runStyle ? ` · run style ${escHtml(h.runStyle)}` : ''}${h.quirin != null ? ` · Quirin ${h.quirin}` : ''}${h.distStarts != null ? ` · starts at today's distance: ${h.distStarts}` : ''}${h.daysSinceWork != null ? ` · last work ${h.daysSinceWork}d ago` : ''}</div>
+    <div class="pp-sub">${standalone ? `Race ${escHtml(race)}` : ''}${h.rawPP != null ? `${standalone ? ' · ' : ''}Prime Power ${h.rawPP}` : ''}${h.surfaceRating != null ? ` · surface fit <b class="pp-adj">${h.surfaceRating}</b>` : ''}${h.classMove === 'down' ? ' · <b class="pp-adj">class drop</b>' : h.classMove === 'up' ? ' · <b class="pp-adj">class rise</b>' : ''}${h.runStyle ? ` · run style ${escHtml(h.runStyle)}` : ''}${h.quirin != null ? ` · Quirin ${h.quirin}` : ''}${h.distStarts != null ? ` · starts at today's distance: ${h.distStarts}` : ''}${h.daysSinceWork != null ? ` · last work ${h.daysSinceWork}d ago` : ''}${h.lastSpd != null ? ` · speed last <b class="pp-adj">${h.lastSpd}</b>, best ${h.bestSpd}` : ''}</div>
     ${(() => {
       const jl = jockeyLine(h);
       const tr = trainerMeet(h);
@@ -3370,7 +3419,7 @@ function ppHorseBlock(h, race, standalone){
     })()}
     ${ppRecordLine(h)}
     ${races ? `<div class="pp-section">Last ${(h.ppRaces||[]).length} starts${h.ltStarts != null && h.ltStarts > (h.ppRaces||[]).length ? ` <span style="text-transform:none;letter-spacing:0;font-weight:400;">(of ${h.ltStarts} career — the data file carries 10)</span>` : ''}</div>
-    <div class="pp-table-wrap"><table class="pp-table"><thead><tr><th>Date</th><th>Trk</th><th>Dist</th><th>Class</th><th>Fin</th><th>Btn</th><th>Trip comment</th><th>Race winner</th></tr></thead><tbody>${races}</tbody></table></div>` : `<p class="pp-sub">No past races in the data file — first-time starter.</p>`}
+    <div class="pp-table-wrap"><table class="pp-table"><thead><tr><th>Date</th><th>Trk</th><th>Dist</th><th>Class</th><th>Fin</th><th>Btn</th><th title="BRIS speed rating for that race, as supplied by the data file">Spd</th><th>Trip comment</th><th>Race winner</th></tr></thead><tbody>${races}</tbody></table></div>` : `<p class="pp-sub">No past races in the data file — first-time starter.</p>`}
     ${works ? `<div class="pp-section">Last ${Math.min((h.ppWorks||[]).length, PP_WORK_LIMIT)} workouts (● = bullet)</div><div class="pp-works">${works}</div>` : ''}`;
 }
 
@@ -3705,6 +3754,6 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board · build 2026-08-29-b</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board · build 2026-08-31-b</div>
 </body>
 </html>
