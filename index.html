@@ -637,6 +637,8 @@
   .clean-toggle input{width:auto; accent-color:var(--board-950);}
   .clean-toggle.on{background:var(--board-950); color:var(--paper);}
 
+  .pick-fig{margin-top:8px; font-size:12.5px; line-height:1.5;}
+  .fig-note{display:block; margin-top:4px; font-size:11px; color:var(--ink-soft); line-height:1.45;}
   .pp-spd{font-family:var(--mono); font-weight:700;}
   .spd-cell{font-family:var(--mono);}
   .spd-best{color:var(--ink-soft); font-size:11px;}
@@ -2899,6 +2901,35 @@ function buildContenderBlock(rs){
   </div>`;
 }
 
+// The last-race BRIS figure shape for a race: who tops it and by how much.
+// Shared by the race card and the pick card so the two can never disagree.
+function figShape(horses){
+  const figured = (horses || []).filter(h => h.lastSpd != null).sort((a,b) => b.lastSpd - a.lastSpd);
+  if (figured.length < 3) return null;
+  const top = figured[0];
+  const ties = figured.filter(h => h.lastSpd === top.lastSpd);
+  return {figured, top, ties, second: figured[1], gap: top.lastSpd - figured[1].lastSpd,
+          covered: figured.length, total: (horses || []).length};
+}
+
+// On the PICK card the useful fact is whether the figure lands on the same
+// horse. It disagrees about half the time, and that is shown, not hidden —
+// separation measured backward across 139 races, so a figure agreeing is not
+// support and a figure disagreeing is not a veto.
+function pickFigLine(rs, h){
+  const f = figShape(rs.horses || []);
+  if (!f) return '';
+  const isPick = x => x === h || (x.horse === h.horse && x.post === h.post);
+  const agrees = f.ties.some(isPick);
+  const body = agrees
+    ? (f.ties.length > 1
+        ? `This horse shares the top last-race figure at ${f.top.lastSpd} with ${f.ties.filter(x => !isPick(x)).map(x => escHtml(x.horse)).join(' · ')}.`
+        : `This horse also tops the field on its last-race figure at ${f.top.lastSpd}, ${f.gap} clear of ${escHtml(f.second.horse)}.`)
+    : `<b>${escHtml(f.ties.map(x => x.horse).join(' · '))}</b> tops the field on last-race figure at ${f.top.lastSpd}${h.lastSpd != null ? `, against ${h.lastSpd} for this horse` : `; this horse carries no figure`}.`;
+  return `<div class="pick-fig"><span class="bet-tag">SPEED FIGURES</span> ${body}`
+    + `<span class="fig-note">${f.covered} of ${f.total} runners carry a figure. Agreement here is not extra support and disagreement is not a warning \u2014 the figure has measured no better when it is clear of the field than when it is not.</span></div>`;
+}
+
 function buildPick(rs){
   const p = pickFor(rs);
   if (p.none) return `<div class="pick-none"><b>Race ${escHtml(rs.race)} — no pick.</b> ${p.none}</div>`;
@@ -2921,6 +2952,7 @@ function buildPick(rs){
       ${head}
       <div>Top career earnings in the field at <b>${money(p.eps)} per start</b>${epsBasis(h)}${second ? ` (next best ${escHtml(second.h.horse)} at ${money(second.eps)}${gap && gap >= 1.5 ? `, a ${gap.toFixed(1)}× gap` : ''})` : ''}, <b>and</b> the market's choice.</div>
       ${marketNote}
+      ${pickFigLine(rs, h)}
       ${h.jockey || h.riderChange ? `<div class="pick-jky">${h.riderChange ? '' : 'Jockey '}${jockeyLine(h)}</div>` : ''}
       ${blindSpotNote(rs)}
       ${driftDowngrade(h)}
@@ -2933,6 +2965,7 @@ function buildPick(rs){
     <div>The market's choice, and <b>second in the field on career earnings at ${money(p.eps)} per start</b>${epsBasis(p.h)} — behind ${escHtml(lead.h.horse)} at ${money(lead.eps)}, who the crowd does not make favourite.${p.nearTie ? ` Those two are within 5% of each other, which is not really a first and a second — on this measure they are level.` : ''}</div>
     <div class="price-warn"><b>Unproven line.</b> Fires only where the Pick filters fail, and is scored separately.</div>
     ${marketNote}
+    ${pickFigLine(rs, p.h)}
     ${p.h.jockey || p.h.riderChange ? `<div class="pick-jky">${p.h.riderChange ? '' : 'Jockey '}${jockeyLine(p.h)}</div>` : ''}
     ${blindSpotNote(rs)}
     ${driftDowngrade(p.h)}
@@ -2958,6 +2991,20 @@ function buildReadPanel(rs){
     if (sup.length){
       lines.push(`<div class="bet-line"><span class="bet-tag place">BET DOWN</span> ${sup.slice(0,4).map(h => horseLabel(h)).join(' · ')}</div>`);
     }
+  }
+
+  // SPEED FIGURES. The shape of the race on the BRIS last-race figure: who is
+  // top and by how much. Deliberately NOT a confidence score. The separation
+  // was measured across 139 races and runs BACKWARD — the widest half of the
+  // gaps returned -18.4% and the narrowest half +47.8% — so a wide gap is
+  // reported as information and never as a stronger opinion.
+  const fig = figShape(horses);
+  if (fig){
+    const body = fig.ties.length > 1
+      ? `${fig.ties.map(h => horseLabel(h)).join(' · ')} share the top last-race figure at ${fig.top.lastSpd}.`
+      : `${horseLabel(fig.top)} tops the field on its last-race figure at ${fig.top.lastSpd}, ${fig.gap} clear of ${escHtml(fig.second.horse)} (${fig.second.lastSpd}).`;
+    lines.push(`<div class="bet-line"><span class="bet-tag">SPEED FIGURES</span> ${body}`
+      + `<span class="fig-note">${fig.covered} of ${fig.total} runners carry a figure. A wider gap has measured no better than a narrow one — this is the shape of the race, not a rating of the pick.</span></div>`);
   }
 
   // Lone speed: top Quirin, 2+ clear of the next horse. Display only.
@@ -3754,6 +3801,6 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board · build 2026-08-31-b</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board · build 2026-08-31-d</div>
 </body>
 </html>
