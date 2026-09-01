@@ -637,6 +637,29 @@
   .clean-toggle input{width:auto; accent-color:var(--board-950);}
   .clean-toggle.on{background:var(--board-950); color:var(--paper);}
 
+  .conf-block{
+    margin:8px 0 2px; padding:8px 10px; border-radius:3px; font-size:12.5px; line-height:1.5;
+    border:1px solid var(--rule); background:#FAFAF7;
+  }
+  .conf-block.conf-questionable{border-color:#C0641E; background:#FDF1E7;}
+  .conf-block.conf-probable{border-color:#C0A21E; background:#FCF8E8;}
+  .conf-tag{
+    display:inline-block; font-weight:800; letter-spacing:.07em; font-size:10px;
+    text-transform:uppercase; border-radius:8px; padding:2px 8px; margin-right:7px; color:#fff;
+  }
+  .conf-high .conf-tag, .conf-tag.conf-high{background:#3C7A4A;}
+  .conf-probable .conf-tag, .conf-tag.conf-probable{background:#B08A16;}
+  .conf-questionable .conf-tag, .conf-tag.conf-questionable{background:#B4541A;}
+  .conf-body{color:var(--ink);}
+  .conf-others{
+    margin-top:7px; padding-top:6px; border-top:1px dotted var(--rule);
+    font-size:12px; color:var(--ink-soft);
+  }
+  .conf-others .race-jump{font-weight:700;}
+  .conf-inline{font-weight:800; font-size:10.5px; letter-spacing:.05em;}
+  .conf-inline.conf-high{color:#3C7A4A;}
+  .conf-inline.conf-probable{color:#B08A16;}
+  .conf-inline.conf-questionable{color:#B4541A;}
   .pick-fig{margin-top:8px; font-size:12.5px; line-height:1.5;}
   .fig-note{display:block; margin-top:4px; font-size:11px; color:var(--ink-soft); line-height:1.45;}
   .pp-spd{font-family:var(--mono); font-weight:700;}
@@ -895,7 +918,7 @@ const rowsBody = document.getElementById('rowsBody');
 const emptyNote = document.getElementById('emptyNote');
 
 function newRow(partial){
-  return Object.assign({id: rowId++, race:'', post:'', horse:'', odds:'', finalOdds:'', score:'', surfaceRating:'', classMove:'', trackCode:'', raceDateYmd:'', ltStarts:null, ltWins:null, ltPlaces:null, ltShows:null, ltEarn:null, raceDistYds:'', raceType:'', raceClaim:'', raceClassTxt:'', scratched:false, connAdjusted:false, runStyle:'', quirin:'', distStarts:'', distAdjusted:false, turfStarts:'', surface:'', daysSinceWork:'', worksAtTrack:'', lastFinMargin:'', h2hNote:'', lastSpd:null, bestSpd:null, avgSpd3:null, jockey:'', jkyStarts:null, jkyWins:null, jkyPlaces:null, jkyShows:null, trainer:'', trnStarts:null, trnWins:null, riderChange:null, tjStarts:'', tjWins:'', keyStats:[], rawPP:'', claimedLastRace:false, lastFinComment:'', hadTrouble:false, recentWorks:[], ppRaces:[], ppWorks:[]}, partial);
+  return Object.assign({id: rowId++, race:'', post:'', horse:'', odds:'', finalOdds:'', score:'', surfaceRating:'', classMove:'', trackCode:'', raceDateYmd:'', ltStarts:null, ltWins:null, ltPlaces:null, ltShows:null, ltEarn:null, raceDistYds:'', raceType:'', raceClaim:'', raceClassTxt:'', scratched:false, connAdjusted:false, runStyle:'', quirin:'', distStarts:'', distAdjusted:false, turfStarts:'', surface:'', daysSinceWork:'', worksAtTrack:'', lastFinMargin:'', h2hNote:'', todayClaim:null, firstTimeTagged:false, claimDropRatio:null, layoffDays:null, lastSpd:null, bestSpd:null, avgSpd3:null, jockey:'', jkyStarts:null, jkyWins:null, jkyPlaces:null, jkyShows:null, trainer:'', trnStarts:null, trnWins:null, riderChange:null, tjStarts:'', tjWins:'', keyStats:[], rawPP:'', claimedLastRace:false, lastFinComment:'', hadTrouble:false, recentWorks:[], ppRaces:[], ppWorks:[]}, partial);
 }
 
 function renderRows(){
@@ -1148,6 +1171,21 @@ function parseBrisnetSingleFile(text){
     // distance, correlates -0.82 with lengths behind, and its last-three mean
     // correlates 0.87 with today's Prime Power. That is a final-time figure,
     // not a fraction. Parsed and displayed; it scores nothing.
+    // CLASS AND TAG CONTEXT. Field 14 is this horse's claiming price today
+    // (13 is the race's). A past start with no claiming price was not run for
+    // a tag at all, which is the case that matters: a horse that has only run
+    // in allowance company and turns up for a claim today.
+    const todayClaim = num(14) || num(13) || null;
+    const pastTags = ppRaces.slice(0, 4).map(r => r.claim).filter(v => v != null && v > 0);
+    const firstTimeTagged = !!todayClaim && pastTags.length === 0 && ppRaces.length > 0;
+    const claimDropRatio = (todayClaim && pastTags.length) ? todayClaim / Math.max(...pastTags) : null;
+    const lastStartYmd = ppRaces.length ? ppRaces[0].date : null;
+    const todayYmd = get(2);
+    const layoffDays = (lastStartYmd && String(lastStartYmd).length === 8 && String(todayYmd).length === 8)
+      ? Math.round((Date.UTC(+todayYmd.slice(0,4), +todayYmd.slice(4,6)-1, +todayYmd.slice(6,8))
+                  - Date.UTC(+String(lastStartYmd).slice(0,4), +String(lastStartYmd).slice(4,6)-1, +String(lastStartYmd).slice(6,8))) / 86400000)
+      : null;
+
     const spdFigs = ppRaces.map(r => r.spd).filter(v => v != null && v > 0);
     const lastSpd = spdFigs.length ? spdFigs[0] : null;
     const bestSpd = spdFigs.length ? Math.max(...spdFigs) : null;
@@ -1223,6 +1261,7 @@ function parseBrisnetSingleFile(text){
       hadTrouble,
       recentWorks,
       lastSpd, bestSpd, avgSpd3,
+      todayClaim, firstTimeTagged, claimDropRatio, layoffDays,
       last3Fins,
       ppRaces,
       ppWorks
@@ -2051,6 +2090,10 @@ document.getElementById('computeBtn').addEventListener('click', () => {
       worksAtTrack: (r.worksAtTrack !== '' && r.worksAtTrack != null && !isNaN(parseFloat(r.worksAtTrack))) ? parseFloat(r.worksAtTrack) : null,
       lastFinMargin: (r.lastFinMargin !== '' && r.lastFinMargin != null && !isNaN(parseFloat(r.lastFinMargin))) ? parseFloat(r.lastFinMargin) : null,
       h2hNote: r.h2hNote || '',
+      todayClaim: r.todayClaim != null ? r.todayClaim : null,
+      firstTimeTagged: !!r.firstTimeTagged,
+      claimDropRatio: r.claimDropRatio != null ? r.claimDropRatio : null,
+      layoffDays: r.layoffDays != null ? r.layoffDays : null,
       lastSpd: r.lastSpd != null ? r.lastSpd : null,
       bestSpd: r.bestSpd != null ? r.bestSpd : null,
       avgSpd3: r.avgSpd3 != null ? r.avgSpd3 : null,
@@ -2930,6 +2973,81 @@ function pickFigLine(rs, h){
     + `<span class="fig-note">${f.covered} of ${f.total} runners carry a figure. Agreement here is not extra support and disagreement is not a warning \u2014 the figure has measured no better when it is clear of the field than when it is not.</span></div>`;
 }
 
+// ---- PICK CONFIDENCE ----
+// Descriptive, not a score. Every entry below is a MEASURED concern: each one
+// has been checked against the horse's own morning line across 160 races, and
+// each names a group that finished BELOW the price the market gave it. The
+// label is a count of those concerns, nothing else — it is not an opinion
+// about the outcome and it never ranks one pick against another.
+//
+// Deliberately NOT included: how far clear the pick is on any rating. Three
+// separate tests have shown separation running the wrong way, so a bigger gap
+// buys no confidence here.
+function pickConcerns(rs, h){
+  const out = [];
+  if (h.firstTimeTagged){
+    out.push(`has not run for a claiming price in its last starts and is entered for a tag today` +
+      (h.todayClaim ? ` (${money(h.todayClaim)})` : '') +
+      `. Horses first up for a tag won 14.0% against a price implying 18.5% across 179 cases`);
+  }
+  // The combination Robert flagged on GP 8/31 R8: only ever run above the
+  // claiming ranks, long absence, now up for a tag. 18 such runners in the
+  // pool won 11.1% against 20.1% implied; the seven at short prices went
+  // 1-for-7. The smallest group here and the one to hold most loosely.
+  if (h.firstTimeTagged && h.layoffDays != null && h.layoffDays >= 120){
+    out.push(`is also off ${h.layoffDays} days. First up for a tag AFTER a long absence has won 11.1% against 20.1% implied, on 18 cases`);
+  }
+  if (h.claimDropRatio != null && h.claimDropRatio <= 0.5){
+    out.push(`entered for less than half its recent claiming price`);
+  }
+  if (h.layoffDays != null && h.layoffDays < 15){
+    out.push(`back within ${h.layoffDays} days. That group won 7.9% against 14.4% implied`);
+  }
+  if (h.lastSpd == null && (rs.horses || []).filter(x => x.lastSpd != null).length >= 3){
+    out.push(`carries no speed figure while most of the field does. Those favourites won 20.0% against 32.3% implied`);
+  }
+  return out;
+}
+
+function confidenceOf(rs, h){
+  const c = pickConcerns(rs, h);
+  if (!c.length) return {level: 'high', label: 'HIGH', concerns: c};
+  if (c.length === 1) return {level: 'probable', label: 'PROBABLE', concerns: c};
+  return {level: 'questionable', label: 'QUESTIONABLE', concerns: c};
+}
+
+// Where a pick is flagged, send the reader to the rest of the field rather
+// than leaving them with a bare warning. Measured across 121 short-priced
+// favourites: with no concerns the favourite won 42.9% and the winner came
+// from the market's 2nd or 3rd choice 34.3% of the time; with two or more
+// concerns the favourite won 25.0% and the 2nd/3rd choice supplied the winner
+// 50.0% of the time. Small n on that last bucket (8 races) — the direction is
+// the point, not the number.
+function othersInFrame(rs, h){
+  const rest = (rs.byMarket || []).filter(x => x !== h).slice(0, 3);
+  if (!rest.length) return '';
+  return `<div class="conf-others">Others in the frame: `
+    + rest.map(x => `${horseLabel(x)}`).join(' · ')
+    + ` &nbsp;<a href="#" class="race-jump" data-race="${escHtml(rs.race)}">read the whole race \u25b8</a></div>`;
+}
+
+function confidenceBlock(rs, h){
+  const c = confidenceOf(rs, h);
+  const head = `<span class="conf-tag conf-${c.level}">${c.label}</span>`;
+  if (!c.concerns.length){
+    return `<div class="conf-block conf-${c.level}">${head}` +
+      `<span class="conf-body">Nothing measured against this one. Favourites with none of the checked concerns won 41.3% against a price implying 33.7%.</span></div>`;
+  }
+  const body = c.concerns.length === 1
+    ? `One measured concern: ${c.concerns[0]}.`
+    : `${c.concerns.length} measured concerns: ` + c.concerns.map(x => x).join('; ') + '.';
+  const tail = c.level === 'questionable'
+    ? ` <b>Read the contenders before backing this.</b> When a short-priced favourite carries two or more of these, it has won 25% and the winner came from the second or third choice half the time.`
+    : (c.level === 'probable' ? ` Worth a look at the rest of the field.` : '');
+  return `<div class="conf-block conf-${c.level}">${head}<span class="conf-body">${body}${tail}</span>`
+    + (c.level === 'high' ? '' : othersInFrame(rs, h)) + `</div>`;
+}
+
 function buildPick(rs){
   const p = pickFor(rs);
   if (p.none) return `<div class="pick-none"><b>Race ${escHtml(rs.race)} — no pick.</b> ${p.none}</div>`;
@@ -2951,6 +3069,7 @@ function buildPick(rs){
     return `<div class="pick-card">
       ${head}
       <div>Top career earnings in the field at <b>${money(p.eps)} per start</b>${epsBasis(h)}${second ? ` (next best ${escHtml(second.h.horse)} at ${money(second.eps)}${gap && gap >= 1.5 ? `, a ${gap.toFixed(1)}× gap` : ''})` : ''}, <b>and</b> the market's choice.</div>
+      ${confidenceBlock(rs, h)}
       ${marketNote}
       ${pickFigLine(rs, h)}
       ${h.jockey || h.riderChange ? `<div class="pick-jky">${h.riderChange ? '' : 'Jockey '}${jockeyLine(h)}</div>` : ''}
@@ -2964,6 +3083,7 @@ function buildPick(rs){
     ${head}
     <div>The market's choice, and <b>second in the field on career earnings at ${money(p.eps)} per start</b>${epsBasis(p.h)} — behind ${escHtml(lead.h.horse)} at ${money(lead.eps)}, who the crowd does not make favourite.${p.nearTie ? ` Those two are within 5% of each other, which is not really a first and a second — on this measure they are level.` : ''}</div>
     <div class="price-warn"><b>Unproven line.</b> Fires only where the Pick filters fail, and is scored separately.</div>
+    ${confidenceBlock(rs, p.h)}
     ${marketNote}
     ${pickFigLine(rs, p.h)}
     ${p.h.jockey || p.h.riderChange ? `<div class="pick-jky">${p.h.riderChange ? '' : 'Jockey '}${jockeyLine(p.h)}</div>` : ''}
@@ -3266,6 +3386,7 @@ function buildBestOfDay(raceSummaries){
     picks.push({rs, h: p.h, eps: p.eps, tier: p.tier, line: p.line, marketKnown: p.marketKnown,
                 drifting: p.h.drift != null && p.h.drift > 0.25,
                 riderChanged: !!p.h.riderChange,
+                conf: confidenceOf(rs, p.h),
                 others, fieldSize: (rs.horses || []).filter(x => x.decimalOdds != null).length});
   });
   if (!picks.length) return '';
@@ -3283,7 +3404,7 @@ function buildBestOfDay(raceSummaries){
       <span class="bo-rank">${i + 1}</span>
       <span class="bo-main">
         <span class="bo-horse">${escHtml(p.h.horse)}</span>
-        <br><span class="bo-meta"><a class="race-jump" data-jump="${escAttr(p.rs.race)}" title="Tap to see every runner in this race">Race ${escHtml(p.rs.race)}</a> · #${escHtml(p.h.post || '?')} · ${escHtml(p.h.oddsStr)} · ${money(p.eps)} per start${p.line === 'primary' ? ', top in the field' : ', 2nd in the field'}${p.marketKnown ? '' : ' · market check pending'}${p.drifting ? ' · DRIFTING, stand down' : ''}${p.riderChanged ? ' · RIDER CHANGE' : ''}</span>
+        <br><span class="bo-meta"><a class="race-jump" data-jump="${escAttr(p.rs.race)}" title="Tap to see every runner in this race">Race ${escHtml(p.rs.race)}</a> · #${escHtml(p.h.post || '?')} · ${escHtml(p.h.oddsStr)} · ${money(p.eps)} per start${p.line === 'primary' ? ', top in the field' : ', 2nd in the field'}${p.marketKnown ? '' : ' · market check pending'}${p.drifting ? ' · DRIFTING, stand down' : ''}${p.riderChanged ? ' · RIDER CHANGE' : ''}${p.conf ? ` · <span class="conf-inline conf-${p.conf.level}">${p.conf.label}</span>` : ''}</span>
         ${p.others.length ? `<br><span class="bo-with">with ${p.others.map(o => `#${escHtml(o.post || '?')} ${escHtml(o.horse)} ${escHtml(o.oddsStr)}`).join(' · ')}</span>`
                           : (p.fieldSize ? '<br><span class="bo-with">no other contender</span>' : '')}
       </span>
@@ -3801,6 +3922,6 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board · build 2026-08-31-d</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board · build 2026-09-01-b</div>
 </body>
 </html>
