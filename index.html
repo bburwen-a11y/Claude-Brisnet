@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Overlay Board v1.16 — Race Card Reader</title>
+<title>Overlay Board v1.17 — Race Card Reader</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
@@ -731,7 +731,7 @@
 <body>
 <div class="wrap">
   <header>
-    <p class="eyebrow">Handicapping utility · <span class="ver">v1.16</span> · released 1 September 2026</p>
+    <p class="eyebrow">Handicapping utility · <span class="ver">v1.17</span> · released 1 September 2026</p>
     <h1><span class="flap">O</span><span class="flap">v</span><span class="flap">e</span><span class="flap">r</span><span class="flap">l</span><span class="flap">a</span><span class="flap">y</span> <span class="flap">B</span><span class="flap">o</span><span class="flap">a</span><span class="flap">r</span><span class="flap">d</span></h1>
     <p class="tagline">Upload a data file or program PDF. Overlay Board lays out the whole card: past performances, scratches, money moves, and where the board likes a horse.</p>
   </header>
@@ -2923,27 +2923,37 @@ function pickFor(rs){
   // ---- TWO FILTERS ----
   //   A — the pick's MORNING LINE must be 2.5 or shorter.
   //   B — the pick must STILL be the betting favourite at post time.
-  // Rank 1 passing both is the Pick line. Rank 1 failing either is suppressed.
+  //   C — CLASS FIT 2 or better: competitive at today's level in at least two
+  //       of its last four starts (skipped for horses with fewer than three
+  //       recent starts, which cannot be assessed).
+  // Rank 1 passing all three is the Pick line. Rank 1 failing any is suppressed.
   // Rank 2 fires only where the filters fail, as a Price play on its own line.
+  //
+  // C added 2026-09-02, registered before being scored forward. On the 177
+  // races behind it: the earnings rule alone 47 picks, 46.8%, -2.6%; the same
+  // rule WITHOUT class fit 40.5% and -19.9%; favourites with class fit 3-4
+  // 55.6% and +35.4%; both conditions together 10 picks, 70.0%, +61.6%.
   const ML_MAX = 2.5;
   // parseOdds returns DECIMAL, so subtract 1 before comparing against 2.5.
   const mlDec = parseOdds(fav.mlOddsStr);                 // decimal
   const mlPrice = mlDec == null ? null : mlDec - 1;       // "to one", what 2.5 means
   const mlOK = mlPrice != null && mlPrice <= ML_MAX;
+  const fitOK = fav.classFit == null || (fav.classSeen || 0) < 3 || fav.classFit >= 2;
   // The market check needs real final odds. Before they are entered the pick IS
   // the market favourite by construction, so the test is pending, not passed.
   const marketKnown = fav.drift != null;
   const live = (rs.horses || []).filter(x => x.decimalOdds != null);
   const shortest = live.length ? live.reduce((a, b) => (b.decimalOdds < a.decimalOdds ? b : a)) : null;
   const stillFav = marketKnown ? (shortest === fav) : null;
-  const filtersPass = mlOK && stillFav !== false;
-  const base = {h: fav, eps: favEps, ranked: el.ranked, fav, mlPrice, mlOK, stillFav, marketKnown};
+  const filtersPass = mlOK && fitOK && stillFav !== false;
+  const base = {h: fav, eps: favEps, ranked: el.ranked, fav, mlPrice, mlOK, fitOK, stillFav, marketKnown};
 
   if (rank === 1){
     const second = el.ranked.find(r => r.eps < favEps);
     if (filtersPass) return Object.assign({line: 'primary', tier: 1, second, nearTie: false}, base);
     const why = [];
     if (!mlOK) why.push(`its morning line is ${escHtml(fav.oddsStr)}, above the 2.5 cut-off`);
+    if (!fitOK) why.push(`it has been competitive at today's level in only ${fav.classFit} of its last ${fav.classSeen} starts`);
     if (stillFav === false) why.push('the money has moved to another horse');
     return {none: `<b>${escHtml(fav.horse)}</b> is the earnings leader and the market's choice, but ${why.join(', and ')}. No pick.`};
   }
@@ -4069,6 +4079,6 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.16 · released 1 September 2026 · build 2026-09-02-d</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.17 · released 1 September 2026 · build 2026-09-02-e</div>
 </body>
 </html>
