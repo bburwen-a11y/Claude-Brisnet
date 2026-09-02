@@ -1,9 +1,9 @@
-
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Overlay Board v1.15 — Race Card Reader</title>
+<title>Overlay Board v1.16 — Race Card Reader</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
@@ -189,9 +189,13 @@
 
   .race-nav{display:flex; flex-wrap:wrap; gap:6px; margin:0 0 16px; align-items:center;}
   .race-nav .nav-lbl{font-family:var(--mono); font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-soft); margin-right:2px;}
+  /* Sticky so the tabs are reachable from the bottom of a long card. The
+     background is opaque because race cards scroll underneath it. */
   .tabbar{
     display:flex; gap:0; margin:0 0 18px; border-bottom:2px solid var(--paper-line);
     overflow-x:auto; -webkit-overflow-scrolling:touch;
+    position:sticky; top:0; z-index:40; background:var(--paper);
+    box-shadow:0 6px 10px -8px rgba(0,0,0,.35);
   }
   .tabbar button{
     flex:0 0 auto; appearance:none; background:none; border:none; cursor:pointer;
@@ -658,6 +662,15 @@
     font-size:12px; color:var(--ink-soft);
   }
   .conf-others .race-jump{font-weight:700;}
+  .xlink{
+    display:inline-block; margin:8px 10px 0 0; font-family:var(--mono); font-size:11px;
+    letter-spacing:.04em; color:var(--board-950); text-decoration:none;
+    border-bottom:1px solid var(--rule); padding-bottom:1px;
+  }
+  .xlink:active{background:var(--paper-tint);}
+  /* Scroll target highlight, so you can see where you landed. */
+  @keyframes landed { from{background:#FFF3D0;} to{background:transparent;} }
+  .just-landed{animation:landed 1.6s ease-out;}
   /* Tappable horse names read as text until touched, so the cards stay calm. */
   a.horse-tap{color:inherit; text-decoration:none; border-bottom:1px dotted var(--rule);}
   a.horse-tap:active{background:var(--paper-tint);}
@@ -718,7 +731,7 @@
 <body>
 <div class="wrap">
   <header>
-    <p class="eyebrow">Handicapping utility · <span class="ver">v1.15</span> · released 1 September 2026</p>
+    <p class="eyebrow">Handicapping utility · <span class="ver">v1.16</span> · released 1 September 2026</p>
     <h1><span class="flap">O</span><span class="flap">v</span><span class="flap">e</span><span class="flap">r</span><span class="flap">l</span><span class="flap">a</span><span class="flap">y</span> <span class="flap">B</span><span class="flap">o</span><span class="flap">a</span><span class="flap">r</span><span class="flap">d</span></h1>
     <p class="tagline">Upload a data file or program PDF. Overlay Board lays out the whole card: past performances, scratches, money moves, and where the board likes a horse.</p>
   </header>
@@ -3164,9 +3177,10 @@ function buildPick(rs){
   if (p.line === 'primary'){
     const second = p.second;
     const gap = second ? p.eps / second.eps : null;
-    return `<div class="pick-card">
+    return `<div class="pick-card" id="pick-r${escAttr(rs.race)}">
       ${head}
       <div>Top career earnings in the field at <b>${money(p.eps)} per start</b>${epsBasis(h)}${second ? ` (next best ${escHtml(second.h.horse)} at ${money(second.eps)}${gap && gap >= 1.5 ? `, a ${gap.toFixed(1)}× gap` : ''})` : ''}, <b>and</b> the market's choice.</div>
+      ${raceCardJumpLink(rs)}
       ${confidenceBlock(rs, h)}
       ${pickContext(rs, h)}
       ${marketNote}
@@ -3178,10 +3192,11 @@ function buildPick(rs){
   }
 
   const lead = p.leader;
-  return `<div class="pick-card tier2">
+  return `<div class="pick-card tier2" id="pick-r${escAttr(rs.race)}">
     ${head}
     <div>The market's choice, and <b>second in the field on career earnings at ${money(p.eps)} per start</b>${epsBasis(p.h)} — behind ${escHtml(lead.h.horse)} at ${money(lead.eps)}, who the crowd does not make favourite.${p.nearTie ? ` Those two are within 5% of each other, which is not really a first and a second — on this measure they are level.` : ''}</div>
     <div class="price-warn"><b>Unproven line.</b> Fires only where the Pick filters fail, and is scored separately.</div>
+    ${raceCardJumpLink(rs)}
     ${confidenceBlock(rs, p.h)}
     ${pickContext(rs, p.h)}
     ${marketNote}
@@ -3193,6 +3208,18 @@ function buildPick(rs){
 }
 
 // Per-race read panel. Nothing here names a horse to back.
+// Cross-links. The two things you flip between are a race and its pick, and
+// until now that meant scrolling to the tab bar, switching, then hunting for
+// the race. These jump straight to the matching block in the other tab.
+function pickJumpLink(rs){
+  const p = pickFor(rs);
+  if (!p || p.none) return '';
+  return `<a href="#" class="xlink" data-goto-pick="${escAttr(rs.race)}">\u25b8 Pick for this race: ${escHtml(p.h.horse)}</a>`;
+}
+function raceCardJumpLink(rs){
+  return `<a href="#" class="xlink" data-goto-card="${escAttr(rs.race)}">\u25b8 Race ${escHtml(rs.race)} card</a>`;
+}
+
 function buildReadPanel(rs){
   const horses = rs.horses || [];
   const lines = [];
@@ -3300,6 +3327,7 @@ function renderRaceCard(raceSummaries, scratchedCount){
         ${readLine}
         ${buildTiebreakRead(rs)}
         ${buildMatchupBlock(rs.horses || [], (rs.horses && rs.horses.length) ? rs.horses[0].raceDistYds : null)}
+        ${pickJumpLink(rs)}
         ${buildRiderChangeBlock(rs)}
         ${buildContenderBlock(rs)}
         ${buildCommonCompanyBlock(rs.horses || [], (rs.horses && rs.horses.length) ? rs.horses[0].raceDistYds : null)}
@@ -3619,6 +3647,25 @@ document.getElementById('sortByPostBtn').addEventListener('click', () => renderF
 document.addEventListener('click', e => {
   const a = e.target.closest ? e.target.closest('.race-jump') : null;
   if (a && a.dataset.jump != null){ e.preventDefault(); markPPReturn(a); openRacePP(a.dataset.jump); return; }
+  // Cross-tab jumps: switch tab, scroll to the matching block, flash it so the
+  // eye finds it without hunting.
+  if (a && (a.dataset.gotoPick != null || a.dataset.gotoCard != null)){
+    e.preventDefault();
+    const toPick = a.dataset.gotoPick != null;
+    const race = toPick ? a.dataset.gotoPick : a.dataset.gotoCard;
+    showTab(toPick ? 'picks' : 'cards');
+    requestAnimationFrame(() => {
+      const el = toPick
+        ? document.getElementById('pick-r' + race)
+        : document.getElementById('card-race-' + race);
+      if (!el) return;
+      el.scrollIntoView({behavior:'smooth', block:'start'});
+      el.classList.remove('just-landed');
+      void el.offsetWidth;
+      el.classList.add('just-landed');
+    });
+    return;
+  }
   const f = e.target.closest ? e.target.closest('.field-jump') : null;
   if (f && f.dataset.jump != null){
     e.preventDefault();
@@ -4022,6 +4069,6 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.15 · released 1 September 2026 · build 2026-09-02-c</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.16 · released 1 September 2026 · build 2026-09-02-d</div>
 </body>
 </html>
