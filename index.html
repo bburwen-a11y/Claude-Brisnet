@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Overlay Board v1.9 — Race Card Reader</title>
+<title>Overlay Board v1.10 — Race Card Reader</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
@@ -657,6 +657,10 @@
     font-size:12px; color:var(--ink-soft);
   }
   .conf-others .race-jump{font-weight:700;}
+  .cp-order{
+    font-weight:400; text-transform:none; letter-spacing:0; font-size:10.5px;
+    color:var(--ink-soft); font-style:italic; margin-left:6px;
+  }
   .conf-inline{font-weight:800; font-size:10.5px; letter-spacing:.05em;}
   .conf-inline.conf-high{color:#3C7A4A;}
   .conf-inline.conf-probable{color:#B08A16;}
@@ -710,7 +714,7 @@
 <body>
 <div class="wrap">
   <header>
-    <p class="eyebrow">Handicapping utility · <span class="ver">v1.9</span> · released 1 September 2026</p>
+    <p class="eyebrow">Handicapping utility · <span class="ver">v1.10</span> · released 1 September 2026</p>
     <h1><span class="flap">O</span><span class="flap">v</span><span class="flap">e</span><span class="flap">r</span><span class="flap">l</span><span class="flap">a</span><span class="flap">y</span> <span class="flap">B</span><span class="flap">o</span><span class="flap">a</span><span class="flap">r</span><span class="flap">d</span></h1>
     <p class="tagline">Upload a data file or program PDF. Overlay Board lays out the whole card: past performances, scratches, money moves, and where the board likes a horse.</p>
   </header>
@@ -2938,7 +2942,7 @@ function buildContenderBlock(rs){
   const nRunners = (rs.horses || []).filter(h => h.decimalOdds != null).length;
   const tight = s.contenders.length + s.questionable.length <= 3;
   return `<div class="cp">
-    <div class="cp-head">Who has a shot</div>
+    <div class="cp-head">Who has a shot <span class="cp-order">listed shortest price first</span></div>
     <div class="cp-row cp-in"><b>Contenders (${s.contenders.length} of ${nRunners})</b><br>${nameList(s.contenders) || '<span class="cp-why">none</span>'}</div>
     ${s.questionable.length ? `<div class="cp-row cp-q"><b>Questionable (${s.questionable.length})</b><br>${nameList(s.questionable)}</div>` : ''}
     ${s.pretenders.length ? `<div class="cp-row cp-out"><b>Pretenders (${s.pretenders.length})</b><br>${nameList(s.pretenders)}</div>` : ''}
@@ -3027,8 +3031,8 @@ function confidenceOf(rs, h){
 function othersInFrame(rs, h){
   const rest = (rs.byMarket || []).filter(x => x !== h).slice(0, 3);
   if (!rest.length) return '';
-  return `<div class="conf-others">Others in the frame: `
-    + rest.map(x => `${horseLabel(x)}`).join(' · ')
+  return `<div class="conf-others">Others in the frame <span class="cp-order">next three by price</span>: `
+    + rest.map(x => `${horseLabel(x)}${x.lastSpd != null ? ` <span class="cp-why">last fig ${x.lastSpd}</span>` : ''}`).join(' · ')
     + ` &nbsp;<a href="#" class="race-jump" data-race="${escHtml(rs.race)}">read the whole race \u25b8</a></div>`;
 }
 
@@ -3923,6 +3927,6 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.9 · released 1 September 2026 · build 2026-09-01-b</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.10 · released 1 September 2026 · build 2026-09-01-c</div>
 </body>
 </html>
