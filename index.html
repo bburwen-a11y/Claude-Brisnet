@@ -1,9 +1,9 @@
-
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Overlay Board v1.20 — Race Card Reader</title>
+<title>Overlay Board v1.22 — Race Card Reader</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
@@ -695,6 +695,9 @@
   .conf-inline.conf-questionable{color:#B4541A;}
   .pick-fig{margin-top:8px; font-size:12.5px; line-height:1.5;}
   .fig-note{display:block; margin-top:4px; font-size:11px; color:var(--ink-soft); line-height:1.45;}
+  .pp-wps{font-size:10.5px; line-height:1.5; white-space:nowrap;}
+  .pp-wps b.wps-today{background:#FFF3D0; padding:0 3px; border-radius:2px;}
+  .pp-wps b.wps-rival{font-weight:700;}
   .pp-spd{font-family:var(--mono); font-weight:700;}
   .spd-cell{font-family:var(--mono);}
   .spd-best{color:var(--ink-soft); font-size:11px;}
@@ -746,7 +749,7 @@
 <body>
 <div class="wrap">
   <header>
-    <p class="eyebrow">Handicapping utility · <span class="ver">v1.20</span> · released 3 September 2026</p>
+    <p class="eyebrow">Handicapping utility · <span class="ver">v1.22</span> · released 3 September 2026</p>
     <h1><span class="flap">O</span><span class="flap">v</span><span class="flap">e</span><span class="flap">r</span><span class="flap">l</span><span class="flap">a</span><span class="flap">y</span> <span class="flap">B</span><span class="flap">o</span><span class="flap">a</span><span class="flap">r</span><span class="flap">d</span></h1>
     <p class="tagline">Upload a data file or program PDF. Overlay Board lays out the whole card: past performances, scratches, money moves, and where the board likes a horse.</p>
   </header>
@@ -1199,7 +1202,7 @@ function parseBrisnetSingleFile(text){
       const finTxt = get(616+i);
       const rawMargin = num(736+i);
       const wonIt = String(finTxt).trim() === '1';
-      ppRaces.push({date: d, track: get(276+i), raceNum: get(296+i), distYds: num(316+i), surf: get(326+i), fin: finTxt, margin: rawMargin, won: wonIt, lenBehind: (rawMargin == null ? null : (wonIt ? -rawMargin : rawMargin)), comment: get(396+i), winner: get(406+i), rtype: get(1086+i), claim: num(546+i), classTxt: get(536+i), spd: num(846+i), latePace: num(816+i)});
+      ppRaces.push({date: d, track: get(276+i), raceNum: get(296+i), distYds: num(316+i), surf: get(326+i), fin: finTxt, margin: rawMargin, won: wonIt, lenBehind: (rawMargin == null ? null : (wonIt ? -rawMargin : rawMargin)), comment: get(396+i), winner: get(406+i), second: get(416+i), third: get(426+i), rtype: get(1086+i), claim: num(546+i), classTxt: get(536+i), spd: num(846+i), latePace: num(816+i)});
     }
     // BRIS SPEED RATING, fields 846-855, one per past race. Identified from a
     // real card (GP 8/31) rather than taken on trust: the pace blocks at 766,
@@ -3849,9 +3852,49 @@ function fmtClass(rtype, claim){
 // anyone reads before it stops informing today's race.
 const PP_WORK_LIMIT = 4;
 
+// Who to pick out of a past race's first three. Bolding EVERY horse entered
+// anywhere today made the column a wall of bold (71 of 80 cells on SAR 9/3 R1,
+// where these mares have been meeting all summer). So the emphasis is narrowed
+// to the race being read: a CONTENDER in it gets the highlight, any other
+// rival in the same race gets plain bold, everyone else is left alone.
+function ppKey(h){
+  return String(h || '').toUpperCase().replace(/\s*\([A-Z]{2,3}\)\s*$/, '').replace(/[^A-Z0-9]/g, '');
+}
+
+function raceRunnerSets(raceKey){
+  const rc = (computedRaces || []).find(x => String(x.race) === String(raceKey));
+  const horses = rc ? rc.horses : [];
+  const rivals = new Set(horses.map(h => ppKey(h.horse)));
+  const contenders = new Set();
+  if (horses.length){
+    const byMarket = horses.slice().sort((a, b) => (a.decimalOdds || 99) - (b.decimalOdds || 99));
+    const split = contenderSplit({race: raceKey, horses, byMarket});
+    if (split) split.contenders.forEach(x => contenders.add(ppKey(x.h.horse)));
+  }
+  return {rivals, contenders};
+}
+
+function wpsCell(names, sets){
+  const cells = names.map(n => {
+    const clean = (n || '').trim();
+    if (!clean) return '';
+    const k = ppKey(clean);
+    const label = escHtml(titleCase(clean));
+    if (sets && sets.contenders.has(k)){
+      return `<b class="wps-today" title="a contender in today's race">${label}</b>`;
+    }
+    if (sets && sets.rivals.has(k)){
+      return `<b class="wps-rival" title="also in today's race">${label}</b>`;
+    }
+    return label;
+  }).filter(Boolean);
+  return cells.length ? cells.join('<br>') : '';
+}
+
 function ppHorseBlock(h, race, standalone){
+  const wpsSets = raceRunnerSets(race);
   const races = (h.ppRaces || []).map(p => `
-    <tr><td>${fmtPPDate(p.date)}</td><td>${escHtml(p.track||'')}</td><td>${fmtDistY(p.distYds)}${/^[Tt]$/.test(p.surf||'') ? '<span class="pp-turf" title="run on turf">T</span>' : ''}</td><td class="pp-class">${escHtml(p.classTxt || fmtClass(p.rtype, p.claim))}</td><td>${escHtml(p.fin||'')}</td><td>${p.margin != null ? (p.won ? '<span class="pp-wonby">won ' + p.margin + 'L</span>' : p.margin + 'L') : ''}</td><td class="pp-spd">${p.spd != null && p.spd > 0 ? p.spd : ''}</td><td>${escHtml((p.comment||'').slice(0,36))}</td><td>${escHtml(p.winner||'')}</td></tr>`).join('');
+    <tr><td>${fmtPPDate(p.date)}</td><td>${escHtml(p.track||'')}</td><td>${fmtDistY(p.distYds)}${/^[Tt]$/.test(p.surf||'') ? '<span class="pp-turf" title="run on turf">T</span>' : ''}</td><td class="pp-class">${escHtml(p.classTxt || fmtClass(p.rtype, p.claim))}</td><td>${escHtml(p.fin||'')}</td><td>${p.margin != null ? (p.won ? '<span class="pp-wonby">won ' + p.margin + 'L</span>' : p.margin + 'L') : ''}</td><td class="pp-spd">${p.spd != null && p.spd > 0 ? p.spd : ''}</td><td>${escHtml((p.comment||'').slice(0,36))}</td><td class="pp-wps">${wpsCell([p.winner, p.second, p.third], wpsSets)}</td></tr>`).join('');
   const works = (h.ppWorks || []).slice(0, PP_WORK_LIMIT).map(w => {
     const bullet = (w.time || '').trim().startsWith('-');
     return `${bullet ? '● ' : ''}${fmtPPDate(w.date)} ${escHtml(w.track||'')} ${escHtml((w.time||'').replace('-',''))} ${escHtml(w.desc||'')}`;
@@ -3871,7 +3914,7 @@ function ppHorseBlock(h, race, standalone){
     })()}
     ${ppRecordLine(h)}
     ${races ? `<div class="pp-section">Last ${(h.ppRaces||[]).length} starts${h.ltStarts != null && h.ltStarts > (h.ppRaces||[]).length ? ` <span style="text-transform:none;letter-spacing:0;font-weight:400;">(of ${h.ltStarts} career — the data file carries 10)</span>` : ''}</div>
-    <div class="pp-table-wrap"><table class="pp-table"><thead><tr><th>Date</th><th>Trk</th><th>Dist</th><th>Class</th><th>Fin</th><th>Btn</th><th title="BRIS speed rating for that race, as supplied by the data file">Spd</th><th>Trip comment</th><th>Race winner</th></tr></thead><tbody>${races}</tbody></table></div>` : `<p class="pp-sub">No past races in the data file — first-time starter.</p>`}
+    <div class="pp-table-wrap"><table class="pp-table"><thead><tr><th>Date</th><th>Trk</th><th>Dist</th><th>Class</th><th>Fin</th><th>Btn</th><th title="BRIS speed rating for that race, as supplied by the data file">Spd</th><th>Trip comment</th><th title="Who finished first, second and third in that race. Highlighted = a contender in today's race; bold = another runner in it.">W / P / S</th></tr></thead><tbody>${races}</tbody></table></div>` : `<p class="pp-sub">No past races in the data file — first-time starter.</p>`}
     ${works ? `<div class="pp-section">Last ${Math.min((h.ppWorks||[]).length, PP_WORK_LIMIT)} workouts (● = bullet)</div><div class="pp-works">${works}</div>` : ''}`;
 }
 
@@ -4206,6 +4249,6 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.20 · released 3 September 2026 · build 2026-09-03-a</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.22 · released 3 September 2026 · build 2026-09-03-c</div>
 </body>
 </html>
