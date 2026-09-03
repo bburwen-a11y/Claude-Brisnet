@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Overlay Board v1.18 — Race Card Reader</title>
+<title>Overlay Board v1.20 — Race Card Reader</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
@@ -297,6 +297,17 @@
   .cp-in{border-left-color:#2E6E45;}
   .cp-q{border-left-color:#C08A2E;}
   .cp-out{border-left-color:var(--paper-line); opacity:.72;}
+  .cp-grid{display:grid; grid-template-columns:1fr; gap:10px;}
+  @media(min-width:700px){ .cp-grid{grid-template-columns:1fr 1fr;} }
+  .cp-box{border:1px solid var(--paper-line); border-left-width:5px; border-radius:3px;
+          padding:10px 12px; background:#fff; font-size:13px; line-height:1.7;}
+  .cp-box h4{margin:0 0 7px; font-family:var(--mono); font-size:10.5px; letter-spacing:.06em;
+             text-transform:uppercase; color:var(--ink-soft);}
+  .cp-box.cp-in{border-left-color:#2E6E45;}
+  .cp-box.cp-out{border-left-color:#8B2A2A; opacity:.85;}
+  .cp-sub{margin-top:9px; padding-top:8px; border-top:1px dotted var(--paper-line);}
+  .cp-sub b{color:#8A6414;}
+  .cp-meet{margin-top:10px;}
   .cp-horse{font-weight:700;}
   .cp-why{font-family:var(--mono); font-size:11.5px; color:var(--ink-soft);}
   .cp-foot{margin-top:6px; padding-top:8px; border-top:1px solid var(--paper-line);
@@ -687,6 +698,10 @@
   .pp-spd{font-family:var(--mono); font-weight:700;}
   .spd-cell{font-family:var(--mono);}
   .spd-best{color:var(--ink-soft); font-size:11px;}
+  /* A bold name in the full field means there are past performances behind it
+     — tap to open them. Plain weight means the file carries none. */
+  td.name.has-pp .pp-link{font-weight:800;}
+  td.name.no-pp{font-weight:400; color:var(--ink-soft);}
   .jky-cell{margin-top:3px;}
   .jky{font-size:11px; color:var(--ink-soft); font-family:var(--mono); letter-spacing:.01em;}
   .jky-rec{color:var(--ink-soft); opacity:.85;}
@@ -731,7 +746,7 @@
 <body>
 <div class="wrap">
   <header>
-    <p class="eyebrow">Handicapping utility · <span class="ver">v1.18</span> · released 2 September 2026</p>
+    <p class="eyebrow">Handicapping utility · <span class="ver">v1.20</span> · released 3 September 2026</p>
     <h1><span class="flap">O</span><span class="flap">v</span><span class="flap">e</span><span class="flap">r</span><span class="flap">l</span><span class="flap">a</span><span class="flap">y</span> <span class="flap">B</span><span class="flap">o</span><span class="flap">a</span><span class="flap">r</span><span class="flap">d</span></h1>
     <p class="tagline">Upload a data file or program PDF. Overlay Board lays out the whole card: past performances, scratches, money moves, and where the board likes a horse.</p>
   </header>
@@ -3092,12 +3107,25 @@ function buildContenderBlock(rs){
     `${tapName(x.h)} <span class="cp-why">${escHtml(x.h.oddsStr)}${x.why.length ? ' \u00b7 ' + escHtml(x.why.join(', ')) : ''}</span>`
   ).join('<br>');
   const nRunners = (rs.horses || []).filter(h => h.decimalOdds != null).length;
-  const tight = s.contenders.length + s.questionable.length <= 3;
+  // Two columns on anything wider than a phone, stacked below that. Previous
+  // meetings sit inside the same card because they are the one piece of
+  // evidence that speaks directly to who beats whom in THIS field.
+  const meetings = buildMatchupBlock(rs.horses || [],
+    (rs.horses && rs.horses.length) ? rs.horses[0].raceDistYds : null);
   return `<div class="cp">
-    <div class="cp-head">Who has a shot <span class="cp-order">listed shortest price first</span></div>
-    <div class="cp-row cp-in"><b>Contenders (${s.contenders.length} of ${nRunners})</b><br>${nameList(s.contenders) || '<span class="cp-why">none</span>'}</div>
-    ${s.questionable.length ? `<div class="cp-row cp-q"><b>Questionable (${s.questionable.length})</b><br>${nameList(s.questionable)}</div>` : ''}
-    ${s.pretenders.length ? `<div class="cp-row cp-out"><b>Pretenders (${s.pretenders.length})</b><br>${nameList(s.pretenders)}</div>` : ''}
+    <div class="cp-head">Contenders vs pretenders <span class="cp-order">listed shortest price first</span></div>
+    <div class="cp-grid">
+      <div class="cp-box cp-in">
+        <h4>Contenders (${s.contenders.length} of ${nRunners})</h4>
+        ${nameList(s.contenders) || '<span class="cp-why">none</span>'}
+        ${s.questionable.length ? `<div class="cp-sub"><b>Questionable (${s.questionable.length})</b><br>${nameList(s.questionable)}</div>` : ''}
+      </div>
+      <div class="cp-box cp-out">
+        <h4>Pretenders (${s.pretenders.length})</h4>
+        ${s.pretenders.length ? nameList(s.pretenders) : '<span class="cp-why">none — the whole field is in the market\u2019s frame</span>'}
+      </div>
+    </div>
+    ${meetings ? `<div class="cp-meet">${meetings}</div>` : ''}
   </div>`;
 }
 
@@ -3339,6 +3367,31 @@ function buildReadPanel(rs){
       + `<span class="fig-note">${fig.covered} of ${fig.total} runners carry a figure. A wider gap has measured no better than a narrow one — this is the shape of the race, not a rating of the pick.</span></div>`);
   }
 
+  // SAME BARN. Logged from 2026-09-02, watch-only, feeding nothing. Across
+  // 149 paired races a trainer had 2+ runners in 35% of them, and the split
+  // between the pair is lopsided: the SHORTER-priced one won 13.1% against a
+  // price implying 20.3% (ratio 0.65, P(ratio>=1) = 0.009) while the longer
+  // one won 17.5% against 11.7% (ratio 1.49, interval starting at 1.00). The
+  // longer-priced stablemate finished ahead in 29 of 61 pairs. Not a concern
+  // on the pick and not a selection: shown so the record can be built card by
+  // card before anything is done with it.
+  const barns = {};
+  horses.forEach(h => {
+    const t = (h.trainer || '').trim().toUpperCase();
+    if (!t) return;
+    (barns[t] = barns[t] || []).push(h);
+  });
+  const doubled = Object.entries(barns).filter(([, hs]) => hs.length > 1);
+  if (doubled.length){
+    const body = doubled.map(([t, hs]) => {
+      const sorted = hs.slice().sort((a, b) => (a.decimalOdds || 99) - (b.decimalOdds || 99));
+      return `<b>${escHtml(titleCase(t))}</b> runs ${sorted.length}: `
+        + sorted.map((h, i) => `${horseLabel(h)}${i === 0 ? ' <span class="cp-why">shorter</span>' : ''}`).join(' \u00b7 ');
+    }).join('<br>');
+    lines.push(`<div class="bet-line"><span class="bet-tag">SAME BARN</span> ${body}`
+      + `<span class="fig-note">Logged, not scored. The market's preferred half of a stable pair has measured below its price and the neglected half above it, but on 61 pairs and found by looking \u2014 this line changes no pick and no label.</span></div>`);
+  }
+
   // Lone speed: top Quirin, 2+ clear of the next horse. Display only.
   const shape = speedShape(horses);
   if (shape && shape.lone){
@@ -3411,7 +3464,6 @@ function renderRaceCard(raceSummaries, scratchedCount){
         </div>
         ${readLine}
         ${buildTiebreakRead(rs)}
-        ${buildMatchupBlock(rs.horses || [], (rs.horses && rs.horses.length) ? rs.horses[0].raceDistYds : null)}
         ${pickJumpLink(rs)}
         ${buildRiderChangeBlock(rs)}
         ${buildContenderBlock(rs)}
@@ -3692,7 +3744,7 @@ function renderFullField(sortMode){
       return `
         <tr>
           <td><span class="field-badge">${escHtml(h.post || '–')}</span></td>
-          <td class="name">${nameCell}${adjMark}${(() => { const jl = jockeyLine(h); return jl ? `<div class="jky-cell">${jl}</div>` : ''; })()}</td>
+          <td class="name ${(h.ppRaces && h.ppRaces.length) || (h.ppWorks && h.ppWorks.length) ? 'has-pp' : 'no-pp'}">${nameCell}${adjMark}${(() => { const jl = jockeyLine(h); return jl ? `<div class="jky-cell">${jl}</div>` : ''; })()}</td>
           <td title="${escAttr(oddsTitle)}">${escHtml(h.oddsStr)}</td>
           <td>${fmtMove(h)}</td>
           <td>${formArrow(h)}</td>
@@ -4154,6 +4206,6 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.18 · released 2 September 2026 · build 2026-09-02-f</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.20 · released 3 September 2026 · build 2026-09-03-a</div>
 </body>
 </html>
