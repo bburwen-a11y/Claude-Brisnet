@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Overlay Board v1.17 — Race Card Reader</title>
+<title>Overlay Board v1.18 — Race Card Reader</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
@@ -731,7 +731,7 @@
 <body>
 <div class="wrap">
   <header>
-    <p class="eyebrow">Handicapping utility · <span class="ver">v1.17</span> · released 1 September 2026</p>
+    <p class="eyebrow">Handicapping utility · <span class="ver">v1.18</span> · released 2 September 2026</p>
     <h1><span class="flap">O</span><span class="flap">v</span><span class="flap">e</span><span class="flap">r</span><span class="flap">l</span><span class="flap">a</span><span class="flap">y</span> <span class="flap">B</span><span class="flap">o</span><span class="flap">a</span><span class="flap">r</span><span class="flap">d</span></h1>
     <p class="tagline">Upload a data file or program PDF. Overlay Board lays out the whole card: past performances, scratches, money moves, and where the board likes a horse.</p>
   </header>
@@ -743,9 +743,9 @@
       <div class="upload-grid four-col">
         <div class="upload-card">
           <h3>Brisnet data file</h3>
-          <p>Brisnet’s "Single File" export. If .drf looks greyed out in the picker, rename it to .csv — the parser reads the contents, not the name. Unzip a .zip first.</p>
+          <p>Brisnet’s "Single File" export. A <b>.zip</b> is fine — it is opened for you. If .drf looks greyed out in the picker, rename it to .csv; the parser reads the contents, not the name.</p>
           <label class="file-btn" for="drfInput">Choose .DRF / .csv</label>
-          <input type="file" id="drfInput" accept=".drf,.csv,.txt,text/csv,text/plain,text/*">
+          <input type="file" id="drfInput" accept=".drf,.csv,.txt,.zip,text/csv,text/plain,text/*,application/zip">
           <div class="status" id="drfStatus"></div>
         </div>
         <div class="upload-card">
@@ -1457,18 +1457,94 @@ function ordinalSuffix(n){
   return s[(v-20)%10] || s[v] || s[0];
 }
 
+/* ---------------- ZIP (Brisnet ships the card zipped) ----------------
+   Read the CENTRAL DIRECTORY rather than walking local headers: when a zip is
+   written with a data descriptor the local header carries zero for the sizes,
+   and the central directory always has the real ones. Stored (method 0) and
+   deflate (method 8) are both handled; deflate needs DecompressionStream,
+   which every current mobile browser has. */
+function looksZipped(bytes){
+  return bytes.length > 4 && bytes[0] === 0x50 && bytes[1] === 0x4B
+      && (bytes[2] === 0x03 || bytes[2] === 0x05) && (bytes[3] === 0x04 || bytes[3] === 0x06);
+}
+
+function zipEntries(bytes){
+  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  // End of central directory: scan back for its signature.
+  let eocd = -1;
+  for (let i = bytes.length - 22; i >= 0 && i > bytes.length - 66000; i--){
+    if (dv.getUint32(i, true) === 0x06054b50){ eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error('zip directory not found');
+  const count = dv.getUint16(eocd + 10, true);
+  let p = dv.getUint32(eocd + 16, true);
+  const out = [];
+  for (let i = 0; i < count; i++){
+    if (dv.getUint32(p, true) !== 0x02014b50) break;
+    const method = dv.getUint16(p + 10, true);
+    const compSize = dv.getUint32(p + 20, true);
+    const rawSize = dv.getUint32(p + 24, true);
+    const nameLen = dv.getUint16(p + 28, true);
+    const extraLen = dv.getUint16(p + 30, true);
+    const commentLen = dv.getUint16(p + 32, true);
+    const localOff = dv.getUint32(p + 42, true);
+    const name = new TextDecoder('utf-8').decode(bytes.subarray(p + 46, p + 46 + nameLen));
+    out.push({name, method, compSize, rawSize, localOff});
+    p += 46 + nameLen + extraLen + commentLen;
+  }
+  return out;
+}
+
+async function zipRead(bytes, entry){
+  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const off = entry.localOff;
+  if (dv.getUint32(off, true) !== 0x04034b50) throw new Error('zip entry header not found');
+  const nameLen = dv.getUint16(off + 26, true);
+  const extraLen = dv.getUint16(off + 28, true);
+  const start = off + 30 + nameLen + extraLen;
+  const data = bytes.subarray(start, start + entry.compSize);
+  if (entry.method === 0) return data;
+  if (entry.method !== 8) throw new Error('compression method ' + entry.method + ' is not supported');
+  if (typeof DecompressionStream === 'undefined'){
+    throw new Error('this browser cannot unzip — please extract the file first');
+  }
+  const stream = new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+// Pick the data file out of the archive: prefer .drf/.csv/.txt, else the
+// biggest entry. Skip Mac resource forks, which otherwise win on name match.
+function pickZipEntry(entries){
+  const usable = entries.filter(e => !/^__MACOSX\/|\/\._|\/$/.test(e.name) && e.rawSize > 0);
+  if (!usable.length) throw new Error('the zip contains no data file');
+  const byExt = usable.filter(e => /\.(drf|csv|txt)$/i.test(e.name));
+  const pool = byExt.length ? byExt : usable;
+  return pool.reduce((a, b) => (b.rawSize > a.rawSize ? b : a));
+}
+
+// One entry point for both plain and zipped files. Brisnet text is Latin-1.
+async function readCardFile(file){
+  const buf = new Uint8Array(await file.arrayBuffer());
+  if (!looksZipped(buf)){
+    return {text: new TextDecoder('iso-8859-1').decode(buf), from: null};
+  }
+  const entry = pickZipEntry(zipEntries(buf));
+  const raw = await zipRead(buf, entry);
+  return {text: new TextDecoder('iso-8859-1').decode(raw), from: entry.name};
+}
+
 document.getElementById('drfInput').addEventListener('change', e => {
   const file = e.target.files[0];
   if (!file) return;
   const statusEl = document.getElementById('drfStatus');
   statusEl.textContent = 'Reading file…';
   statusEl.className = 'status';
-  const reader = new FileReader();
-  reader.onload = ev => {
-    lastDrfText = ev.target.result;
+  readCardFile(file).then(res => {
+    lastDrfText = res.text;
+    const unzipped = res.from ? ` (unzipped ${res.from})` : '';
     let extracted;
     try {
-      extracted = parseBrisnetSingleFile(ev.target.result);
+      extracted = parseBrisnetSingleFile(res.text);
     } catch (err){
       statusEl.textContent = 'Could not parse this file as a Brisnet Single-File data file. Confirm it\'s the "Single File" format (not "Multi File" or "ALLWAYS") and hasn\'t been re-saved/edited by another program.';
       statusEl.className = 'status err';
@@ -1488,7 +1564,7 @@ document.getElementById('drfInput').addEventListener('change', e => {
     const loadedWhen = fmtRaceDate(extracted.map(h => h.raceDateYmd).find(Boolean));
     const loadedWho = (extracted.map(h => (h.trackCode || '').toUpperCase()).find(Boolean)) || '';
     const cardTag = [loadedWho, loadedWhen].filter(Boolean).join(' ');
-    const forCard = cardTag ? ` for ${cardTag}` : '';
+    const forCard = (cardTag ? ` for ${cardTag}` : '') + unzipped;
     const dateWarn = (() => {
       const ymd = extracted.map(h => h.raceDateYmd).find(Boolean);
       if (!ymd || String(ymd).length !== 8) return '';
@@ -1510,12 +1586,11 @@ document.getElementById('drfInput').addEventListener('change', e => {
       statusEl.textContent = `Imported ${extracted.length} entries across ${raceCount} race(s)${forCard}.${dateWarn} Prime Power, surface fit, race conditions, class move and jockey/trainer meet records came through. Mark scratches in the Scr column before computing; the Final column stays empty until you fill it in at the track.`;
       statusEl.className = 'status ok';
     }
-  };
-  reader.onerror = () => {
-    statusEl.textContent = 'Could not read the file.';
+  }).catch(err => {
+    statusEl.textContent = 'Could not read the file: ' + (err && err.message ? err.message : err)
+      + '. If it is a zip your browser will not open, extract the .DRF or .CSV first and choose that.';
     statusEl.className = 'status err';
-  };
-  reader.readAsText(file, 'ISO-8859-1');
+  });
 });
 
 const csvInput = document.getElementById('csvInput');
@@ -4079,6 +4154,6 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.17 · released 1 September 2026 · build 2026-09-02-e</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.18 · released 2 September 2026 · build 2026-09-02-f</div>
 </body>
 </html>
