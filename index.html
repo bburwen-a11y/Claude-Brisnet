@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Overlay Board v1.27 — Race Card Reader</title>
+<title>Overlay Board v1.28 — Race Card Reader</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
@@ -719,6 +719,10 @@
   .pp-wps b.wps-rival{font-weight:700;}
   .pp-post{font-family:var(--mono); white-space:nowrap;}
   .pp-of{color:var(--ink-soft); font-size:9.5px;}
+  .pp-ladder{margin-left:5px; font-size:9px; vertical-align:1px;}
+  .pp-up{color:#8B2A2A;}      /* ran ABOVE today's level */
+  .pp-down{color:#2E6E45;}    /* ran BELOW today's level */
+  .pp-same{color:var(--ink-soft);}
   .pp-spd{font-family:var(--mono); font-weight:700;}
   .spd-cell{font-family:var(--mono);}
   .spd-best{color:var(--ink-soft); font-size:11px;}
@@ -770,7 +774,7 @@
 <body>
 <div class="wrap">
   <header>
-    <p class="eyebrow">Handicapping utility · <span class="ver">v1.27</span> · released 4 September 2026</p>
+    <p class="eyebrow">Handicapping utility · <span class="ver">v1.28</span> · released 4 September 2026</p>
     <h1><span class="flap">O</span><span class="flap">v</span><span class="flap">e</span><span class="flap">r</span><span class="flap">l</span><span class="flap">a</span><span class="flap">y</span> <span class="flap">B</span><span class="flap">o</span><span class="flap">a</span><span class="flap">r</span><span class="flap">d</span></h1>
     <p class="tagline">Upload a data file or program PDF. Overlay Board lays out the whole card: past performances, scratches, money moves, and where the board likes a horse.</p>
   </header>
@@ -980,7 +984,7 @@ const rowsBody = document.getElementById('rowsBody');
 const emptyNote = document.getElementById('emptyNote');
 
 function newRow(partial){
-  return Object.assign({id: rowId++, race:'', post:'', horse:'', odds:'', finalOdds:'', score:'', surfaceRating:'', classMove:'', trackCode:'', raceDateYmd:'', ltStarts:null, ltWins:null, ltPlaces:null, ltShows:null, ltEarn:null, raceDistYds:'', raceType:'', raceClaim:'', raceClassTxt:'', scratched:false, connAdjusted:false, runStyle:'', quirin:'', distStarts:'', distAdjusted:false, turfStarts:'', surface:'', daysSinceWork:'', worksAtTrack:'', lastFinMargin:'', h2hNote:'', classFit:null, classSeen:0, todayClaim:null, firstTimeTagged:false, claimDropRatio:null, layoffDays:null, lastSpd:null, bestSpd:null, avgSpd3:null, jockey:'', jkyStarts:null, jkyWins:null, jkyPlaces:null, jkyShows:null, trainer:'', trnStarts:null, trnWins:null, riderChange:null, tjStarts:'', tjWins:'', keyStats:[], rawPP:'', claimedLastRace:false, lastFinComment:'', hadTrouble:false, recentWorks:[], ppRaces:[], ppWorks:[]}, partial);
+  return Object.assign({id: rowId++, race:'', post:'', horse:'', odds:'', finalOdds:'', score:'', surfaceRating:'', classMove:'', trackCode:'', raceDateYmd:'', ltStarts:null, ltWins:null, ltPlaces:null, ltShows:null, ltEarn:null, raceDistYds:'', raceType:'', raceClaim:'', raceClassTxt:'', scratched:false, connAdjusted:false, runStyle:'', quirin:'', distStarts:'', distAdjusted:false, turfStarts:'', surface:'', daysSinceWork:'', worksAtTrack:'', lastFinMargin:'', h2hNote:'', classFit:null, classSeen:0, classTxtToday:'', todayClaim:null, firstTimeTagged:false, claimDropRatio:null, layoffDays:null, lastSpd:null, bestSpd:null, avgSpd3:null, jockey:'', jkyStarts:null, jkyWins:null, jkyPlaces:null, jkyShows:null, trainer:'', trnStarts:null, trnWins:null, riderChange:null, tjStarts:'', tjWins:'', keyStats:[], rawPP:'', claimedLastRace:false, lastFinComment:'', hadTrouble:false, recentWorks:[], ppRaces:[], ppWorks:[]}, partial);
 }
 
 function renderRows(){
@@ -1351,6 +1355,7 @@ function parseBrisnetSingleFile(text){
       recentWorks,
       lastSpd, bestSpd, avgSpd3,
       todayClaim, firstTimeTagged, claimDropRatio, layoffDays, classFit, classSeen,
+      classTxtToday: get(11),
       last3Fins,
       ppRaces,
       ppWorks
@@ -2258,6 +2263,7 @@ document.getElementById('computeBtn').addEventListener('click', () => {
       lastFinMargin: (r.lastFinMargin !== '' && r.lastFinMargin != null && !isNaN(parseFloat(r.lastFinMargin))) ? parseFloat(r.lastFinMargin) : null,
       h2hNote: r.h2hNote || '',
       classFit: r.classFit != null ? r.classFit : null,
+      classTxtToday: r.classTxtToday || '',
       classSeen: r.classSeen || 0,
       todayClaim: r.todayClaim != null ? r.todayClaim : null,
       firstTimeTagged: !!r.firstTimeTagged,
@@ -3952,10 +3958,43 @@ function wpsCell(names, sets){
   return cells.length ? cells.join('<br>') : '';
 }
 
+// Mark each past race against TODAY'S level, so a horse climbing the ladder
+// reads as one. Comparison is on the claiming tag where both races carry one;
+// where either doesn't, the class family (Md / Clm / Alw-OC) is used, which is
+// coarse but honest. Display only — nothing here feeds the class-fit rule or
+// the pick, and the arrow deliberately says nothing about whether the horse
+// ran well, only where the race sat.
+function classLadder(p, h){
+  const todayTag = h.todayClaim != null ? h.todayClaim : null;
+  const pastTag = p.claim != null && p.claim > 0 ? p.claim : null;
+  let dir = null;
+  if (todayTag && pastTag){
+    if (pastTag > todayTag * 1.15) dir = 'up';
+    else if (pastTag < todayTag * 0.85) dir = 'down';
+    else dir = 'same';
+  } else {
+    const rank = t => {
+      const L = String(t || '').toUpperCase();
+      if (/^(MD|MSW|MC)/.test(L) || L.includes('MDSPWT')) return 1;
+      if (/^S?CLM/.test(L)) return 2;
+      if (/^(OC|ALW|AOC)/.test(L)) return 3;
+      if (/^(STK|G[123]|HCP)/.test(L)) return 4;
+      return 0;
+    };
+    const a = rank(p.classTxt), b = rank(h.classTxtToday);
+    if (!a || !b) return '';
+    dir = a > b ? 'up' : (a < b ? 'down' : 'same');
+  }
+  const mark = dir === 'up' ? '\u25b2' : (dir === 'down' ? '\u25bc' : '=');
+  const title = dir === 'up' ? 'above today\u2019s level'
+              : (dir === 'down' ? 'below today\u2019s level' : 'same level as today');
+  return `<span class="pp-ladder pp-${dir}" title="${title}">${mark}</span>`;
+}
+
 function ppHorseBlock(h, race, standalone){
   const wpsSets = raceRunnerSets(race);
   const races = (h.ppRaces || []).map(p => `
-    <tr><td>${fmtPPDate(p.date)}</td><td>${escHtml(p.track||'')}</td><td>${fmtDistY(p.distYds)}${/^[Tt]$/.test(p.surf||'') ? '<span class="pp-turf" title="run on turf">T</span>' : ''}</td><td class="pp-class">${escHtml(p.classTxt || fmtClass(p.rtype, p.claim))}</td><td class="pp-post">${(p.pastPost != null && p.pastField != null && p.pastPost >= 1 && p.pastPost <= p.pastField) ? `${p.pastPost}<span class="pp-of">/${p.pastField}</span>` : ''}</td><td>${escHtml(p.fin||'')}</td><td>${p.margin != null ? (p.won ? '<span class="pp-wonby">won ' + p.margin + 'L</span>' : p.margin + 'L') : ''}</td><td class="pp-spd">${p.spd != null && p.spd > 0 ? p.spd : ''}</td><td>${escHtml((p.comment||'').slice(0,36))}</td><td class="pp-wps">${wpsCell([p.winner, p.second, p.third], wpsSets)}</td></tr>`).join('');
+    <tr><td>${fmtPPDate(p.date)}</td><td>${escHtml(p.track||'')}</td><td>${fmtDistY(p.distYds)}${/^[Tt]$/.test(p.surf||'') ? '<span class="pp-turf" title="run on turf">T</span>' : ''}</td><td class="pp-class">${escHtml(p.classTxt || fmtClass(p.rtype, p.claim))}${classLadder(p, h)}</td><td class="pp-post">${(p.pastPost != null && p.pastField != null && p.pastPost >= 1 && p.pastPost <= p.pastField) ? `${p.pastPost}<span class="pp-of">/${p.pastField}</span>` : ''}</td><td>${escHtml(p.fin||'')}</td><td>${p.margin != null ? (p.won ? '<span class="pp-wonby">won ' + p.margin + 'L</span>' : p.margin + 'L') : ''}</td><td class="pp-spd">${p.spd != null && p.spd > 0 ? p.spd : ''}</td><td>${escHtml((p.comment||'').slice(0,36))}</td><td class="pp-wps">${wpsCell([p.winner, p.second, p.third], wpsSets)}</td></tr>`).join('');
   const works = (h.ppWorks || []).slice(0, PP_WORK_LIMIT).map(w => {
     const bullet = (w.time || '').trim().startsWith('-');
     return `${bullet ? '● ' : ''}${fmtPPDate(w.date)} ${escHtml(w.track||'')} ${escHtml((w.time||'').replace('-',''))} ${escHtml(w.desc||'')}`;
@@ -4348,6 +4387,7 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.27 · released 4 September 2026 · build 2026-09-04-b</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.28 · released 4 September 2026 · build 2026-09-04-c</div>
 </body>
 </html>
+
