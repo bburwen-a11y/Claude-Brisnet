@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Overlay Board v1.22 — Race Card Reader</title>
+<title>Overlay Board v1.23 — Race Card Reader</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
@@ -695,6 +695,13 @@
   .conf-inline.conf-questionable{color:#B4541A;}
   .pick-fig{margin-top:8px; font-size:12.5px; line-height:1.5;}
   .fig-note{display:block; margin-top:4px; font-size:11px; color:var(--ink-soft); line-height:1.45;}
+  .pp-filter{display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin:10px 0 14px;}
+  .pp-filt{
+    appearance:none; border:1px solid var(--rule); background:#fff; border-radius:3px;
+    padding:6px 11px; font-family:var(--mono); font-size:11px; cursor:pointer; color:var(--ink);
+  }
+  .pp-filt.on{background:var(--board-950); color:var(--paper); border-color:var(--board-950); font-weight:700;}
+  .pp-filter-note{font-size:11px; color:var(--ink-soft);}
   .pp-wps{font-size:10.5px; line-height:1.5; white-space:nowrap;}
   .pp-wps b.wps-today{background:#FFF3D0; padding:0 3px; border-radius:2px;}
   .pp-wps b.wps-rival{font-weight:700;}
@@ -749,7 +756,7 @@
 <body>
 <div class="wrap">
   <header>
-    <p class="eyebrow">Handicapping utility · <span class="ver">v1.22</span> · released 3 September 2026</p>
+    <p class="eyebrow">Handicapping utility · <span class="ver">v1.23</span> · released 3 September 2026</p>
     <h1><span class="flap">O</span><span class="flap">v</span><span class="flap">e</span><span class="flap">r</span><span class="flap">l</span><span class="flap">a</span><span class="flap">y</span> <span class="flap">B</span><span class="flap">o</span><span class="flap">a</span><span class="flap">r</span><span class="flap">d</span></h1>
     <p class="tagline">Upload a data file or program PDF. Overlay Board lays out the whole card: past performances, scratches, money moves, and where the board likes a horse.</p>
   </header>
@@ -3081,7 +3088,29 @@ function contenderSplit(rs){
     const why = [];
     if (price >= 12) why.push(`${h.oddsStr} — priced out`);
     if (rank > 5) why.push(`${rank}th choice of ${ranked.length}`);
-    if (why.length) { out.pretenders.push({h, why}); return; }
+    if (why.length){
+      // A price-cut horse is NOT called a pretender when the file says we
+      // cannot judge it. Two cases, both measured on 187 races:
+      //   class fit 2+ — rescuing these to CONTENDER failed outright (2.7%
+      //     against 2.8% for the ones left behind), so they are not promoted;
+      //     but SAR 9/3 R10 Foto won at 23.48 with four competitive runs at
+      //     today's trip, so calling them pretenders on price alone overstates
+      //     what we know. Questionable is the honest bucket.
+      //   first-time starters — no form exists to judge, and as a group they
+      //     won 14.3% against a price implying 13.3% (ratio 1.08, +13.1% ROI),
+      //     which is the opposite of pretender.
+      const fitOK = h.classFit != null && (h.classSeen || 0) >= 3 && h.classFit >= 2;
+      const debut = !(h.ppRaces && h.ppRaces.length);
+      if (fitOK || debut){
+        out.questionable.push({h, why: why.concat([
+          debut ? 'first-time starter — no form to judge'
+                : `but competitive at today's level in ${h.classFit} of its last ${h.classSeen}`
+        ])});
+        return;
+      }
+      out.pretenders.push({h, why});
+      return;
+    }
     if (h.lastFinMargin != null && h.lastFinMargin > 10){
       out.questionable.push({h, why: [`beaten ${h.lastFinMargin}L last comparable start`]});
       return;
@@ -3987,22 +4016,44 @@ function closePPOverlay(){
   });
 }
 
-function openRacePP(race){
+// Reading a twelve-runner maiden means scrolling past four horses the price
+// has already ruled out. The filter drops the pretenders only — contenders and
+// questionable both stay, because questionable now means "cannot judge", not
+// "no chance". The choice is remembered so it survives moving between races.
+let ppFieldFilter = 'all';
+
+function openRacePP(race, filter){
   const rc = computedRaces.find(r => r.race === race);
   if (!rc) return;
-  const horses = rc.horses.slice().sort((a,b) => (Number(a.post)||99) - (Number(b.post)||99));
-  const meta = raceMeta(horses);
-  const blocks = horses.map(h => `<div class="pp-horse">${ppHorseBlock(h, race, false)}</div>`).join('');
-  const matchups = buildMatchupBlock(horses, horses.length ? horses[0].raceDistYds : null)
-                 + buildCommonCompanyBlock(horses, horses.length ? horses[0].raceDistYds : null);
+  if (filter) ppFieldFilter = filter;
+  const all = rc.horses.slice().sort((a,b) => (Number(a.post)||99) - (Number(b.post)||99));
+  const split = contenderSplit({race, horses: rc.horses,
+    byMarket: rc.horses.slice().sort((a,b) => (a.decimalOdds||99) - (b.decimalOdds||99))});
+  const cut = new Set(split ? split.pretenders.map(x => x.h) : []);
+  const showing = (ppFieldFilter === 'live' && split) ? all.filter(h => !cut.has(h)) : all;
+  const meta = raceMeta(all);
+  const blocks = showing.map(h => `<div class="pp-horse">${ppHorseBlock(h, race, false)}</div>`).join('');
+  const matchups = buildMatchupBlock(showing, showing.length ? showing[0].raceDistYds : null)
+                 + buildCommonCompanyBlock(showing, showing.length ? showing[0].raceDistYds : null);
+  const n = cut.size;
+  const toggle = split && n
+    ? `<div class="pp-filter">
+         <button class="pp-filt${ppFieldFilter === 'all' ? ' on' : ''}" data-field-filter="all">Whole field (${all.length})</button>
+         <button class="pp-filt${ppFieldFilter === 'live' ? ' on' : ''}" data-field-filter="live">Contenders only (${all.length - n})</button>
+         <span class="pp-filter-note">${ppFieldFilter === 'live' ? `${n} priced-out runner${n === 1 ? '' : 's'} hidden` : `${n} priced out`}</span>
+       </div>`
+    : '';
   document.getElementById('ppContent').innerHTML =
     `<button class="pp-back">${ppBackLabel()}</button>
      <h3 class="pp-race-title">Race ${escHtml(race)} — past performances</h3>
-     <div class="pp-race-meta">${(() => { const d = raceDateOf(horses); return d ? escHtml(d) + ' · ' : ''; })()}${meta ? escHtml(meta) + ' · ' : ''}${horses.length} runners · program order</div>
+     <div class="pp-race-meta">${(() => { const d = raceDateOf(all); return d ? escHtml(d) + ' · ' : ''; })()}${meta ? escHtml(meta) + ' · ' : ''}${showing.length} of ${all.length} runners · program order</div>
+     ${toggle}
      ${matchups}
      ${blocks}${PP_FOOT}`;
   document.querySelector('.pp-card').classList.add('pp-race-card');
   document.getElementById('ppOverlay').classList.add('show');
+  document.getElementById('ppContent').querySelectorAll('[data-field-filter]').forEach(b =>
+    b.addEventListener('click', () => openRacePP(race, b.dataset.fieldFilter)));
 }
 
 function openPP(race, horseName){
@@ -4249,6 +4300,6 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.22 · released 3 September 2026 · build 2026-09-03-c</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.23 · released 3 September 2026 · build 2026-09-03-d</div>
 </body>
 </html>
