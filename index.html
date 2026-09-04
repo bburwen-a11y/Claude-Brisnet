@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Overlay Board v1.23 — Race Card Reader</title>
+<title>Overlay Board v1.24 — Race Card Reader</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
@@ -673,6 +673,7 @@
     font-size:12px; color:var(--ink-soft);
   }
   .conf-others .race-jump{font-weight:700;}
+  .sort-note{font-size:11px; color:var(--ink-soft); font-style:italic; align-self:center; margin-left:4px;}
   .xlink{
     display:inline-block; margin:8px 10px 0 0; font-family:var(--mono); font-size:11px;
     letter-spacing:.04em; color:var(--board-950); text-decoration:none;
@@ -756,7 +757,7 @@
 <body>
 <div class="wrap">
   <header>
-    <p class="eyebrow">Handicapping utility · <span class="ver">v1.23</span> · released 3 September 2026</p>
+    <p class="eyebrow">Handicapping utility · <span class="ver">v1.24</span> · released 3 September 2026</p>
     <h1><span class="flap">O</span><span class="flap">v</span><span class="flap">e</span><span class="flap">r</span><span class="flap">l</span><span class="flap">a</span><span class="flap">y</span> <span class="flap">B</span><span class="flap">o</span><span class="flap">a</span><span class="flap">r</span><span class="flap">d</span></h1>
     <p class="tagline">Upload a data file or program PDF. Overlay Board lays out the whole card: past performances, scratches, money moves, and where the board likes a horse.</p>
   </header>
@@ -911,8 +912,9 @@
     <section id="fieldSection" style="display:none;">
       <h2><span class="step-num">4</span> Full field, race by race</h2>
       <div class="sort-toggle no-print" role="group" aria-label="Sort order">
-        <button class="toggle-btn active" id="sortByEdgeBtn" data-sort="edge">Sort: edge</button>
-        <button class="toggle-btn" id="sortByPostBtn" data-sort="post">Sort: post position</button>
+        <button class="toggle-btn active" id="showAllBtn">Whole field</button>
+        <button class="toggle-btn" id="showLiveBtn">Hide pretenders</button>
+        <span class="sort-note">always in post order</span>
       </div>
       <div id="fieldTables"></div>
     </section>
@@ -959,7 +961,7 @@ let rowId = 0;
 let lastCsvData = null;
 let lastDrfText = null;
 let computedRaces = [];   // full per-race horse data, kept around for re-sorting
-let currentSort = 'edge';
+let currentSort = 'all';   // 'all' or 'live' — the field table is always post-ordered
 
 const rowsBody = document.getElementById('rowsBody');
 const emptyNote = document.getElementById('emptyNote');
@@ -3739,10 +3741,15 @@ function renderPicks(raceSummaries){
     }));
 }
 
-function renderFullField(sortMode){
-  currentSort = sortMode;
-  document.getElementById('sortByEdgeBtn').classList.toggle('active', sortMode === 'edge');
-  document.getElementById('sortByPostBtn').classList.toggle('active', sortMode === 'post');
+// The field table is ALWAYS in post order. Sorting it by edge or market rank
+// was a leftover from the model era: it re-ranked the field by a number the
+// tool no longer stands behind, and it made the post column — which is the one
+// thing that varies by track and trip — impossible to read down. The toggle
+// now controls WHO is listed, not the order.
+function renderFullField(mode){
+  currentSort = (mode === 'live' || mode === 'all') ? mode : (currentSort || 'all');
+  document.getElementById('showAllBtn').classList.toggle('active', currentSort === 'all');
+  document.getElementById('showLiveBtn').classList.toggle('active', currentSort === 'live');
 
   const fieldSection = document.getElementById('fieldSection');
   const container = document.getElementById('fieldTables');
@@ -3753,11 +3760,14 @@ function renderFullField(sortMode){
   fieldSection.style.display = 'block';
 
   container.innerHTML = computedRaces.map(rc => {
-    const horses = rc.horses.slice().sort((a,b) => {
-      if (sortMode === 'post') return (Number(a.post)||99) - (Number(b.post)||99);
-      if (rc.hasRatings) return (b.edge ?? -Infinity) - (a.edge ?? -Infinity);
-      return b.marketProb - a.marketProb;
-    });
+    const split = contenderSplit({race: rc.race, horses: rc.horses,
+      byMarket: rc.horses.slice().sort((a,b) => (a.decimalOdds||99) - (b.decimalOdds||99))});
+    const cut = new Set((currentSort === 'live' && split) ? split.pretenders.map(x => x.h) : []);
+    const horses = rc.horses.slice()
+      .filter(h => !cut.has(h))
+      .sort((a,b) => (Number(a.post)||99) - (Number(b.post)||99));
+    const hiddenNote = cut.size
+      ? ` <span class="cp-why">${cut.size} priced-out runner${cut.size === 1 ? '' : 's'} hidden</span>` : '';
     const favPost = horses.reduce((a,b) => (a.decimalOdds != null && (b.decimalOdds == null || a.decimalOdds < b.decimalOdds)) ? a : b).post;
     const shape = speedShape(horses);
     const rowsHtml = horses.map(h => {
@@ -3798,7 +3808,7 @@ function renderFullField(sortMode){
       <div class="field-race" id="field-race-${escAttr(rc.race)}">
         <div class="field-race-head">
           <strong class="race-no ${readLevelFor(rc.race)}"><a class="race-jump" data-jump="${escAttr(rc.race)}" title="Tap for every runner's past performances">Race ${escHtml(rc.race)}</a></strong>
-          <span class="race-metric">${(() => { const d = raceDateOf(horses); return d ? escHtml(d) + ' · ' : ''; })()}${metaLine ? escHtml(metaLine) + ' · ' : ''}${horses.length} runners · book ${pct(rc.overround)}${rc.hasRatings ? '' : ' · no ratings supplied'}</span>
+          <span class="race-metric">${(() => { const d = raceDateOf(horses); return d ? escHtml(d) + ' · ' : ''; })()}${metaLine ? escHtml(metaLine) + ' · ' : ''}${horses.length} runners · post order · book ${pct(rc.overround)}${rc.hasRatings ? '' : ' · no ratings supplied'}${hiddenNote}</span>
         </div>
         ${sparseWarning}
         <table class="field-table">
@@ -3810,8 +3820,8 @@ function renderFullField(sortMode){
   bindTapHandlers(container);
 }
 
-document.getElementById('sortByEdgeBtn').addEventListener('click', () => renderFullField('edge'));
-document.getElementById('sortByPostBtn').addEventListener('click', () => renderFullField('post'));
+document.getElementById('showAllBtn').addEventListener('click', () => renderFullField('all'));
+document.getElementById('showLiveBtn').addEventListener('click', () => renderFullField('live'));
 
 document.addEventListener('click', e => {
   const a = e.target.closest ? e.target.closest('.race-jump') : null;
@@ -3838,7 +3848,7 @@ document.addEventListener('click', e => {
   const f = e.target.closest ? e.target.closest('.field-jump') : null;
   if (f && f.dataset.jump != null){
     e.preventDefault();
-    renderFullField('post');
+    renderFullField(currentSort);
     const el = document.getElementById('field-race-' + f.dataset.jump);
     if (el) el.scrollIntoView({behavior:'smooth', block:'start'});
   }
@@ -4078,7 +4088,7 @@ function bindTapHandlers(root){
   root.querySelectorAll('.field-jump').forEach(a => {
     a.addEventListener('click', e => {
       e.preventDefault(); e.stopPropagation();
-      renderFullField('post');
+      renderFullField(currentSort);
       const el = document.getElementById('field-race-' + a.dataset.jump);
       if (el) el.scrollIntoView({behavior:'smooth', block:'start'});
     });
@@ -4300,6 +4310,6 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.23 · released 3 September 2026 · build 2026-09-03-d</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.24 · released 3 September 2026 · build 2026-09-03-e</div>
 </body>
 </html>
