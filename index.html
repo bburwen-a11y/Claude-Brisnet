@@ -595,6 +595,29 @@
   /* Model %, Edge: the columns the decile/log-loss diagnostic condemned.
      Still computed, still driving the ticket lines, but no longer competing
      for the eye with the columns that carry measured signal. */
+  /* SHAPE BOARD — one consolidated read per race. Rows sit in MARKET order on
+     purpose: the crowd's ordering is the benchmark, and the columns show where
+     a horse's measured facts sit against its own price. No rank of our own. */
+  .shape{margin:0 0 12px; border:1px solid var(--paper-line); border-radius:3px; overflow:hidden;}
+  .shape-head{padding:8px 11px; background:var(--board-950); color:var(--paper);
+    font-family:var(--mono); font-size:10px; letter-spacing:.07em; text-transform:uppercase;}
+  .shape-tbl{width:100%; border-collapse:collapse; font-size:12px;}
+  .shape-tbl th{font-family:var(--mono); font-size:9px; letter-spacing:.05em; text-transform:uppercase;
+    text-align:left; padding:6px 7px; color:var(--ink-soft); border-bottom:1px solid var(--paper-line);
+    background:var(--paper-dim); font-weight:600; white-space:nowrap;}
+  .shape-tbl td{padding:6px 7px; border-bottom:1px dotted var(--paper-line); vertical-align:top;}
+  .shape-tbl tr:last-child td{border-bottom:none;}
+  .shape-tbl td.h{font-weight:600; color:var(--ink);}
+  .shape-tbl td.num{font-family:var(--mono); font-size:11px; white-space:nowrap;}
+  .shape-tbl .muted{color:var(--ink-soft);}
+  .shape-tbl .last-line{display:block; margin-top:2px; font-size:11px; font-weight:400;
+    color:var(--ink-soft); line-height:1.4;}
+  .shape-tbl .flag{font-family:var(--mono); font-size:9.5px; letter-spacing:.03em;}
+  .shape-tbl .warn{color:#8B2A2A;}
+  .shape-tbl .ok{color:#2E6E45;}
+  .shape-foot{padding:9px 11px; border-top:2px solid var(--paper-line);
+    font-size:12px; line-height:1.6; color:var(--ink-soft); background:var(--paper-dim);}
+  .shape-foot b{color:var(--ink);}
   .rule-record{
     display:block; margin:12px 0 0; padding:11px 13px;
     border:1px dashed var(--paper-line); border-left:4px solid var(--paper-line);
@@ -2515,7 +2538,7 @@ function renderWorkDots(recentWorks){
 // Answers one question the ratings cannot: when two horses arrive at the same
 // rating, is one walking toward it and the other away from it? Everything here
 // is a DIRECTION, and none of it touches any number.
-const TROUBLE_WORDS = ['bump','bmp','check','chk','stumbl','bobbl','awk','reluctant','veer','clip','jostl','squeez','forced wide','broke slow'];
+const TROUBLE_WORDS = ['bump','bmp','check','chk','stumbl','bobbl','awk','reluctant','veer','clip','jostl','squeez','forced wide','broke slow','steadied','stdy','shuffl','blocked','boxed','traffic','crowd','pinch','wide trip','no room','lost iron','fractious'];
 
 function ratingOf(h){
   if (h.rawPP != null && h.rawPP > 0) return h.rawPP;
@@ -3224,7 +3247,7 @@ function pickFigLine(rs, h){
         : `This horse also tops the field on its last-race figure at ${f.top.lastSpd}, ${f.gap} clear of ${escHtml(f.second.horse)}.`)
     : `<b>${escHtml(f.ties.map(x => x.horse).join(' · '))}</b> tops the field on last-race figure at ${f.top.lastSpd}${h.lastSpd != null ? `, against ${h.lastSpd} for this horse` : `; this horse carries no figure`}.`;
   return `<div class="pick-fig"><span class="bet-tag">SPEED FIGURES</span> ${body}`
-    + `<span class="fig-note">${f.covered} of ${f.total} runners carry a figure. Agreement here is not extra support and disagreement is not a warning \u2014 the figure has measured no better when it is clear of the field than when it is not.</span></div>`;
+    + `<span class="fig-note">${f.covered} of ${f.total} runners carry a figure.</span></div>`;
 }
 
 // ---- PICK CONFIDENCE ----
@@ -3335,7 +3358,7 @@ function confidenceBlock(rs, h){
     + (c.level === 'high' ? '' : `<span class="conf-gloss">what argues against it</span>`);
   if (!c.concerns.length){
     return `<div class="conf-block conf-${c.level}">${head}` +
-      `<span class="conf-body">Nothing measured against this one. Favourites with none of the checked concerns won 41.3% against a price implying 33.7%.</span>`
+      `<span class="conf-body">Nothing in the form runs against this one.</span>`
       + pickContenders(rs, h) + `</div>`;
   }
   const body = c.concerns.length === 1
@@ -3411,6 +3434,152 @@ function raceCardJumpLink(rs){
   return `<a href="#" class="xlink" data-goto-card="${escAttr(rs.race)}">\u25b8 Race ${escHtml(rs.race)} card</a>`;
 }
 
+// ---- SHAPE BOARD (build 2026-09-04-f, Robert's ask) ----
+// One consolidated read per race, replacing the need to assemble the picture
+// from scattered lines. It reports what each measured input SAYS about a horse
+// and nothing about whether to back it.
+//
+// Rows are in MARKET order. That is the whole design. The one thing measured
+// repeatedly and never overturned is that the price is the best available
+// ranking (final-odds log-loss 1.679 against 2.006 for knowing nothing), and
+// every attempt to reorder against it — rating-share edge, earnings, bullet
+// works, money moves — came back flat or inverted. So the board shows the
+// crowd's order and lets the columns disagree with it in the open, rather than
+// inventing a ranking that measurement says would point the wrong way.
+//
+// There is deliberately NO play/pass label. That experiment ran: the status
+// system's PASS races beat its PLAY races, and the edge deciles behind it were
+// inverted (top 6.2%, bottom 35.5%).
+function distNote(h){
+  const today = num_(h.raceDistYds);
+  if (today == null) return null;
+  const past = (h.ppRaces || []).filter(p => p.distYds != null);
+  if (!past.length) return null;
+  const d = today - past[0].distYds;
+  if (Math.abs(d) < 220) return null;                 // inside one furlong: same trip
+  return d > 0 ? 'stretch' : 'cutback';
+}
+function num_(v){ const n = parseFloat(v); return isNaN(n) ? null : n; }
+
+function buildShapeBoard(rs){
+  const horses = (rs.byMarket || []).filter(h => !h.scratched);
+  if (horses.length < 2) return '';
+  const figured = horses.filter(h => h.lastSpd != null);
+  const topFig = figured.length >= 3 ? Math.max.apply(null, figured.map(h => h.lastSpd)) : null;
+  const sh = speedShape(horses);
+  const loneId = (sh && sh.lone && sh.top) ? sh.top.id : null;
+
+  // The last start, read off the past performances: where it finished, how far
+  // back, over what trip and surface, and whether the chart comment flagged
+  // trouble. This is the line a form student writes next to a horse's name.
+  function lastLine(h){
+    const p = (h.ppRaces || [])[0];
+    if (!p) return '<span class="muted">first-time starter</span>';
+    const bits = [];
+    const fin = String(p.fin || '').trim();
+    if (fin){
+      const bt = p.lenBehind;
+      bits.push(p.won ? `won by ${fmtLen(Math.abs(bt))}`
+        : `${ordinalOf(parseInt(fin, 10)) || fin}${bt != null ? `, beaten ${fmtLen(bt)}` : ''}`);
+    }
+    if (p.distYds) bits.push(furlongs(p.distYds));
+    if (p.surf) bits.push(escHtml(surfWord(p.surf)));
+    if (p.classTxt) bits.push(escHtml(p.classTxt));
+    if (h.layoffDays != null) bits.push(`${h.layoffDays}d ago`);
+    let line = bits.join(' \u00b7 ');
+    const cmt = (p.comment || '').trim();
+    if (cmt && TROUBLE_WORDS.some(k => cmt.toLowerCase().includes(k))){
+      line += ` <span class="warn">\u2014 ${escHtml(cmt)}</span>`;
+    }
+    return `<span class="last-line">${line}</span>`;
+  }
+
+  const rows = horses.map(h => {
+    let pace = h.runStyle ? escHtml(h.runStyle) : '<span class="muted">\u2014</span>';
+    if (h.quirin != null) pace += ` <span class="muted">${h.quirin}</span>`;
+    if (h.id === loneId) pace += ' <span class="flag ok">LONE</span>';
+
+    const cls = (h.classFit == null || (h.classSeen || 0) < 3)
+      ? '<span class="muted">thin</span>'
+      : `<span class="${h.classFit <= 1 ? 'warn' : ''}">${h.classFit} of ${h.classSeen}</span>`;
+
+    const fig = h.lastSpd == null
+      ? '<span class="muted">\u2014</span>'
+      : `${h.lastSpd}${topFig != null && h.lastSpd === topFig ? ' <span class="flag ok">TOP</span>' : ''}`;
+
+    const dn = distNote(h);
+    const trip = !(h.ppRaces || []).length ? '<span class="muted">\u2014</span>'
+               : dn === 'stretch' ? '<span class="warn">stretching out</span>'
+               : dn === 'cutback' ? 'cutting back'
+               : '<span class="muted">same trip</span>';
+
+    let money = '<span class="muted">\u2014</span>';
+    if (rs.hasMoveData && h.drift != null){
+      money = h.drift <= -0.25 ? '<span class="ok">bet down</span>'
+            : h.drift >= 0.25 ? '<span class="warn">drifted</span>' : 'steady';
+    }
+
+    return `<tr>
+      <td class="h">${horseLabel(h)}<br>${lastLine(h)}</td>
+      <td class="num">${escHtml(h.oddsStr || '')}</td>
+      <td>${pace}</td>
+      <td>${cls}</td>
+      <td class="num">${fig}</td>
+      <td>${trip}</td>
+      <td>${formArrow(h)}</td>
+      <td>${money}</td>
+    </tr>`;
+  }).join('');
+
+  // A short factual read. Names the market's choice, then lists only what the
+  // past performances actually say that runs against it.
+  const fav = horses[0], second = horses[1];
+  const notes = [];
+  if (topFig != null && fav.lastSpd !== topFig){
+    notes.push(`top last-race figure: ${figured.filter(h => h.lastSpd === topFig).map(h => escHtml(h.horse)).join(' and ')}`);
+  }
+  if (fav.classFit != null && (fav.classSeen || 0) >= 3 && fav.classFit <= 1){
+    notes.push(`competitive at today's level in only ${fav.classFit} of its last ${fav.classSeen}`);
+  }
+  if (distNote(fav) === 'stretch') notes.push('stretching out today');
+  if (loneId && fav.id !== loneId){
+    const l = horses.find(h => h.id === loneId);
+    notes.push(`lone early speed is ${escHtml(l.horse)}`);
+  }
+  const foot = `<b>${escHtml(fav.horse)}</b> is the market's choice at ${escHtml(fav.oddsStr || '')}`
+    + (second ? `, ${(fav.marketProb - second.marketProb) >= 0.10 ? 'clear of' : 'narrowly over'} ${escHtml(second.horse)}` : '')
+    + '. '
+    + (notes.length ? `Against that: ${notes.join('; ')}.` : 'Nothing in the form runs against it.');
+
+  return `<div class="shape">
+    <div class="shape-head">The shape of race ${escHtml(rs.race)}</div>
+    <table class="shape-tbl"><thead><tr>
+      <th>Horse &amp; last start</th><th>Odds</th><th>Pace</th><th>Class</th><th>Figure</th><th>Trip</th><th>Form</th><th>Money</th>
+    </tr></thead><tbody>${rows}</tbody></table>
+    <div class="shape-foot">${foot}</div>
+  </div>`;
+}
+
+// Small formatters for the last-start line.
+function fmtLen(v){
+  if (v == null) return '';
+  const a = Math.abs(v);
+  if (a < 0.15) return 'a nose';
+  if (a < 0.3) return 'a head';
+  if (a < 0.6) return 'a neck';
+  const whole = Math.floor(a), frac = a - whole;
+  const f = frac < 0.15 ? '' : frac < 0.4 ? '\u00bc' : frac < 0.65 ? '\u00bd' : '\u00be';
+  return `${whole || ''}${f}`.trim() + ' length' + (Math.abs(a - 1) < 0.01 ? '' : 's');
+}
+function furlongs(yds){
+  const f = yds / 220;
+  return (Math.abs(f - Math.round(f)) < 0.06 ? Math.round(f) : f.toFixed(1)) + 'f';
+}
+function surfWord(c){
+  const k = String(c || '').toUpperCase();
+  return k === 'T' ? 'turf' : k === 'D' ? 'dirt' : k === 'A' ? 'all-weather' : k.toLowerCase();
+}
+
 function buildReadPanel(rs){
   const horses = rs.horses || [];
   const lines = [];
@@ -3467,7 +3636,7 @@ function buildReadPanel(rs){
         + sorted.map((h, i) => `${horseLabel(h)}${i === 0 ? ' <span class="cp-why">shorter</span>' : ''}`).join(' \u00b7 ');
     }).join('<br>');
     lines.push(`<div class="bet-line"><span class="bet-tag">SAME BARN</span> ${body}`
-      + `<span class="fig-note">Logged, not scored. The market's preferred half of a stable pair has measured below its price and the neglected half above it, but on 61 pairs and found by looking \u2014 this line changes no pick and no label.</span></div>`);
+      + `<span class="fig-note">Noted, not counted.</span></div>`);
   }
 
   // Lone speed: top Quirin, 2+ clear of the next horse. Display only.
@@ -3478,9 +3647,10 @@ function buildReadPanel(rs){
 
   if (!lines.length){
     return `<div class="ticket"><div class="ticket-head">Reading <a class="race-jump" data-jump="${escAttr(rs.race)}" title="Tap for every runner's past performances">race ${escHtml(rs.race)}</a></div>
-      <div class="bet-line">Nothing stands out in this race. The past performances are one tap away on the race number.</div></div>`;
+      ${buildShapeBoard(rs)}
+      <div class="bet-line">Beyond the board above, nothing else stands out. The past performances are one tap away on the race number.</div></div>`;
   }
-  return `<div class="ticket"><div class="ticket-head">Reading <a class="race-jump" data-jump="${escAttr(rs.race)}" title="Tap for every runner's past performances">race ${escHtml(rs.race)}</a></div>${lines.join('')}</div>`;
+  return `<div class="ticket"><div class="ticket-head">Reading <a class="race-jump" data-jump="${escAttr(rs.race)}" title="Tap for every runner's past performances">race ${escHtml(rs.race)}</a></div>${buildShapeBoard(rs)}${lines.join('')}</div>`;
 }
 
 /* ---------------- RACE CARD ---------------- */
@@ -4422,6 +4592,6 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.28 · released 4 September 2026 · build 2026-09-04-e</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.28 · released 4 September 2026 · build 2026-09-04-h</div>
 </body>
 </html>
