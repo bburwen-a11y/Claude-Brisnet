@@ -595,13 +595,17 @@
   /* Model %, Edge: the columns the decile/log-loss diagnostic condemned.
      Still computed, still driving the ticket lines, but no longer competing
      for the eye with the columns that carry measured signal. */
-  .rule-record{display:none;}
-  body.diag .rule-record{
-    display:block; margin:10px 0 0; padding:10px 12px;
-    border:1px dashed var(--paper-line); border-radius:3px; background:var(--paper-dim);
+  .rule-record{
+    display:block; margin:12px 0 0; padding:11px 13px;
+    border:1px dashed var(--paper-line); border-left:4px solid var(--paper-line);
+    border-radius:3px; background:var(--paper-dim);
     font-size:12px; line-height:1.65; color:var(--ink-soft);
   }
   .rule-record b{color:var(--ink);}
+  /* Never travels onto the printable/shared page. Robert's standing rule: the
+     record is between him and the tool, not part of a card he hands to someone. */
+  .print-page .rule-record{display:none;}
+  @media print{ .rule-record{display:none;} }
   .field-table td.diag-col, .field-table th.diag-col{display:none;}
   body.diag .field-table td.diag-col, body.diag .field-table th.diag-col{display:table-cell;}
   .sp-lone{
@@ -3765,9 +3769,10 @@ function buildBestOfDay(raceSummaries){
   </div>`;
 }
 
-// How the naming rule has actually done. Kept behind "Show diagnostics" for the
-// same reason the old clean-copy toggle existed: this belongs between Robert and
-// the tool, not on a card he passes to someone else. Updated 2026-09-04.
+// How the naming rule has actually done. Always on screen — a named horse
+// without its record is the thing this tool exists not to do. Stripped from the
+// printable/shared page by CSS instead, which is where the old clean-copy rule
+// actually applied. Updated 2026-09-04.
 const RULE_RECORD = `<div class="rule-record">
   <b>What this rule has done.</b> On the 177 races it was built from: 47 picks, 46.8% won,
   &minus;2.6% at flat $2. That is a strike rate well above the field average and a return
@@ -3790,7 +3795,7 @@ function renderPicks(raceSummaries){
   document.getElementById('pickCount').textContent = n;
   list.innerHTML = n
     ? best + blocks.join('')
-    : `<div class="pick-none"><b>No picks on this card.</b> The rule needs the earnings-per-start leader to also be the market favourite, and a maiden or first-time-starter field cannot be ranked at all. A quiet card is normal.</div>` + blocks.join('');
+    : `<div class="pick-none"><b>No picks on this card.</b> The rule needs the earnings-per-start leader to also be the market favourite, and a maiden or first-time-starter field cannot be ranked at all. A quiet card is normal.</div>` + RULE_RECORD + blocks.join('');
   bindTapHandlers(list);
   list.querySelectorAll('button[data-bet]').forEach(btn =>
     btn.addEventListener('click', () => {
@@ -4417,6 +4422,6 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.28 · released 4 September 2026 · build 2026-09-04-d</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.28 · released 4 September 2026 · build 2026-09-04-e</div>
 </body>
 </html>
