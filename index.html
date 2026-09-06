@@ -601,6 +601,13 @@
   .shape{margin:0 0 12px; border:1px solid var(--paper-line); border-radius:3px; overflow:hidden;}
   .shape-head{padding:8px 11px; background:var(--board-950); color:var(--paper);
     font-family:var(--mono); font-size:10px; letter-spacing:.07em; text-transform:uppercase;}
+  .pace{margin:0; padding:10px 12px; border-bottom:1px solid var(--paper-line); background:var(--paper-dim);}
+  .pace-head{font-family:var(--mono); font-size:9.5px; letter-spacing:.07em; text-transform:uppercase;
+    color:var(--ink-soft); margin-bottom:5px;}
+  .pace-body{font-size:12px; line-height:1.6; color:var(--ink);}
+  .pace-body b{color:var(--ink);}
+  .pace-body .muted{color:var(--ink-soft); font-family:var(--mono); font-size:10.5px;}
+  .pace-foot{display:block; margin-top:6px; font-size:11px; color:var(--ink-soft);}
   .shape-tbl{width:100%; border-collapse:collapse; font-size:12px;}
   .shape-tbl th{font-family:var(--mono); font-size:9px; letter-spacing:.05em; text-transform:uppercase;
     text-align:left; padding:6px 7px; color:var(--ink-soft); border-bottom:1px solid var(--paper-line);
@@ -3459,6 +3466,83 @@ function distNote(h){
 }
 function num_(v){ const n = parseFloat(v); return isNaN(n) ? null : n; }
 
+// ---- PACE PROJECTION (build 2026-09-05-d, Robert's ask) ----
+// Simulates how the early part of the race is likely to unfold and says which
+// running styles the resulting shape suits. Everything here comes off the data
+// file: Quirin speed points (0-8, early-lead likelihood only, not ability) and
+// the run-style code. Nothing is scored and no horse is rated to win.
+//
+// STYLE WEIGHT: a horse's Quirin number says how quickly it leaves; the style
+// code says what it does next. E leads, EP presses, P stalks, S closes. Adding
+// a small style bump orders the front end more sensibly than Quirin alone,
+// which cannot separate two horses on the same number.
+const STYLE_BUMP = {E: 1.5, EP: 1.0, 'E/P': 1.0, P: 0, 'P/S': -0.5, S: -1.0, SS: -1.5};
+
+function paceRank(h){
+  const q = (h.quirin != null) ? h.quirin : null;
+  if (q == null) return null;
+  const st = String(h.runStyle || '').toUpperCase().replace(/\s/g, '');
+  return q + (STYLE_BUMP[st] != null ? STYLE_BUMP[st] : 0);
+}
+
+function paceProjection(rs){
+  const field = (rs.byMarket || rs.horses || []).filter(h => !h.scratched);
+  const rated = field.map(h => ({h, r: paceRank(h), q: h.quirin}))
+                     .filter(x => x.r != null)
+                     .sort((a, b) => b.r - a.r);
+  if (rated.length < 4) return null;
+
+  // Horses with genuine early speed: Quirin 5 or better.
+  const speed = rated.filter(x => x.q >= 5);
+  const top = rated[0], second = rated[1];
+  let shape, note;
+  if (speed.length === 0){
+    shape = 'NO CLEAR SPEED';
+    note = `nothing in the field is rated to leave quickly; ${escHtml(top.h.horse)} projects to the lead by default`;
+  } else if (speed.length === 1 && (top.r - second.r) >= 2){
+    shape = 'LONE SPEED';
+    note = `${escHtml(top.h.horse)} is the only horse rated to leave quickly and projects to get the lead uncontested`;
+  } else if (speed.length === 1){
+    shape = 'PRESSED';
+    note = `${escHtml(top.h.horse)} projects to lead with ${escHtml(second.h.horse)} close enough to press`;
+  } else if (speed.length === 2){
+    shape = 'DUEL';
+    note = `${speed.map(x => escHtml(x.h.horse)).join(' and ')} are both rated to leave quickly and project to contest the lead`;
+  } else {
+    shape = 'CONTESTED';
+    note = `${speed.length} horses are rated to leave quickly — ${speed.map(x => escHtml(x.h.horse)).join(', ')} — so the early lead projects to be fought for`;
+  }
+
+  // Which running styles the projected shape suits. A statement about the shape,
+  // not about which horse is best.
+  const closers = rated.filter(x => x.q <= 1).map(x => x.h.horse);
+  let suits;
+  if (shape === 'LONE SPEED' || shape === 'NO CLEAR SPEED'){
+    suits = `An uncontested lead suits the front end. Horses rated to come from behind`
+      + (closers.length ? ` — ${closers.map(escHtml).join(', ')} — ` : ' ')
+      + `need the leader to stop on its own.`;
+  } else if (shape === 'CONTESTED'){
+    suits = `A fought-for lead suits horses rated to come from off the pace`
+      + (closers.length ? `: ${closers.map(escHtml).join(', ')}.` : '.');
+  } else {
+    suits = `A pressed or contested lead gives horses rated just off the pace something to run at.`;
+  }
+
+  const order = rated.slice(0, Math.min(4, rated.length)).map(x =>
+    `${escHtml(x.h.horse)} <span class="muted">(${escHtml(x.h.runStyle || '—')}${x.q != null ? ', ' + x.q : ''})</span>`
+  ).join(' &rarr; ');
+
+  return `<div class="pace">
+    <div class="pace-head">Projected pace &mdash; ${shape}</div>
+    <div class="pace-body">
+      <b>Order out of the gate:</b> ${order}<br>
+      ${note.charAt(0).toUpperCase() + note.slice(1)}. ${suits}
+      <span class="pace-foot">Quirin speed points measure how quickly a horse leaves, not how good it is.
+      Projection only &mdash; how the race is actually run may differ.</span>
+    </div>
+  </div>`;
+}
+
 function buildShapeBoard(rs){
   const horses = (rs.byMarket || []).filter(h => !h.scratched);
   if (horses.length < 2) return '';
@@ -3551,6 +3635,7 @@ function buildShapeBoard(rs){
 
   return `<div class="shape">
     <div class="shape-head">The shape of race ${escHtml(rs.race)}</div>
+    ${paceProjection(rs) || ''}
     <table class="shape-tbl"><thead><tr>
       <th>Horse &amp; last start</th><th>Odds</th><th>Pace</th><th>Class</th><th>Figure</th><th>Trip</th><th>Form</th><th>Money</th>
     </tr></thead><tbody>${rows}</tbody></table>
@@ -4591,6 +4676,6 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.29 · released 5 September 2026 · build 2026-09-05-c</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.29 · released 5 September 2026 · build 2026-09-05-d</div>
 </body>
 </html>
