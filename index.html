@@ -1058,6 +1058,15 @@ function renderRows(){
       inp.addEventListener(evt, e => {
         r[e.target.dataset.f] = isCheckbox ? e.target.checked : e.target.value;
         if (isCheckbox) tr.classList.toggle('scratched-row', r.scratched);
+        // A scratch changes the field, so everything downstream is stale the
+        // moment the box is ticked — including a named pick. Rebuild straight
+        // away if a card is already on screen, the same as the RSS feed does.
+        // Without this the Picks tab kept naming a horse that had been
+        // scratched until the user happened to press Build again.
+        if (isCheckbox && e.target.dataset.f === 'scratched' &&
+            document.getElementById('resultsSection').style.display === 'block'){
+          document.getElementById('computeBtn').click();
+        }
       });
     });
     tr.querySelector('.del-btn').addEventListener('click', () => {
@@ -3379,6 +3388,10 @@ function confidenceBlock(rs, h){
 function buildPick(rs){
   const p = pickFor(rs);
   if (p.none) return `<div class="pick-none"><b>Race ${escHtml(rs.race)} — no pick.</b> ${p.none}</div>`;
+  if (isScratchedNow(rs, p.h)){
+    return `<div class="pick-none"><b>Race ${escHtml(rs.race)} — no pick.</b> `
+      + `${escHtml(p.h.horse)} is marked scratched. Rebuild the card to re-rank the race.</div>`;
+  }
 
   const h = p.h;
   const head = `<div class="pick-head">
@@ -3973,6 +3986,7 @@ function buildBestOfDay(raceSummaries){
   raceSummaries.forEach(rs => {
     const p = pickFor(rs);
     if (p.none) return;
+    if (isScratchedNow(rs, p.h)) return;
     // Who else has a shot in the race the pick came from — the same split the
     // race card shows, minus the pick itself.
     const split = contenderSplit(rs);
@@ -4041,6 +4055,18 @@ const PRICEPLAY_BASIS = `<div class="rule-record">
   for every runner's past performances.
 </div>`;
 
+// Guard against a stale summary. A pick is built from a snapshot taken at
+// compute time; if a horse has been ticked scratched since, that snapshot still
+// holds it. Checked against the live rows by race + name before anything is
+// named.
+function isScratchedNow(rs, h){
+  const race = String(rs.race || '').trim();
+  const name = String(h && h.horse || '').trim().toLowerCase();
+  if (!name) return false;
+  return rows.some(r => r.scratched && String(r.race || '').trim() === race &&
+                        String(r.horse || '').trim().toLowerCase() === name);
+}
+
 function renderPicks(raceSummaries){
   const list = document.getElementById('pickList');
   const blocks = raceSummaries.map(rs => buildPick(rs));
@@ -4049,7 +4075,7 @@ function renderPicks(raceSummaries){
   document.getElementById('pickCount').textContent = n;
   list.innerHTML = n
     ? best + blocks.join('')
-    : `<div class="pick-none"><b>No picks on this card.</b> The rule needs the earnings-per-start leader to also be the market favourite, and a maiden or first-time-starter field cannot be ranked at all. A quiet card is normal.</div>` + RULE_RECORD + blocks.join('');
+    : `<div class="pick-none"><b>No picks on this card.</b> The rule needs the earnings-per-start leader to also be the market favourite, and a maiden or first-time-starter field cannot be ranked at all. A quiet card is normal.</div>` + blocks.join('');
   bindTapHandlers(list);
   list.querySelectorAll('button[data-bet]').forEach(btn =>
     btn.addEventListener('click', () => {
@@ -4676,6 +4702,6 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.29 · released 5 September 2026 · build 2026-09-05-d</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.29 · released 5 September 2026 · build 2026-09-05-e</div>
 </body>
 </html>
