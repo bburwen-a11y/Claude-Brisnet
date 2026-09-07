@@ -932,7 +932,7 @@
 
     <section id="picksSection" style="display:none;">
       <h2><span class="step-num">★</span> Where the board likes a horse</h2>
-      <div class="rss-info" style="margin:0 0 14px;">Two separate lines, and the only place this tool names a horse. <b>Pick</b> &mdash; the field's highest career earnings per start is also the market favourite, at a morning line of 2.5 or shorter, still favourite at post, and competitive at today's level in at least two of its last four starts. <b>Price play</b> &mdash; a separate line, used only where a Pick is not available: the morning-line favourite is <i>second</i> in the field on career earnings per start.</div>
+      <div class="rss-info" style="margin:0 0 14px;">Two separate lines, and the only place this tool names a horse. <b>Pick</b> &mdash; the field's highest career earnings per start is also the market favourite at a morning line of 2.5 or shorter, and also holds the field's single best speed figure. <b>Price play</b> &mdash; a separate line, used only where a Pick is not available: the morning-line favourite is <i>second</i> in the field on career earnings per start.</div>
       <div id="pickList"></div>
     </section>
 
@@ -3067,6 +3067,36 @@ function epsBasis(h){
   return ` <span class="eps-basis">(${bits}${thin})</span>`;
 }
 
+// ---- REGISTERED FILTER D (Robert's ask) ----
+// Replaces filters B and C on the Pick line. Written down before the card it
+// is meant to be tested on, and not to be adjusted afterwards.
+//
+// D: the morning-line favourite must also be the SOLE highest BEST SPEED
+//    FIGURE in the field. Ties do not count. The field must carry at least
+//    three figured runners, otherwise the race is declined.
+//
+// Why this and not something else: earnings per start says a horse once ran
+// well somewhere; the best figure says how fast it has actually been. The two
+// are different dimensions, and requiring both to point at the same horse is a
+// stronger statement than either alone. B was dropped because it needs live
+// odds, which are not available when the card is built. C was dropped because
+// it almost never fires.
+//
+// Everything D needs is in the data file, so a Pick is final the night before
+// and never waits on the board.
+function topBestFigureSole(rs, h){
+  const vals = (rs.horses || [])
+    .filter(x => !x.scratched && x.bestSpd != null)
+    .map(x => x.bestSpd)
+    .sort((a, b) => b - a);
+  if (vals.length < 3) return {ok: false, why: 'fewer than three figured runners'};
+  if (vals[0] === vals[1]) return {ok: false, why: 'top best figure is tied'};
+  if (h.bestSpd == null || h.bestSpd !== vals[0]){
+    return {ok: false, why: 'does not hold the top best figure'};
+  }
+  return {ok: true, why: ''};
+}
+
 function pickFor(rs){
   const horses = rs.horses || [];
   // Select on the MORNING LINE. byMarket re-sorts on whichever odds column is
@@ -4033,9 +4063,10 @@ function buildBestOfDay(raceSummaries){
 // performances and the file that was uploaded.
 const PICK_BASIS = `<div class="rule-record">
   <b>Pick.</b> Read straight off the data file: this horse has the highest career earnings
-  per start in the field, is the morning-line favourite at 2.5 or shorter, is still the
-  favourite on the odds entered, and its last four starts show it competitive at today's
-  level at least twice. Tap the race number for every runner's past performances.
+  per start in the field, is the morning-line favourite at 2.5 or shorter, and holds the
+  single highest best speed figure in the field &mdash; no ties, and at least three runners
+  carrying a figure. Nothing here waits on the live board. Tap the race number for every
+  runner's past performances.
 </div>`;
 
 const PRICEPLAY_BASIS = `<div class="rule-record">
@@ -4692,6 +4723,6 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.30 · released 6 September 2026 · build 2026-09-06-a</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.30 · released 6 September 2026 · build 2026-09-06-b</div>
 </body>
 </html>
