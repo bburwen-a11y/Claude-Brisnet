@@ -627,6 +627,19 @@
   .shape-foot b{color:var(--ink);}
   .mu-note{margin:3px 0 0 10px; font-size:11px; line-height:1.45; color:var(--ink-soft);}
   .mu-trouble{color:#8B2A2A;}
+  .evidence{margin:10px 0 0; border:1px solid var(--paper-line); border-radius:3px; overflow:hidden;}
+  .evidence-head{padding:7px 10px; background:var(--paper-dim); font-family:var(--mono);
+    font-size:9.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-soft);}
+  .ev-tbl{width:100%; border-collapse:collapse; font-size:12px;}
+  .ev-tbl td{padding:5px 10px; border-bottom:1px dotted var(--paper-line);}
+  .ev-tbl tr:last-child td{border-bottom:none;}
+  .ev-rank{font-family:var(--mono); font-size:11px; white-space:nowrap; color:var(--ink-soft);}
+  .ev-rank.ev-top{color:#2E6E45; font-weight:700;}
+  .ev-val{font-family:var(--mono); font-size:11px; text-align:right; color:var(--ink-soft);}
+  .ev-extra{padding:7px 10px; font-size:11.5px; line-height:1.5; color:var(--ink-soft);
+    border-top:1px solid var(--paper-line);}
+  .ev-foot{padding:6px 10px 8px; font-size:10.5px; line-height:1.45; color:var(--ink-soft);
+    background:var(--paper-dim);}
   .rule-record{
     display:block; margin:12px 0 0; padding:11px 13px;
     border:1px dashed var(--paper-line); border-left:4px solid var(--paper-line);
@@ -3162,41 +3175,33 @@ function pickFor(rs){
 
   // ---- TWO FILTERS ----
   //   A — the pick's MORNING LINE must be 2.5 or shorter.
-  //   B — the pick must STILL be the betting favourite at post time.
-  //   C — CLASS FIT 2 or better: competitive at today's level in at least two
-  //       of its last four starts (skipped for horses with fewer than three
-  //       recent starts, which cannot be assessed).
-  // Rank 1 passing all three is the Pick line. Rank 1 failing any is suppressed.
-  // Rank 2 fires only where the filters fail, as a Price play on its own line.
+  //   D — the pick must hold the field's SINGLE highest best speed figure:
+  //       no ties, and at least three runners carrying a figure.
   //
-  // C is the class condition. Earnings per start rewards a horse that once ran
-  // well in good company, so C asks separately whether it has been competitive
-  // at TODAY'S level recently. It is skipped when the horse has too few recent
-  // starts to judge.
-
-  // in-sample and still has no forward evidence behind it.
+  // B (still favourite at post) and C (class fit) are retired. B needed live
+  // odds, which are not available when the card is built, and its separation
+  // did not survive on a larger sample. C fired too rarely to be assessed.
+  // Both A and D come off the data file, so a Pick is final the night before
+  // and never waits on the board.
+  //
+  // Rank 1 passing both is the Pick line. Rank 1 failing either is suppressed.
+  // Rank 2 fires as a Price play on its own line.
   const ML_MAX = 2.5;
   // parseOdds returns DECIMAL, so subtract 1 before comparing against 2.5.
   const mlDec = parseOdds(fav.mlOddsStr);                 // decimal
   const mlPrice = mlDec == null ? null : mlDec - 1;       // "to one", what 2.5 means
   const mlOK = mlPrice != null && mlPrice <= ML_MAX;
-  const fitOK = fav.classFit == null || (fav.classSeen || 0) < 3 || fav.classFit >= 2;
-  // The market check needs real final odds. Before they are entered the pick IS
-  // the market favourite by construction, so the test is pending, not passed.
-  const marketKnown = fav.drift != null;
-  const live = (rs.horses || []).filter(x => x.decimalOdds != null);
-  const shortest = live.length ? live.reduce((a, b) => (b.decimalOdds < a.decimalOdds ? b : a)) : null;
-  const stillFav = marketKnown ? (shortest === fav) : null;
-  const filtersPass = mlOK && fitOK && stillFav !== false;
-  const base = {h: fav, eps: favEps, ranked: el.ranked, fav, mlPrice, mlOK, fitOK, stillFav, marketKnown};
+  const dCheck = topBestFigureSole(rs, fav);
+  const figOK = dCheck.ok;
+  const filtersPass = mlOK && figOK;
+  const base = {h: fav, eps: favEps, ranked: el.ranked, fav, mlPrice, mlOK, figOK, figWhy: dCheck.why};
 
   if (rank === 1){
     const second = el.ranked.find(r => r.eps < favEps);
     if (filtersPass) return Object.assign({line: 'primary', tier: 1, second, nearTie: false}, base);
     const why = [];
     if (!mlOK) why.push(`its morning line is ${escHtml(fav.oddsStr)}, above the 2.5 cut-off`);
-    if (!fitOK) why.push(`it has been competitive at today's level in only ${fav.classFit} of its last ${fav.classSeen} starts`);
-    if (stillFav === false) why.push('the money has moved to another horse');
+    if (!figOK) why.push(`on best speed figure it ${escHtml(dCheck.why)}`);
     return {none: `<b>${escHtml(fav.horse)}</b> is the earnings leader and the market's choice, but ${why.join(', and ')}. No pick.`};
   }
   if (rank === 2){
@@ -3456,15 +3461,12 @@ function buildPick(rs){
   const h = p.h;
   const head = `<div class="pick-head">
       <span class="pick-tier${p.line === 'price' ? ' t2' : ''}">${p.line === 'primary'
-        ? (p.marketKnown ? 'Agreement rule' : 'Agreement rule \u00b7 pending')
-        : 'Second on earnings'}</span>
+        ? 'Pick'
+        : 'Price play \u00b7 second on earnings'}</span>
       <span class="pick-horse">#${escHtml(h.post || '?')} ${escHtml(h.horse)}</span>
       <span class="race-metric"><a class="race-jump" data-jump="${escAttr(rs.race)}" title="Tap to see every runner in this race">Race ${escHtml(rs.race)}</a>${(() => { const d = raceDateOf(rs.horses); return d ? ' · ' + escHtml(d) : ''; })()} · ${escHtml(h.oddsStr)} · ${pct(h.marketProb)} of the pool</span>
     </div>`;
 
-  const marketNote = p.marketKnown
-    ? `<div class="mkt-ok"><b>Market confirms it \u2014 still favourite at ${escHtml(p.h.oddsStr)}.</b></div>`
-    : `<div class="mkt-pending"><b>Market check pending.</b> Enter final odds before the off \u2014 if this horse is no longer favourite, the pick is withdrawn.</div>`;
 
   if (p.line === 'primary'){
     const second = p.second;
@@ -3475,7 +3477,7 @@ function buildPick(rs){
       ${raceCardJumpLink(rs)}
       ${confidenceBlock(rs, h)}
       ${pickContext(rs, h)}
-      ${marketNote}
+      ${buildEvidenceBlock(rs, h)}
       ${pickFigLine(rs, h)}
       ${h.jockey || h.riderChange ? `<div class="pick-jky">${h.riderChange ? '' : 'Jockey '}${jockeyLine(h)}</div>` : ''}
       ${blindSpotNote(rs)}
@@ -3491,7 +3493,7 @@ function buildPick(rs){
     ${raceCardJumpLink(rs)}
     ${confidenceBlock(rs, p.h)}
     ${pickContext(rs, p.h)}
-    ${marketNote}
+    ${buildEvidenceBlock(rs, h)}
     ${pickFigLine(rs, p.h)}
     ${p.h.jockey || p.h.riderChange ? `<div class="pick-jky">${p.h.riderChange ? '' : 'Jockey '}${jockeyLine(p.h)}</div>` : ''}
     ${blindSpotNote(rs)}
@@ -3613,6 +3615,76 @@ function paceProjection(rs){
       <span class="pace-foot">Quirin speed points measure how quickly a horse leaves, not how good it is.
       Projection only &mdash; how the race is actually run may differ.</span>
     </div>
+  </div>`;
+}
+
+// ---- WHAT THE FILE SAYS ABOUT THIS HORSE (Robert's ask) ----
+// A named horse should carry its own evidence, not just its name. Every line
+// is the horse's RANK in today's field on one measure, read off the data file.
+// No measure is weighted against another and nothing here is added into a
+// score — the reader decides what the pattern is worth.
+//
+// Deliberately NOT collapsed into a single support grade. The speed measures
+// overlap heavily: a horse holding the top last figure and the top best figure
+// is one fact about that horse, and counting it as two or three pieces of
+// agreeing evidence would overstate what the file actually contains.
+function rankIn(horses, h, get){
+  const vals = horses.map(x => ({x, v: get(x)})).filter(t => t.v != null && t.v > 0);
+  if (vals.length < 3) return null;
+  vals.sort((a, b) => b.v - a.v);
+  const me = vals.find(t => t.x.id === h.id);
+  if (!me) return null;
+  const rank = 1 + vals.filter(t => t.v > me.v).length;
+  const tied = vals.filter(t => t.v === me.v).length > 1;
+  return {rank, of: vals.length, value: me.v, tied};
+}
+
+function epsOf(h){
+  return (h.ltEarn != null && h.ltStarts) ? h.ltEarn / h.ltStarts : null;
+}
+function turfEpsOf(h){
+  return (h.turfEarn != null && h.turfStarts) ? h.turfEarn / h.turfStarts : null;
+}
+function wetEpsOf(h){
+  return (h.wetEarn != null && h.wetStarts) ? h.wetEarn / h.wetStarts : null;
+}
+
+function buildEvidenceBlock(rs, h){
+  const field = (rs.byMarket || rs.horses || []).filter(x => !x.scratched);
+  if (field.length < 3) return '';
+  const rows = [];
+  const place = (label, r, fmt) => {
+    if (!r) return;
+    rows.push(`<tr><td>${label}</td>`
+      + `<td class="ev-rank${r.rank === 1 && !r.tied ? ' ev-top' : ''}">`
+      + `${r.rank} of ${r.of}${r.tied ? ' (tied)' : ''}</td>`
+      + `<td class="ev-val">${fmt(r.value)}</td></tr>`);
+  };
+
+  place('Career earnings per start', rankIn(field, h, epsOf), v => money(v));
+  const g = String(h.surfaceToday || h.surface || '').toUpperCase();
+  if (g === 'T') place('Turf earnings per start', rankIn(field, h, turfEpsOf), v => money(v));
+  place('Best speed figure', rankIn(field, h, x => x.bestSpd), v => Math.round(v));
+  place('Last-race figure', rankIn(field, h, x => x.lastSpd), v => Math.round(v));
+  place('Prime Power', rankIn(field, h, x => x.rawPP), v => v);
+
+  // Facts that are not ranks.
+  const extra = [];
+  if (h.classFit != null && (h.classSeen || 0) >= 3){
+    extra.push(`competitive at today's level in ${h.classFit} of its last ${h.classSeen}`);
+  }
+  if (h.turfStarts === 0 && g === 'T') extra.push('has never raced on turf');
+  if (h.layoffDays != null) extra.push(`${h.layoffDays} days since its last start`);
+  if (h.quirin != null) extra.push(`Quirin ${h.quirin}${h.runStyle ? ', run style ' + escHtml(h.runStyle) : ''}`);
+  if (h.hadTrouble) extra.push('chart comment flagged trouble last time');
+
+  if (!rows.length && !extra.length) return '';
+  return `<div class="evidence">
+    <div class="evidence-head">What the file says about ${escHtml(h.horse)}</div>
+    ${rows.length ? `<table class="ev-tbl"><tbody>${rows.join('')}</tbody></table>` : ''}
+    ${extra.length ? `<div class="ev-extra">${extra.join(' &middot; ')}</div>` : ''}
+    <div class="ev-foot">Ranks within today's field, read off the data file. The speed
+    measures overlap, so a horse topping both is one fact rather than two.</div>
   </div>`;
 }
 
@@ -4779,6 +4851,6 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.31 · released 7 September 2026 · build 2026-09-07-b</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.31 · released 7 September 2026 · build 2026-09-07-c</div>
 </body>
 </html>
