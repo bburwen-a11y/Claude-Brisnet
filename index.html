@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Overlay Board v1.30 — Race Card Reader</title>
+<title>Overlay Board v1.31 — Race Card Reader</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
@@ -625,6 +625,8 @@
   .shape-foot{padding:9px 11px; border-top:2px solid var(--paper-line);
     font-size:12px; line-height:1.6; color:var(--ink-soft); background:var(--paper-dim);}
   .shape-foot b{color:var(--ink);}
+  .mu-note{margin:3px 0 0 10px; font-size:11px; line-height:1.45; color:var(--ink-soft);}
+  .mu-trouble{color:#8B2A2A;}
   .rule-record{
     display:block; margin:12px 0 0; padding:11px 13px;
     border:1px dashed var(--paper-line); border-left:4px solid var(--paper-line);
@@ -815,7 +817,7 @@
 <body>
 <div class="wrap">
   <header>
-    <p class="eyebrow">Handicapping utility · <span class="ver">v1.30</span> · released 6 September 2026</p>
+    <p class="eyebrow">Handicapping utility · <span class="ver">v1.31</span> · released 7 September 2026</p>
     <h1><span class="flap">O</span><span class="flap">v</span><span class="flap">e</span><span class="flap">r</span><span class="flap">l</span><span class="flap">a</span><span class="flap">y</span> <span class="flap">B</span><span class="flap">o</span><span class="flap">a</span><span class="flap">r</span><span class="flap">d</span></h1>
     <p class="tagline">Upload a data file or program PDF. Overlay Board lays out the whole card: past performances, scratches, money moves, and where the board likes a horse.</p>
   </header>
@@ -1025,7 +1027,7 @@ const rowsBody = document.getElementById('rowsBody');
 const emptyNote = document.getElementById('emptyNote');
 
 function newRow(partial){
-  return Object.assign({id: rowId++, race:'', post:'', horse:'', odds:'', finalOdds:'', score:'', surfaceRating:'', classMove:'', trackCode:'', raceDateYmd:'', ltStarts:null, ltWins:null, ltPlaces:null, ltShows:null, ltEarn:null, raceDistYds:'', raceType:'', raceClaim:'', raceClassTxt:'', scratched:false, connAdjusted:false, runStyle:'', quirin:'', distStarts:'', distAdjusted:false, turfStarts:'', surface:'', daysSinceWork:'', worksAtTrack:'', lastFinMargin:'', h2hNote:'', classFit:null, classSeen:0, classTxtToday:'', todayClaim:null, firstTimeTagged:false, claimDropRatio:null, layoffDays:null, lastSpd:null, bestSpd:null, avgSpd3:null, jockey:'', jkyStarts:null, jkyWins:null, jkyPlaces:null, jkyShows:null, trainer:'', trnStarts:null, trnWins:null, riderChange:null, tjStarts:'', tjWins:'', keyStats:[], rawPP:'', claimedLastRace:false, lastFinComment:'', hadTrouble:false, recentWorks:[], ppRaces:[], ppWorks:[]}, partial);
+  return Object.assign({id: rowId++, race:'', post:'', horse:'', odds:'', finalOdds:'', score:'', surfaceRating:'', classMove:'', trackCode:'', raceDateYmd:'', ltStarts:null, ltWins:null, ltPlaces:null, ltShows:null, ltEarn:null, raceDistYds:'', raceType:'', raceClaim:'', raceClassTxt:'', scratched:false, connAdjusted:false, runStyle:'', quirin:'', distStarts:'', distAdjusted:false, turfStarts:'', turfWins:null, turfPlaces:null, turfShows:null, turfEarn:null, wetStarts:null, wetWins:null, wetPlaces:null, wetShows:null, wetEarn:null, surface:'', daysSinceWork:'', worksAtTrack:'', lastFinMargin:'', h2hNote:'', classFit:null, classSeen:0, classTxtToday:'', todayClaim:null, firstTimeTagged:false, claimDropRatio:null, layoffDays:null, lastSpd:null, bestSpd:null, avgSpd3:null, jockey:'', jkyStarts:null, jkyWins:null, jkyPlaces:null, jkyShows:null, trainer:'', trnStarts:null, trnWins:null, riderChange:null, tjStarts:'', tjWins:'', keyStats:[], rawPP:'', claimedLastRace:false, lastFinComment:'', hadTrouble:false, recentWorks:[], ppRaces:[], ppWorks:[]}, partial);
 }
 
 function renderRows(){
@@ -1389,7 +1391,9 @@ function parseBrisnetSingleFile(text){
       runStyle: get(210),
       quirin: num(211),
       distStarts: num(65),
-      turfStarts: num(70),
+      turfStarts: num(75),
+      turfWins: num(76), turfPlaces: num(77), turfShows: num(78), turfEarn: num(79),
+      wetStarts: num(80), wetWins: num(81), wetPlaces: num(82), wetShows: num(83), wetEarn: num(84),
       surface: surface,
       daysSinceWork,
       worksAtTrack,
@@ -1795,7 +1799,7 @@ function decodeEntities(t){
 }
 
 function parseChangesFeed(text){
-  const out = {track:'', feedDate:'', scratches:[], riders:[], conditions:[], other:0};
+  const out = {track:'', feedDate:'', scratches:[], riders:[], conditions:[], courses: [], other:0};
   const titleMatch = text.match(/<title>\s*Equibase\s+([A-Z0-9]{2,4})\s+Changes/i);
   if (titleMatch) out.track = titleMatch[1].toUpperCase();
   const pub = text.match(/<pubDate>([^<]+)<\/pubDate>/);
@@ -1837,6 +1841,12 @@ function parseChangesFeed(text){
     } else if ((mm = body.match(/^#\s*(\d{1,2})\s+(.+?)\s+Jockey\s*-\s*(.+?)\s+changed to\s+(.+?)\s*$/i))){
       out.riders.push({race, post: String(parseInt(mm[1], 10)), horse: mm[2].trim(),
                        from: mm[3].trim(), to: mm[4].trim()});
+    } else if ((mm = body.match(/Course\s*-\s*([A-Za-z ]+?)\s+changed to\s+([A-Za-z ]+?)\s*$/i))){
+      // An off-turf switch changes what every surface-dependent read in the
+      // tool is describing: the turf-debut flag, the surface rating used for
+      // the score, and the readability turf deduction all refer to a surface
+      // the race is no longer being run on. Applied to the rows, not just noted.
+      out.courses.push({race, from: mm[1].trim(), to: mm[2].trim()});
     } else if (/Track Condition/i.test(body)){
       out.conditions.push({race, text: body.replace(/\s+/g,' ').trim()});
     } else {
@@ -1938,20 +1948,34 @@ function applyChangesFeed(text){
       (riderUnmatched.length ? `<br><i>${riderUnmatched.length} change had no matching row.</i>` : '') + `</div>`);
   }
 
+  let courseApplied = 0;
+  if (feed.courses && feed.courses.length){
+    const surfCode = t => /turf|grass/i.test(t) ? 'T' : /tapeta|poly|all.?weather|synth/i.test(t) ? 'A' : 'D';
+    feed.courses.forEach(c => {
+      const to = surfCode(c.to);
+      rows.filter(r => String(r.race).trim() === String(c.race).trim()).forEach(r => {
+        if (r.surface !== to){ r.surface = to; courseApplied++; }
+      });
+    });
+    parts.push(`<div class="rss-warn">⚑ <b>Course change${feed.courses.length===1?'':'s'} applied.</b><br>` +
+      feed.courses.map(c => `R${escHtml(c.race)}: ${escHtml(c.from)} → <b>${escHtml(c.to)}</b>`).join('<br>') +
+      `<br>Surface fit, the turf-debut flag and the readability turf deduction are recomputed against the surface the race is now being run on.</div>`);
+  }
+
   if (feed.conditions.length){
     parts.push(`<div class="rss-info"><b>Track condition / rail notes:</b><br>` +
       feed.conditions.map(c => `R${escHtml(c.race)}: ${escHtml(c.text)}`).join('<br>') + `</div>`);
   }
 
   reportEl.innerHTML = parts.join('');
-  statusEl.textContent = applied
-    ? `${applied} horse(s) marked scratched. Recomputing…`
-    : 'No new scratches to apply — the table already matched the feed.';
+  statusEl.textContent = (applied || courseApplied)
+    ? `${applied} horse(s) marked scratched${courseApplied ? `, ${courseApplied} row(s) moved to a new surface` : ''}. Recomputing…`
+    : 'No new scratches or course changes to apply — the table already matched the feed.';
   statusEl.className = 'status ok';
 
   // Only recompute when a card is already on screen; otherwise leave it to the
   // Compute button so the person sees the table state first.
-  if (applied && document.getElementById('resultsSection').style.display === 'block'){
+  if ((applied || courseApplied) && document.getElementById('resultsSection').style.display === 'block'){
     document.getElementById('computeBtn').click();
   }
 }
@@ -2303,6 +2327,8 @@ document.getElementById('computeBtn').addEventListener('click', () => {
       runStyle: r.runStyle || '', quirin: (r.quirin !== '' && r.quirin != null && !isNaN(parseFloat(r.quirin))) ? parseFloat(r.quirin) : null,
       distStarts: (r.distStarts !== '' && r.distStarts != null && !isNaN(parseFloat(r.distStarts))) ? parseFloat(r.distStarts) : null,
       turfStarts: (r.turfStarts !== '' && r.turfStarts != null && !isNaN(parseFloat(r.turfStarts))) ? parseFloat(r.turfStarts) : null,
+      turfWins: r.turfWins, turfPlaces: r.turfPlaces, turfShows: r.turfShows, turfEarn: r.turfEarn,
+      wetStarts: r.wetStarts, wetWins: r.wetWins, wetPlaces: r.wetPlaces, wetShows: r.wetShows, wetEarn: r.wetEarn,
       surfaceToday: r.surface || '',
       raceDistYds: (r.raceDistYds !== '' && r.raceDistYds != null && !isNaN(parseFloat(r.raceDistYds))) ? parseFloat(r.raceDistYds) : null,
       raceType: r.raceType || '',
@@ -2737,7 +2763,20 @@ function buildMatchupBlock(horses, todayDistYds){
     }
     const offDist = (todayDistYds != null && m.distYds != null && Math.abs(m.distYds - todayDistYds) > 440)
       ? ` <span class="mu-foot">\u2014 that meeting was at ${fmtDistY(m.distYds)}, today is ${fmtDistY(todayDistYds)}</span>` : '';
-    return `<div class="mu-row"><span class="mu-when">${when}</span><br><span class="mu-line">${line}</span>${offDist}</div>`;
+    // How the meeting was RUN, not just how it finished. A beaten horse with a
+    // trouble note in the chart lost for a reason the finish position does not
+    // carry, and that is the part a form student reads before deciding whether
+    // the result means anything.
+    const note = (h, pp) => {
+      const c = String(pp && pp.comment || '').trim();
+      if (!c) return '';
+      const bad = TROUBLE_WORDS.some(k => c.toLowerCase().includes(k));
+      return `<div class="mu-note${bad ? ' mu-trouble' : ''}">${escHtml(h.horse)}: ${escHtml(c)}</div>`;
+    };
+    const notes = m.winner
+      ? note(m.winner, m.winner === m.a ? m.pa : m.pb) + note(m.loser, m.loser === m.a ? m.pa : m.pb)
+      : note(m.a, m.pa) + note(m.b, m.pb);
+    return `<div class="mu-row"><span class="mu-when">${when}</span><br><span class="mu-line">${line}</span>${offDist}${notes}</div>`;
   }).join('');
   const more = ms.length > 6 ? `<div class="mu-foot">${ms.length - 6} further meeting(s) not shown.</div>` : '';
   return `<div class="matchup">
@@ -4363,6 +4402,21 @@ function money(n){
   if (n == null) return '—';
   return '$' + Math.round(n).toLocaleString('en-US');
 }
+// The data file keeps a separate record for turf and for off going. A horse
+// with a strong overall line and nothing on grass is a different proposition
+// from one whose record was made on it, and the totals hide that.
+function surfaceRecordLine(label, st, w, p, sh, earn){
+  if (st == null || st === '' || isNaN(st)) return '';
+  if (st <= 0) return `<br><span class="rec-sub"><b>${label}:</b> no starts</span>`;
+  const wins = w || 0, pl = p || 0, shw = sh || 0, itm = wins + pl + shw;
+  const per = (earn != null && st) ? earn / st : null;
+  return `<br><span class="rec-sub"><b>${label}: ${st} start${st === 1 ? '' : 's'}</b>`
+    + ` &middot; ${wins}-${pl}-${shw} &middot; ${itm} in the money`
+    + (earn != null ? ` &middot; <span class="rec-money">${money(earn)}</span>` : '')
+    + (per != null ? ` (${money(per)} per start)` : '')
+    + `</span>`;
+}
+
 function ppRecordLine(h){
   if (h.ltStarts == null || h.ltStarts <= 0){
     return (h.ltStarts === 0)
@@ -4379,6 +4433,8 @@ function ppRecordLine(h){
     · <b>${itm} in the money</b> (${itmPct.toFixed(0)}% of starts, wins ${winPct.toFixed(0)}%)
     · <span class="rec-money">${money(h.ltEarn)}</span> earned
     ${perStart != null ? `<br><span class="rec-sub">${money(perStart)} per start — a rough read on the class of company kept</span>` : ''}
+    ${surfaceRecordLine('Turf', h.turfStarts, h.turfWins, h.turfPlaces, h.turfShows, h.turfEarn)}
+    ${surfaceRecordLine('Off track', h.wetStarts, h.wetWins, h.wetPlaces, h.wetShows, h.wetEarn)}
   </div>`;
 }
 
@@ -4723,6 +4779,6 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.30 · released 6 September 2026 · build 2026-09-06-b</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.31 · released 7 September 2026 · build 2026-09-07-b</div>
 </body>
 </html>
