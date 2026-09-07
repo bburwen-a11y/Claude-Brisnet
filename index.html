@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Overlay Board v1.31 — Race Card Reader</title>
+<title>Overlay Board v1.32 — Race Card Reader</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
@@ -830,7 +830,7 @@
 <body>
 <div class="wrap">
   <header>
-    <p class="eyebrow">Handicapping utility · <span class="ver">v1.31</span> · released 7 September 2026</p>
+    <p class="eyebrow">Handicapping utility · <span class="ver">v1.32</span> · released 7 September 2026</p>
     <h1><span class="flap">O</span><span class="flap">v</span><span class="flap">e</span><span class="flap">r</span><span class="flap">l</span><span class="flap">a</span><span class="flap">y</span> <span class="flap">B</span><span class="flap">o</span><span class="flap">a</span><span class="flap">r</span><span class="flap">d</span></h1>
     <p class="tagline">Upload a data file or program PDF. Overlay Board lays out the whole card: past performances, scratches, money moves, and where the board likes a horse.</p>
   </header>
@@ -3444,7 +3444,7 @@ function confidenceBlock(rs, h){
     ? `One measured concern: ${c.concerns[0]}.`
     : `${c.concerns.length} measured concerns: ` + c.concerns.map(x => x).join('; ') + '.';
   const tail = c.level === 'questionable'
-    ? ` <b>Read the contenders before backing this.</b> When a short-priced favourite carries two or more of these, it has won 25% and the winner came from the second or third choice half the time.`
+    ? ` <b>Read the contenders before backing this.</b> A short-priced favourite carrying two or more of these is worth checking against the rest of the field before it is backed.`
     : (c.level === 'probable' ? ` Worth a look at the rest of the field.` : '');
   return `<div class="conf-block conf-${c.level}">${head}<span class="conf-body">${body}${tail}</span>`
     + pickContenders(rs, h) + `</div>`;
@@ -3842,13 +3842,10 @@ function buildReadPanel(rs){
       + `<span class="fig-note">${fig.covered} of ${fig.total} runners carry a figure.</span></div>`);
   }
 
-  // SAME BARN. Logged, watch-only, feeding nothing. Across
-  // 149 paired races a trainer had 2+ runners in 35% of them, and the split
-  // between the pair is worth seeing rather than assuming the shorter price
-  // is the stable's opinion: the neglected half of a barn's pair beats the
-  // preferred half often enough to be worth a look. The
-  // on the pick and not a selection: shown so the record can be built card by
-  // card before anything is done with it.
+  // SAME BARN. Logged, watch-only, feeding nothing. When a trainer runs more
+  // than one in a race, the split between them is worth seeing rather than
+  // assuming the shorter price is the stable's opinion. Shown as information
+  // on the card, never as a selection.
   const barns = {};
   horses.forEach(h => {
     const t = (h.trainer || '').trim().toUpperCase();
@@ -4145,7 +4142,7 @@ function buildBestOfDay(raceSummaries){
       <span class="bo-rank">${i + 1}</span>
       <span class="bo-main">
         <span class="bo-horse">${escHtml(p.h.horse)}</span>
-        <br><span class="bo-meta"><a class="race-jump" data-jump="${escAttr(p.rs.race)}" title="Tap to see every runner in this race">Race ${escHtml(p.rs.race)}</a> · #${escHtml(p.h.post || '?')} · ${escHtml(p.h.oddsStr)} · ${money(p.eps)} per start${p.line === 'primary' ? ', top in the field' : ', 2nd in the field'}${p.marketKnown ? '' : ' · market check pending'}${p.drifting ? ' · DRIFTING, stand down' : ''}${p.riderChanged ? ' · RIDER CHANGE' : ''}${p.conf ? ` · <span class="conf-inline conf-${p.conf.level}">${p.conf.label}</span>` : ''}</span>
+        <br><span class="bo-meta"><a class="race-jump" data-jump="${escAttr(p.rs.race)}" title="Tap to see every runner in this race">Race ${escHtml(p.rs.race)}</a> · #${escHtml(p.h.post || '?')} · ${escHtml(p.h.oddsStr)} · ${money(p.eps)} per start${p.line === 'primary' ? ', top in the field' : ', 2nd in the field'}${p.drifting ? ' · DRIFTING, stand down' : ''}${p.riderChanged ? ' · RIDER CHANGE' : ''}${p.conf ? ` · <span class="conf-inline conf-${p.conf.level}">${p.conf.label}</span>` : ''}</span>
         ${p.others.length ? `<br><span class="bo-with">with ${p.others.map(o => `#${escHtml(o.post || '?')} ${escHtml(o.horse)} ${escHtml(o.oddsStr)}`).join(' · ')}</span>`
                           : (p.fieldSize ? '<br><span class="bo-with">no other contender</span>' : '')}
       </span>
@@ -4851,6 +4848,6 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.31 · released 7 September 2026 · build 2026-09-07-c</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.32 · released 7 September 2026 · build 2026-09-07-d</div>
 </body>
 </html>
