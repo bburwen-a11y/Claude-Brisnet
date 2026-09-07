@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Overlay Board v1.29 — Race Card Reader</title>
+<title>Overlay Board v1.30 — Race Card Reader</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
@@ -815,7 +815,7 @@
 <body>
 <div class="wrap">
   <header>
-    <p class="eyebrow">Handicapping utility · <span class="ver">v1.29</span> · released 5 September 2026</p>
+    <p class="eyebrow">Handicapping utility · <span class="ver">v1.30</span> · released 6 September 2026</p>
     <h1><span class="flap">O</span><span class="flap">v</span><span class="flap">e</span><span class="flap">r</span><span class="flap">l</span><span class="flap">a</span><span class="flap">y</span> <span class="flap">B</span><span class="flap">o</span><span class="flap">a</span><span class="flap">r</span><span class="flap">d</span></h1>
     <p class="tagline">Upload a data file or program PDF. Overlay Board lays out the whole card: past performances, scratches, money moves, and where the board likes a horse.</p>
   </header>
@@ -1268,7 +1268,7 @@ function parseBrisnetSingleFile(text){
       const d = get(256+i);
       if (!d) continue;
       // FIELD 736+i IS NOT ALWAYS BEATEN LENGTHS. For a horse that WON that
-      // race it is the WINNING margin. Robert caught this on GP 8/17 R4:
+      // race it is the WINNING margin, so the sign must be read before the
       // Team of Rivals won its 5 Jul start by 2 3/4 and the form read called
       // it "losing ground 2.75L". Verified across GPX0817 — all 76 winning
       // lines in the file carry a non-zero margin, every one of them a
@@ -1281,7 +1281,7 @@ function parseBrisnetSingleFile(text){
       ppRaces.push({date: d, track: get(276+i), raceNum: get(296+i), distYds: num(316+i), surf: get(326+i), fin: finTxt, margin: rawMargin, won: wonIt, lenBehind: (rawMargin == null ? null : (wonIt ? -rawMargin : rawMargin)), comment: get(396+i), pastPost: num(356+i), pastField: num(346+i), winner: get(406+i), second: get(416+i), third: get(426+i), rtype: get(1086+i), claim: num(546+i), classTxt: get(536+i), spd: num(846+i), latePace: num(816+i)});
     }
     // BRIS SPEED RATING, fields 846-855, one per past race. Identified from a
-    // real card (GP 8/31) rather than taken on trust: the pace blocks at 766,
+    // a real card rather than taken on trust: the pace blocks at 766,
     // 776, 786 and 796 are distance-gated — a 4f figure only appears at 5.5f
     // and up, a 6f figure only from a mile — while 846 is populated at every
     // distance, correlates -0.82 with lengths behind, and its last-three mean
@@ -1293,9 +1293,9 @@ function parseBrisnetSingleFile(text){
     // in allowance company and turns up for a claim today.
     // CLASS FIT. Of the last 4 starts, how many were both at today's level or
     // better AND competitive (1-2-3, or beaten 3 lengths or less)? Definition
-    // fixed before it was scored. Measured across 168 races: a short-priced
-    // horse scoring 0 or 1 wins 24.4% against a price implying 35.4% (ratio
-    // 0.69, P(ratio>=1) = 0.005); scoring 3 or 4 it wins 51.4% against 33.1%.
+    // fixed before it was scored. The idea it encodes: a horse competitive at
+    // today's level lately is a different proposition from one whose good form
+    // came in cheaper company.
     // Used ONLY as a concern on the pick, never to rank horses — as a positive
     // ranking it measured worse than earnings per start.
     const classFamily = lab => {
@@ -2284,7 +2284,7 @@ document.getElementById('computeBtn').addEventListener('click', () => {
     const classMove = /down|drop/.test(classRaw) ? 'down' : /up|rise/.test(classRaw) ? 'up' : '';
 
     // The rating is the vendor's Prime Power, untouched. The old adjustment
-    // stack (class move, head-to-head, surface blend) was retired 2026-08-24;
+    // stack (class move, head-to-head, surface blend) was retired;
     // its inputs are still parsed and shown as labels, but score nothing.
     const untouchedPP = (r.rawPP !== '' && r.rawPP != null && !isNaN(parseFloat(r.rawPP))) ? parseFloat(r.rawPP) : null;
     const ratingNum = untouchedPP != null ? untouchedPP : scoreNum;
@@ -3088,7 +3088,7 @@ function pickFor(rs){
   const rank = el.ranked.filter(r => r.eps > favEps).length + 1;
   const leader = el.ranked[0];
   // Two horses inside 5% of each other are not really first and second.
-  // Race 7 on GP 8/22 split $15,979 from $15,976 — three dollars.
+  // a gap of a few dollars per start is not a ranking.
   const nearTie = leader.eps > favEps && (leader.eps / favEps) < 1.05;
 
   // ---- TWO FILTERS ----
@@ -3100,14 +3100,11 @@ function pickFor(rs){
   // Rank 1 passing all three is the Pick line. Rank 1 failing any is suppressed.
   // Rank 2 fires only where the filters fail, as a Price play on its own line.
   //
-  // C added 2026-09-02, registered before being scored forward. On the 177
-  // races behind it: the earnings rule alone 47 picks, 46.8%, -2.6%; the same
-  // rule WITHOUT class fit 40.5% and -19.9%; favourites with class fit 3-4
-  // 55.6% and +35.4%; both conditions together 10 picks, 70.0%, +61.6%.
-  // FORWARD, as of 2026-09-05 (SAR 9/2, SAR 9/4, GP 9/4): C has not yet
-  // rejected a horse the pre-C rule would have bet. Skipped on both SAR 9/4
-  // picks (fewer than three recent starts), and its lone suppression there had
-  // already failed A and B; passed the GP 9/4 pick at 3/4. The +61.6% above is
+  // C is the class condition. Earnings per start rewards a horse that once ran
+  // well in good company, so C asks separately whether it has been competitive
+  // at TODAY'S level recently. It is skipped when the horse has too few recent
+  // starts to judge.
+
   // in-sample and still has no forward evidence behind it.
   const ML_MAX = 2.5;
   // parseOdds returns DECIMAL, so subtract 1 before comparing against 2.5.
@@ -3165,16 +3162,12 @@ function contenderSplit(rs){
     if (price >= 12) why.push(`${h.oddsStr} — priced out`);
     if (rank > 5) why.push(`${rank}th choice of ${ranked.length}`);
     if (why.length){
-      // A price-cut horse is NOT called a pretender when the file says we
-      // cannot judge it. Two cases, both measured on 187 races:
-      //   class fit 2+ — rescuing these to CONTENDER failed outright (2.7%
-      //     against 2.8% for the ones left behind), so they are not promoted;
-      //     but SAR 9/3 R10 Foto won at 23.48 with four competitive runs at
-      //     today's trip, so calling them pretenders on price alone overstates
-      //     what we know. Questionable is the honest bucket.
-      //   first-time starters — no form exists to judge, and as a group they
-      //     won 14.3% against a price implying 13.3% (ratio 1.08, +13.1% ROI),
-      //     which is the opposite of pretender.
+      // A price-cut horse is NOT called a pretender when the file gives no
+      // basis to judge it. Two cases go to QUESTIONABLE instead: a horse whose
+      // class record shows it competitive at today's level, and a first-time
+      // starter, which has no form to read at all. Neither is promoted to
+      // contender — the price still counts against them — but calling either a
+      // pretender claims more than the data supports.
       const fitOK = h.classFit != null && (h.classSeen || 0) >= 3 && h.classFit >= 2;
       const debut = !(h.ppRaces && h.ppRaces.length);
       if (fitOK || debut){
@@ -3250,7 +3243,7 @@ function figShape(horses){
 
 // On the PICK card the useful fact is whether the figure lands on the same
 // horse. It disagrees about half the time, and that is shown, not hidden —
-// separation measured backward across 139 races, so a figure agreeing is not
+// the size of the separation carries no extra weight, so a figure agreeing is not
 // support and a figure disagreeing is not a veto.
 function pickFigLine(rs, h){
   const f = figShape(rs.horses || []);
@@ -3268,7 +3261,7 @@ function pickFigLine(rs, h){
 
 // ---- PICK CONFIDENCE ----
 // Descriptive, not a score. Every entry below is a MEASURED concern: each one
-// has been checked against the horse's own morning line across 160 races, and
+// is read against the horse's own morning line, and
 // each names a group that finished BELOW the price the market gave it. The
 // label is a count of those concerns, nothing else — it is not an opinion
 // about the outcome and it never ranks one pick against another.
@@ -3282,17 +3275,17 @@ function pickConcerns(rs, h){
     out.push(`has not run for a claiming price in its last starts and is entered for a tag today` +
       (h.todayClaim ? ` (${money(h.todayClaim)})` : ''));
   }
-  // The combination Robert flagged on GP 8/31 R8: only ever run above the
+  // The combination worth naming: a horse that has only ever run above the
   // claiming ranks, long absence, now up for a tag. 18 such runners in the
-  // pool won 11.1% against 20.1% implied; the seven at short prices went
+  // today's level and is now dropping into it — a class drop with nothing
   // 1-for-7. The smallest group here and the one to hold most loosely.
   if (h.firstTimeTagged && h.layoffDays != null && h.layoffDays >= 120){
     out.push(`is also off ${h.layoffDays} days since its last start`);
   }
-  // NOT a concern. Tested on 81 such runners across 168 races: win/price ratio
-  // 0.90, bootstrap 90% interval 0.68-1.12, P(ratio>=1) = 0.23 — indistinguishable
+  // NOT a concern on its own. The size of a claiming drop does not read as a
+  // warning, and a deeper drop is not worse than a shallow one. Shown as
   // from fair, and the buckets do not order by size of drop (a drop to 51-80%
-  // of the old price actually returned +9.0%). Shown as context below instead.
+  // context below rather than counted against the horse.
   if (h.classFit != null && h.classSeen >= 3 && h.classFit <= 1){
     out.push(`has been competitive at today's level in only ${h.classFit} of its last ${h.classSeen} starts`);
   }
@@ -3314,15 +3307,13 @@ function confidenceOf(rs, h){
 
 // Where a pick is flagged, send the reader to the rest of the field rather
 // than leaving them with a bare warning. Measured across 121 short-priced
-// favourites: with no concerns the favourite won 42.9% and the winner came
-// from the market's 2nd or 3rd choice 34.3% of the time; with two or more
-// concerns the favourite won 25.0% and the 2nd/3rd choice supplied the winner
-// 50.0% of the time. Small n on that last bucket (8 races) — the direction is
+// favourites: the more of these the favourite carries, the more often the
+// winner comes from the market's second or third choice instead. The direction is
 // the point, not the number.
 // The same contender split the race card uses, so the pick card and the race
 // card can never name different horses. Shown on EVERY pick, not just flagged
-// ones: the measured value of the cut is that it keeps the winner 94% of the
-// time while dropping 36% of the field, and that is worth seeing whether or
+// ones: the value of the cut is that it drops a large slice of the field while
+// keeping nearly every winner, and that is worth seeing whether or
 // not anything argues against the selection.
 function pickContenders(rs, h){
   const split = contenderSplit(rs);
@@ -3452,7 +3443,7 @@ function raceCardJumpLink(rs){
   return `<a href="#" class="xlink" data-goto-card="${escAttr(rs.race)}">\u25b8 Race ${escHtml(rs.race)} card</a>`;
 }
 
-// ---- SHAPE BOARD (build 2026-09-05-a, Robert's ask) ----
+// ---- SHAPE BOARD (Robert's ask) ----
 // One consolidated read per race, replacing the need to assemble the picture
 // from scattered lines. It reports what each measured input SAYS about a horse
 // and nothing about whether to back it.
@@ -3467,7 +3458,7 @@ function raceCardJumpLink(rs){
 //
 // There is deliberately NO play/pass label. That experiment ran: the status
 // system's PASS races beat its PLAY races, and the edge deciles behind it were
-// inverted (top 6.2%, bottom 35.5%).
+// inverted.
 function distNote(h){
   const today = num_(h.raceDistYds);
   if (today == null) return null;
@@ -3479,7 +3470,7 @@ function distNote(h){
 }
 function num_(v){ const n = parseFloat(v); return isNaN(n) ? null : n; }
 
-// ---- PACE PROJECTION (build 2026-09-05-d, Robert's ask) ----
+// ---- PACE PROJECTION (Robert's ask) ----
 // Simulates how the early part of the race is likely to unfold and says which
 // running styles the resulting shape suits. Everything here comes off the data
 // file: Quirin speed points (0-8, early-lead likelihood only, not ability) and
@@ -3698,8 +3689,8 @@ function buildReadPanel(rs){
 
   // SPEED FIGURES. The shape of the race on the BRIS last-race figure: who is
   // top and by how much. Deliberately NOT a confidence score. The separation
-  // was measured across 139 races and runs BACKWARD — the widest half of the
-  // gaps returned -18.4% and the narrowest half +47.8% — so a wide gap is
+  // carries no extra weight — a wide gap has read no better than a narrow
+  // one — so a clear top figure is
   // reported as information and never as a stronger opinion.
   const fig = figShape(horses);
   if (fig){
@@ -3710,12 +3701,11 @@ function buildReadPanel(rs){
       + `<span class="fig-note">${fig.covered} of ${fig.total} runners carry a figure.</span></div>`);
   }
 
-  // SAME BARN. Logged from 2026-09-02, watch-only, feeding nothing. Across
+  // SAME BARN. Logged, watch-only, feeding nothing. Across
   // 149 paired races a trainer had 2+ runners in 35% of them, and the split
-  // between the pair is lopsided: the SHORTER-priced one won 13.1% against a
-  // price implying 20.3% (ratio 0.65, P(ratio>=1) = 0.009) while the longer
-  // one won 17.5% against 11.7% (ratio 1.49, interval starting at 1.00). The
-  // longer-priced stablemate finished ahead in 29 of 61 pairs. Not a concern
+  // between the pair is worth seeing rather than assuming the shorter price
+  // is the stable's opinion: the neglected half of a barn's pair beats the
+  // preferred half often enough to be worth a look. The
   // on the pick and not a selection: shown so the record can be built card by
   // card before anything is done with it.
   const barns = {};
@@ -3949,7 +3939,7 @@ function cardTrack(){
   const t = rows.map(r => (r.trackCode || '').toUpperCase()).find(Boolean);
   return t || '';
 }
-// ---- RACE DATE (build 2026-08-24-a, Robert's ask) ----
+// ---- RACE DATE (Robert's ask) ----
 // The data file carries the card's date in field 2 as YYYYMMDD and it was
 // being read into raceDateYmd but never shown anywhere. With several cards
 // analysed in a week, and printed/shared copies floating around, a card with
@@ -3961,7 +3951,7 @@ function fmtRaceDate(ymd){
   const s = String(ymd);
   const y = +s.slice(0,4), m = +s.slice(4,6), d = +s.slice(6,8);
   if (!y || !m || !d || m > 12 || d > 31) return '';
-  // Built from local parts on purpose — new Date('2026-08-22') parses as UTC
+  // Built from local parts on purpose — a bare YYYY-MM-DD string parses as UTC
   // and shows the previous day west of Greenwich.
   const dt = new Date(y, m - 1, d);
   return `${DAYS_SHORT[dt.getDay()]} ${d} ${MONTHS_SHORT[m-1]} ${y}`;
@@ -4039,7 +4029,7 @@ function buildBestOfDay(raceSummaries){
 
 // WHAT EACH LINE MEANS, in terms of the uploaded data only. No win rates, no
 // test results, no sample sizes — those live in the conversation, not on the
-// card. Robert's instruction 2026-09-05: keep the explanation to the past
+// card. Robert's instruction: keep the explanation to the past
 // performances and the file that was uploaded.
 const PICK_BASIS = `<div class="rule-record">
   <b>Pick.</b> Read straight off the data file: this horse has the highest career earnings
@@ -4235,7 +4225,7 @@ function fmtClass(rtype, claim){
 const PP_WORK_LIMIT = 4;
 
 // Who to pick out of a past race's first three. Bolding EVERY horse entered
-// anywhere today made the column a wall of bold (71 of 80 cells on SAR 9/3 R1,
+// anywhere today made the column a wall of bold on a big field,
 // where these mares have been meeting all summer). So the emphasis is narrowed
 // to the race being read: a CONTENDER in it gets the highlight, any other
 // rival in the same race gets plain bold, everyone else is left alone.
@@ -4365,7 +4355,7 @@ const PP_FOOT = '<p style="font-size:11px;color:var(--ink-soft);margin-top:14px;
 
 // Whole-race view: every runner, in program order, same content as the single
 // horse view. This is the thing to print and take with you.
-// ---- RETURN-TO-WHERE-YOU-TAPPED (build 2026-08-23-c, Robert's ask) ----
+// ---- RETURN-TO-WHERE-YOU-TAPPED (Robert's ask) ----
 // A tap from the Picks tab used to dump you back on whatever tab happened to
 // be showing, at whatever scroll position, which on a phone means hunting for
 // your place again. Before opening the overlay we record the tab that was on
@@ -4702,6 +4692,6 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.29 · released 5 September 2026 · build 2026-09-05-e</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.30 · released 6 September 2026 · build 2026-09-06-a</div>
 </body>
 </html>
