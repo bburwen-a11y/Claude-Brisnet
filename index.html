@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Overlay Board v1.32 — Race Card Reader</title>
+<title>Overlay Board v1.33 — Race Card Reader</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
@@ -404,6 +404,11 @@
   .race-card-top{display:flex; justify-content:space-between; align-items:baseline; gap:10px; flex-wrap:wrap;}
   .race-card-top strong{font-size:16px;}
   .race-metric{font-family:var(--mono); font-size:12px; color:var(--ink-soft);}
+  .race-conds{margin:8px 0 2px; padding:8px 10px; background:rgba(0,0,0,.03);
+    border-left:3px solid var(--paper-line); border-radius:2px;
+    font-size:12px; line-height:1.5; color:var(--ink-soft);}
+  .rc-tag{display:inline-block; margin-right:7px; font-family:var(--mono); font-size:9.5px;
+    letter-spacing:.07em; font-weight:800; color:var(--board-950);}
   .race-reason{font-size:12px; color:var(--ink-soft); margin-top:6px; font-style:italic;}
   .pace-note{font-size:11.5px; color:var(--ink-soft); margin-top:8px; padding:7px 9px; background:rgba(0,0,0,.035); border-radius:4px; line-height:1.5;}
   .fav-note{font-size:12.5px; color:var(--ink); margin-top:8px; padding:8px 10px; background:rgba(201,152,60,.12); border:1px solid var(--amber); border-radius:4px; line-height:1.55; font-weight:600;}
@@ -830,7 +835,7 @@
 <body>
 <div class="wrap">
   <header>
-    <p class="eyebrow">Handicapping utility · <span class="ver">v1.32</span> · released 7 September 2026</p>
+    <p class="eyebrow">Handicapping utility · <span class="ver">v1.33</span> · released 7 September 2026</p>
     <h1><span class="flap">O</span><span class="flap">v</span><span class="flap">e</span><span class="flap">r</span><span class="flap">l</span><span class="flap">a</span><span class="flap">y</span> <span class="flap">B</span><span class="flap">o</span><span class="flap">a</span><span class="flap">r</span><span class="flap">d</span></h1>
     <p class="tagline">Upload a data file or program PDF. Overlay Board lays out the whole card: past performances, scratches, money moves, and where the board likes a horse.</p>
   </header>
@@ -1040,7 +1045,7 @@ const rowsBody = document.getElementById('rowsBody');
 const emptyNote = document.getElementById('emptyNote');
 
 function newRow(partial){
-  return Object.assign({id: rowId++, race:'', post:'', horse:'', odds:'', finalOdds:'', score:'', surfaceRating:'', classMove:'', trackCode:'', raceDateYmd:'', ltStarts:null, ltWins:null, ltPlaces:null, ltShows:null, ltEarn:null, raceDistYds:'', raceType:'', raceClaim:'', raceClassTxt:'', scratched:false, connAdjusted:false, runStyle:'', quirin:'', distStarts:'', distAdjusted:false, turfStarts:'', turfWins:null, turfPlaces:null, turfShows:null, turfEarn:null, wetStarts:null, wetWins:null, wetPlaces:null, wetShows:null, wetEarn:null, surface:'', daysSinceWork:'', worksAtTrack:'', lastFinMargin:'', h2hNote:'', classFit:null, classSeen:0, classTxtToday:'', todayClaim:null, firstTimeTagged:false, claimDropRatio:null, layoffDays:null, lastSpd:null, bestSpd:null, avgSpd3:null, jockey:'', jkyStarts:null, jkyWins:null, jkyPlaces:null, jkyShows:null, trainer:'', trnStarts:null, trnWins:null, riderChange:null, tjStarts:'', tjWins:'', keyStats:[], rawPP:'', claimedLastRace:false, lastFinComment:'', hadTrouble:false, recentWorks:[], ppRaces:[], ppWorks:[]}, partial);
+  return Object.assign({id: rowId++, race:'', post:'', horse:'', odds:'', finalOdds:'', score:'', surfaceRating:'', classMove:'', trackCode:'', raceDateYmd:'', ltStarts:null, ltWins:null, ltPlaces:null, ltShows:null, ltEarn:null, raceDistYds:'', raceType:'', raceClaim:'', raceClassTxt:'', scratched:false, connAdjusted:false, runStyle:'', quirin:'', distStarts:'', distAdjusted:false, turfStarts:'', turfWins:null, turfPlaces:null, turfShows:null, turfEarn:null, wetStarts:null, wetWins:null, wetPlaces:null, wetShows:null, wetEarn:null, surface:'', daysSinceWork:'', worksAtTrack:'', lastFinMargin:'', h2hNote:'', classFit:null, classSeen:0, classTxtToday:'', racePurse:null, raceConds:'', todayClaim:null, firstTimeTagged:false, claimDropRatio:null, layoffDays:null, lastSpd:null, bestSpd:null, avgSpd3:null, jockey:'', jkyStarts:null, jkyWins:null, jkyPlaces:null, jkyShows:null, trainer:'', trnStarts:null, trnWins:null, riderChange:null, tjStarts:'', tjWins:'', keyStats:[], rawPP:'', claimedLastRace:false, lastFinComment:'', hadTrouble:false, recentWorks:[], ppRaces:[], ppWorks:[]}, partial);
 }
 
 function renderRows(){
@@ -1423,6 +1428,12 @@ function parseBrisnetSingleFile(text){
       lastSpd, bestSpd, avgSpd3,
       todayClaim, firstTimeTagged, claimDropRatio, layoffDays, classFit, classSeen,
       classTxtToday: get(11),
+      // TODAY'S PURSE AND THE WRITTEN CONDITIONS. Field 12 is the purse; the
+      // eligibility text runs across 225-230 and is split mid-word, so the
+      // segments are joined with no separator. BRIS substitutes a semicolon
+      // for every comma in these text fields, so they are put back.
+      racePurse: num(12),
+      raceConds: [225,226,227,228,229,230].map(n => get(n)).join('').replace(/;/g, ',').replace(/\s+/g,' ').trim(),
       last3Fins,
       ppRaces,
       ppWorks
@@ -2353,6 +2364,8 @@ document.getElementById('computeBtn').addEventListener('click', () => {
       h2hNote: r.h2hNote || '',
       classFit: r.classFit != null ? r.classFit : null,
       classTxtToday: r.classTxtToday || '',
+      racePurse: r.racePurse != null ? r.racePurse : null,
+      raceConds: r.raceConds || '',
       classSeen: r.classSeen || 0,
       todayClaim: r.todayClaim != null ? r.todayClaim : null,
       firstTimeTagged: !!r.firstTimeTagged,
@@ -2560,7 +2573,18 @@ function raceMeta(horses){
     }
   }
   if (cls) parts.push(cls);
+  const purseH = horses.find(x => x.racePurse);
+  if (purseH) parts.push(money(purseH.racePurse) + ' purse');
   return parts.join(' · ');
+}
+
+// The written conditions of today's race, as the track wrote them. This is the
+// only place the card says what a horse must NOT have done to be eligible,
+// which is what separates two races carrying the same class label.
+function raceCondsLine(horses){
+  const h = (horses || []).find(x => x.raceConds);
+  if (!h) return '';
+  return `<div class="race-conds"><span class="rc-tag">CONDITIONS</span>${escHtml(h.raceConds)}</div>`;
 }
 
 function pct(x){ return (x*100).toFixed(1) + '%'; }
@@ -3934,6 +3958,7 @@ function renderRaceCard(raceSummaries, scratchedCount){
           <span class="race-metric">${(() => { const d = raceDateOf(rs.horses); return d ? escHtml(d) + ' · ' : ''; })()}${rs.meta ? escHtml(rs.meta) + ' · ' : ''}${rs.fieldSize} runners · book ${pct(rs.overround)} · ${oddsSourceMode === 'ml' ? 'morning line' : 'final odds'}</span>
           ${concentrationTag(rs)}
         </div>
+        ${raceCondsLine(rs.horses)}
         ${readLine}
         ${buildTiebreakRead(rs)}
         ${pickJumpLink(rs)}
@@ -4282,6 +4307,7 @@ function renderFullField(mode){
           <strong class="race-no ${readLevelFor(rc.race)}"><a class="race-jump" data-jump="${escAttr(rc.race)}" title="Tap for every runner's past performances">Race ${escHtml(rc.race)}</a></strong>
           <span class="race-metric">${(() => { const d = raceDateOf(horses); return d ? escHtml(d) + ' · ' : ''; })()}${metaLine ? escHtml(metaLine) + ' · ' : ''}${horses.length} runners · post order · book ${pct(rc.overround)}${rc.hasRatings ? '' : ' · no ratings supplied'}${hiddenNote}</span>
         </div>
+        ${raceCondsLine(horses)}
         ${sparseWarning}
         <table class="field-table">
           <thead><tr><th>Post</th><th>Horse</th><th>Odds</th><th title="Final odds against the morning line">Move</th><th title="Beaten-lengths direction over recent comparable starts. Display only.">Form</th><th title="Quirin speed points, read against the field. LONE = highest and at least 2 clear.">Speed</th><th title="Recent works at today's track. Green = bullet.">Works</th><th title="BRIS speed rating: most recent figure, with the horse's best in brackets. Display only — nothing here is scored on it.">Spd</th><th title="Odds-implied win probability, normalized across the field">Market %</th><th class="diag-col">Model %</th><th class="diag-col">Edge</th><th class="raw-col" title="Prime Power as supplied by the data file">Raw PP</th></tr></thead>
@@ -4588,6 +4614,7 @@ function openRacePP(race, filter, focusName){
     `<button class="pp-back">${ppBackLabel()}</button>
      <h3 class="pp-race-title">Race ${escHtml(race)} — past performances</h3>
      <div class="pp-race-meta">${(() => { const d = raceDateOf(all); return d ? escHtml(d) + ' · ' : ''; })()}${meta ? escHtml(meta) + ' · ' : ''}${showing.length} of ${all.length} runners · program order</div>
+     ${raceCondsLine(all)}
      ${toggle}
      ${matchups}
      ${blocks}${PP_FOOT}`;
@@ -4848,6 +4875,6 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.32 · released 7 September 2026 · build 2026-09-07-d</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.33 · released 7 September 2026 · build 2026-09-07-e</div>
 </body>
 </html>
