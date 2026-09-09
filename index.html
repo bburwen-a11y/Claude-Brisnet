@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Overlay Board v1.33 — Race Card Reader</title>
+<title>Overlay Board v1.39 — Race Card Reader</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
@@ -404,6 +404,12 @@
   .race-card-top{display:flex; justify-content:space-between; align-items:baseline; gap:10px; flex-wrap:wrap;}
   .race-card-top strong{font-size:16px;}
   .race-metric{font-family:var(--mono); font-size:12px; color:var(--ink-soft);}
+  .read-gate{margin:8px 0 2px; padding:8px 10px; border-radius:3px; font-size:12px; line-height:1.5;}
+  .read-gate.rg-read{background:rgba(46,110,69,.07); border-left:3px solid #2E6E45;}
+  .read-gate.rg-thin{background:rgba(217,167,59,.10); border-left:3px solid #C08A2E;}
+  .read-gate.rg-none{background:rgba(139,42,42,.07); border-left:3px solid #8B2A2A;}
+  .rg-tag{font-family:var(--mono); font-size:9.5px; letter-spacing:.07em; font-weight:800; margin-right:7px;}
+  .rg-note{margin-top:4px; font-size:11px; opacity:.75;}
   .race-conds{margin:8px 0 2px; padding:8px 10px; background:rgba(0,0,0,.03);
     border-left:3px solid var(--paper-line); border-radius:2px;
     font-size:12px; line-height:1.5; color:var(--ink-soft);}
@@ -835,7 +841,7 @@
 <body>
 <div class="wrap">
   <header>
-    <p class="eyebrow">Handicapping utility · <span class="ver">v1.33</span> · released 7 September 2026</p>
+    <p class="eyebrow">Handicapping utility · <span class="ver">v1.39</span> · released 7 September 2026</p>
     <h1><span class="flap">O</span><span class="flap">v</span><span class="flap">e</span><span class="flap">r</span><span class="flap">l</span><span class="flap">a</span><span class="flap">y</span> <span class="flap">B</span><span class="flap">o</span><span class="flap">a</span><span class="flap">r</span><span class="flap">d</span></h1>
     <p class="tagline">Upload a data file or program PDF. Overlay Board lays out the whole card: past performances, scratches, money moves, and where the board likes a horse.</p>
   </header>
@@ -847,9 +853,9 @@
       <div class="upload-grid four-col">
         <div class="upload-card">
           <h3>Brisnet data file</h3>
-          <p>Brisnet’s "Single File" export. A <b>.zip</b> is fine — it is opened for you. If .drf looks greyed out in the picker, rename it to .csv; the parser reads the contents, not the name.</p>
+          <p>Brisnet’s <b>Single File</b> export, or a <b>multi-part</b> card (the four-file .DRF/.DR2/.DR3/.DR4 set some tracks ship). A <b>.zip</b> is fine and is opened for you — for a multi-part card send the whole zip, since the four files only work as a set. If .drf looks greyed out in the picker, rename it to .csv; the parser reads the contents, not the name.</p>
           <label class="file-btn" for="drfInput">Choose .DRF / .csv</label>
-          <input type="file" id="drfInput" accept=".drf,.csv,.txt,.zip,text/csv,text/plain,text/*,application/zip">
+          <input type="file" id="drfInput" accept=".drf,.dr2,.dr3,.dr4,.csv,.txt,.zip,text/csv,text/plain,text/*,application/zip">
           <div class="status" id="drfStatus"></div>
         </div>
         <div class="upload-card">
@@ -952,7 +958,7 @@
 
     <section id="picksSection" style="display:none;">
       <h2><span class="step-num">★</span> Where the board likes a horse</h2>
-      <div class="rss-info" style="margin:0 0 14px;">Two separate lines, and the only place this tool names a horse. <b>Pick</b> &mdash; the field's highest career earnings per start is also the market favourite at a morning line of 2.5 or shorter, and also holds the field's single best speed figure. <b>Price play</b> &mdash; a separate line, used only where a Pick is not available: the morning-line favourite is <i>second</i> in the field on career earnings per start.</div>
+      <div class="rss-info" style="margin:0 0 14px;">Two separate lines, and the only place this tool names a horse. <b>Pick</b> &mdash; the market favourite also holds the field's single highest average of its last three speed figures. <b>Price play</b> &mdash; a separate line, used only where a Pick is not available: the morning-line favourite is <i>second</i> in the field on career earnings per start.</div>
       <div id="pickList"></div>
     </section>
 
@@ -1189,6 +1195,87 @@ function parseCYMD(s){
   if (!y || !m || !d) return null;
   return new Date(Date.UTC(y, m-1, d));
 }
+// ============================================================
+// MULTI-PART EXPORT
+// Some tracks ship a card as four files rather than one: a race header, an
+// entries file, a past-performance file and a summary file. Rather than carry a
+// second set of parsing rules through the tool, this TRANSLATES those files
+// into single-file records and hands them to the normal parser, so scoring,
+// picks, past performances and readability cannot drift between the two paths.
+//
+// The multi-part export is a SUBSET of the single file. It carries no Quirin
+// speed points, no run style, no turf/wet splits and no trainer-jockey combo
+// record, so anything resting on those reads as absent rather than as zero.
+function assembleMultiPart(texts){
+  // Identify parts by SHAPE, not by file extension — extensions vary between
+  // exports, column counts do not.
+  let hdr = null, ent = null, pp = null, sum = null;
+  texts.forEach(t => {
+    const rows = t.split(/\r\n|\n|\r/).filter(l => l.trim()).map(parseCSVLine).filter(r => r.length > 5);
+    if (!rows.length) return;
+    const w = Math.max.apply(null, rows.map(r => r.length));
+    if (w <= 40) hdr = rows;
+    else if (w >= 100 && w < 145) pp = rows;
+    else if (w >= 190 && w < 245) ent = rows;
+    else if (w >= 245 && w < 400) sum = rows;
+  });
+  if (!ent) return null;
+
+  const k = r => String(parseInt(r[2], 10)) + '-' + String(parseInt(r[3], 10));
+  const ppBy = {}, sumBy = {}, hdrBy = {};
+  (pp || []).forEach(r => { (ppBy[k(r)] = ppBy[k(r)] || []).push(r); });
+  (sum || []).forEach(r => { sumBy[k(r)] = r; });
+  (hdr || []).forEach(r => { hdrBy[String(parseInt(r[2], 10))] = r; });
+
+  const daysBetween = (from, to) => {
+    if (!/^\d{8}$/.test(from) || !/^\d{8}$/.test(to)) return '';
+    const d = x => Date.UTC(+x.slice(0,4), +x.slice(4,6) - 1, +x.slice(6,8));
+    return String(Math.round((d(to) - d(from)) / 86400000));
+  };
+
+  return ent.map(e => {
+    const f = new Array(1435).fill('');
+    const put = (n, v) => { f[n-1] = (v == null ? '' : String(v)); };  // spec field N is f[N-1]
+    const h = hdrBy[String(parseInt(e[2], 10))] || [];
+    const su = sumBy[k(e)] || [];
+    const lines = (ppBy[k(e)] || []).slice(0, 10);
+
+    put(1, e[0]); put(2, e[1]); put(3, e[2]); put(4, e[3]);
+    put(6, h[3]); put(7, h[4]); put(9, h[6]); put(11, h[8]); put(12, h[9]); put(13, h[10]);
+    // The header holds the written conditions as one string; the single-file
+    // layout splits them across six fields, so they are chunked back the same
+    // way and rejoined downstream.
+    const conds = String(h[12] || '').replace(/\s+/g, ' ').trim();
+    for (let i = 0; i < 6; i++) put(225 + i, conds.slice(i * 60, (i + 1) * 60));
+
+    put(28, e[6]); put(29, e[7]); put(30, e[8]); put(31, e[9]); put(32, e[10]);
+    put(33, e[11]); put(35, e[13]); put(36, e[14]); put(37, e[15]); put(38, e[16]);
+    put(44, e[201]); put(45, e[23]);
+    put(97, e[75]); put(98, e[76]); put(99, e[77]); put(100, e[78]); put(101, e[79]);
+    for (let i = 0; i < 12; i++){ put(102 + i, e[80 + i]); put(114 + i, e[92 + i]); put(126 + i, e[104 + i]); }
+
+    if (su.length){
+      put(251, su[4]);
+      put(1178, su[9]); put(1179, su[10]); put(1180, su[11]); put(1181, su[12]);
+      put(1328, su[9]); put(1331, su[12]);
+      for (let i = 0; i < 6; i++){
+        const b = 18 + i * 5;
+        for (let j = 0; j < 5; j++) put(1337 + i * 5 + j, su[b + j]);
+      }
+    }
+    lines.forEach((L, i) => {
+      put(256 + i, L[4]);  put(276 + i, L[6]);  put(296 + i, L[8]);  put(306 + i, L[9]);
+      put(316 + i, L[10]); put(326 + i, L[11]); put(346 + i, L[13]); put(356 + i, L[12]);
+      put(396 + i, L[18]); put(406 + i, L[19]); put(416 + i, L[20]); put(426 + i, L[21]);
+      put(516 + i, L[30]); put(536 + i, L[32]); put(546 + i, L[33]); put(556 + i, L[34]);
+      put(616 + i, L[14]); put(736 + i, L[52]); put(816 + i, L[57]); put(846 + i, L[63]);
+    });
+    if (lines.length) put(224, daysBetween(lines[0][4], e[1]));
+
+    return f.map(x => (/[",]/.test(x) ? '"' + x.replace(/"/g, '""') + '"' : x)).join(',');
+  }).join('\n');
+}
+
 function parseBrisnetSingleFile(text){
   const lines = text.split(/\r\n|\n|\r/).filter(l => l.trim().length > 0);
   const out = [];
@@ -1256,13 +1343,18 @@ function parseBrisnetSingleFile(text){
     const hadTrouble = lastFinComment && TROUBLE_KEYWORDS.some(k => lastFinComment.toLowerCase().includes(k));
 
     const tjStarts = num(1413), tjWins = num(1414);
+    // TRAINER ANGLE STATS. Six named categories, five values each: label,
+    // starts, win %, in-the-money %, and the $2 return on those starts. The
+    // last two were parsed and thrown away for months; they are the half that
+    // says whether an angle pays. A 30%-winning angle at -0.60 is a losing
+    // angle, and only the ROI figure shows it.
     const keyStats = [];
     for (let i = 0; i < 6; i++){
       const base = 1337 + i*5;
       const cat = get(base);
-      const sts = num(base+1), win = num(base+2);
+      const sts = num(base+1), win = num(base+2), itm = num(base+3), roi = num(base+4);
       if (cat && sts != null && sts > 0){
-        keyStats.push({category: cat, starts: sts, winPct: win});
+        keyStats.push({category: cat.trim(), starts: sts, winPct: win, itmPct: itm, roi: roi});
       }
     }
 
@@ -1649,11 +1741,19 @@ function pickZipEntry(entries){
 async function readCardFile(file){
   const buf = new Uint8Array(await file.arrayBuffer());
   if (!looksZipped(buf)){
-    return {text: new TextDecoder('iso-8859-1').decode(buf), from: null};
+    return {text: new TextDecoder('iso-8859-1').decode(buf), from: null, parts: null};
   }
-  const entry = pickZipEntry(zipEntries(buf));
+  const entries = zipEntries(buf);
+  const entry = pickZipEntry(entries);
   const raw = await zipRead(buf, entry);
-  return {text: new TextDecoder('iso-8859-1').decode(raw), from: entry.name};
+  const text = new TextDecoder('iso-8859-1').decode(raw);
+  // Keep every member of the archive. A multi-part card needs all four; the
+  // single file needs only the one, and the extras are ignored.
+  const parts = [];
+  for (const en of entries){
+    try { parts.push(new TextDecoder('iso-8859-1').decode(await zipRead(buf, en))); } catch (err) {}
+  }
+  return {text, from: entry.name, parts};
 }
 
 document.getElementById('drfInput').addEventListener('change', e => {
@@ -1666,21 +1766,42 @@ document.getElementById('drfInput').addEventListener('change', e => {
     lastDrfText = res.text;
     const unzipped = res.from ? ` (unzipped ${res.from})` : '';
     let extracted;
+    let viaMulti = false;
+    // A multi-part archive is tried FIRST. Its entries file will parse as a
+    // single file without complaint — the field the parser reads as the horse
+    // name lands on a number — so waiting for the single-file path to fail
+    // never works. It does not fail; it succeeds with nonsense.
+    if (res.parts && res.parts.length > 1){
+      try {
+        const merged = assembleMultiPart(res.parts);
+        if (merged){
+          const multiRows = parseBrisnetSingleFile(merged);
+          if (multiRows.length && multiRows.some(h => /[A-Za-z]/.test(h.horse || ''))){
+            extracted = multiRows;
+            viaMulti = true;
+          }
+        }
+      } catch (err){ /* fall through to the single-file path */ }
+    }
     try {
-      extracted = parseBrisnetSingleFile(res.text);
+      if (!viaMulti) extracted = parseBrisnetSingleFile(res.text);
     } catch (err){
-      statusEl.textContent = 'Could not parse this file as a Brisnet Single-File data file. Confirm it\'s the "Single File" format (not "Multi File" or "ALLWAYS") and hasn\'t been re-saved/edited by another program.';
+      statusEl.textContent = 'Could not read this as a card. It should be Brisnet\'s "Single File" export, or a multi-part card with all four of its files still zipped together, and not re-saved by another program.';
       statusEl.className = 'status err';
       return;
     }
-    if (!extracted.length){
-      statusEl.textContent = 'No rows recognized. Confirm this is Brisnet\'s "Single File" comma-delimited format.';
+    // A file whose rows carry no alphabetic horse name is not a card, whatever
+    // else parsed cleanly.
+    if (extracted && extracted.length && !extracted.some(h => /[A-Za-z]/.test(h.horse || ''))) extracted = [];
+    if (!extracted || !extracted.length){
+      statusEl.textContent = 'No rows recognized. This should be Brisnet\'s "Single File" format, or a multi-part export with all of its files still in the same zip.';
       statusEl.className = 'status err';
       return;
     }
     extracted.forEach(h => rows.push(newRow(h)));
     renderRows();
     const raceCount = new Set(extracted.map(h => h.race)).size;
+    const formatNote = viaMulti ? ' \u00b7 multi-part export, four files assembled' : '';
     const withOdds = extracted.filter(h => parseOdds(h.odds) != null).length;
     // Name the card that just loaded. Uploading the wrong date's file has
     // happened, and silently analysing it is worse than a wasted upload.
@@ -1700,7 +1821,7 @@ document.getElementById('drfInput').addEventListener('change', e => {
       return ` This card is ${days} day(s) ahead.`;
     })();
     if (withOdds === 0){
-      statusEl.textContent = `Imported ${extracted.length} entries across ${raceCount} race(s)${forCard}.${dateWarn} This file has no morning-line odds for any horse (fields 43/44 are blank). That usually means it was pulled before Brisnet published odds for this card; try re-downloading closer to post time. Prime Power, surface fit, and class move DID come through, so you can type odds in by hand and still compute.`;
+      statusEl.textContent = `Imported ${extracted.length} entries across ${raceCount} race(s)${forCard}.${dateWarn} This file has no morning-line odds for any horse (fields 43/44 are blank). That usually means it was pulled before Brisnet published odds for this card; try re-downloading closer to post time. Prime Power, surface fit, and class move DID come through, so you can type odds in by hand and still compute.${formatNote}`;
       statusEl.className = 'status err';
     } else if (withOdds < extracted.length){
       statusEl.textContent = `Imported ${extracted.length} entries across ${raceCount} race(s)${forCard}.${dateWarn} ${extracted.length - withOdds} horse(s) are missing morning-line odds and won't be scored until you fill them in below.`;
@@ -2473,8 +2594,8 @@ document.getElementById('computeBtn').addEventListener('click', () => {
       if (favorite){
         const favParts = [`${escHtml(favorite.horse)} is the favorite (${escHtml(favorite.oddsStr)})`];
         if (favorite.claimedLastRace) favParts.push('claimed last race');
-        const favAngle = (favorite.keyStats || []).find(k => k.starts >= 5 && k.winPct >= 20);
-        if (favAngle) favParts.push(`trainer angle: ${escHtml(favAngle.category)} (${favAngle.starts}st, ${favAngle.winPct.toFixed(0)}%)`);
+        const favAngle = (favorite.keyStats || []).find(k => k.starts >= 5 && k.winPct >= 20 && k.roi != null && k.roi > 0);
+        if (favAngle) favParts.push(`trainer angle: ${escHtml(favAngle.category)} (${favAngle.starts}st, ${favAngle.winPct.toFixed(0)}% win, ${favAngle.itmPct.toFixed(0)}% itm, ${favAngle.roi > 0 ? '+' : ''}${favAngle.roi.toFixed(2)} per $2)`);
         if (favorite.lastFinMargin != null){
           const troubleTag = favorite.hadTrouble ? ' — ⚠ possible trouble in that trip' : '';
           const comment = favorite.lastFinComment ? ` ("${escHtml(favorite.lastFinComment)}")` : '';
@@ -2491,9 +2612,11 @@ document.getElementById('computeBtn').addEventListener('click', () => {
       const angles = [];
       horses.forEach(h => {
         if (h === favorite) return;
-        const notable = (h.keyStats || []).filter(k => k.starts >= 5 && k.winPct >= 20);
+        // An angle only counts as notable if it also returned a profit on its
+        // own starts. Win rate alone selects angles the market already prices.
+        const notable = (h.keyStats || []).filter(k => k.starts >= 5 && k.winPct >= 20 && k.roi != null && k.roi > 0);
         notable.forEach(k => {
-          angles.push(`${escHtml(h.horse)}: ${escHtml(k.category)} (${k.starts}st, ${k.winPct.toFixed(0)}%)`);
+          angles.push(`${escHtml(h.horse)}: ${escHtml(k.category)} (${k.starts}st, ${k.winPct.toFixed(0)}% win, ${k.itmPct.toFixed(0)}% itm, ${k.roi > 0 ? '+' : ''}${k.roi.toFixed(2)} per $2)`);
         });
         if (h.tjStarts != null && h.tjStarts >= 5 && h.tjWins != null){
           const tjPct = (h.tjWins / h.tjStarts * 100);
@@ -3173,6 +3296,75 @@ function topBestFigureSole(rs, h){
   return {ok: true, why: ''};
 }
 
+// ---- RECENT ABILITY: the mean of a horse's last three BRIS figures ----
+// Registered 2026-09-07 to REPLACE earnings per start as the Pick's selecting
+// dimension. Measured on 87 races across nine forward cards with the corrected
+// speed fields: splitting morning-line favourites by whether they also hold the
+// sole highest three-race average separated them by 23 points of strike rate,
+// while splitting the same favourites on earnings per start pointed the WRONG
+// way. Earnings measures where a horse has been running; the figure mean
+// measures how fast it has been lately, and a lightly raced horse with the best
+// recent numbers is exactly what earnings cannot see.
+function avg3Of(h){
+  const figs = ((h && h.ppRaces) || []).map(p => p.spd).filter(v => v != null && v > 0).slice(0, 3);
+  if (!figs.length) return null;
+  return figs.reduce((a, b) => a + b, 0) / figs.length;
+}
+
+// The pick must hold the field's SINGLE highest three-race figure mean. Ties do
+// not count, and the race needs at least three runners carrying figures.
+function topAvg3Sole(rs, h){
+  const rated = (rs.horses || []).filter(x => !x.scratched && avg3Of(x) != null)
+                                 .map(x => ({x, v: avg3Of(x)}))
+                                 .sort((a, b) => b.v - a.v);
+  if (rated.length < 3) return {ok: false, why: 'fewer than three runners carry a recent figure', rated};
+  if (rated[0].v === rated[1].v) return {ok: false, why: 'the top recent-figure average is tied', rated};
+  if (rated[0].x !== h) return {ok: false, why: `it is ${ordinalOf(rated.findIndex(r => r.x === h) + 1 || rated.length)} on recent figures, behind ${escHtml(rated[0].x.horse)}`, rated};
+  return {ok: true, why: '', rated};
+}
+
+// ---- CAN THIS RACE BE READ AT ALL? ----
+// A data-availability check on the RACE, separate from which horse is named.
+// It asks whether the past-performance record is thick enough for any
+// figure-based reading to mean something: how many runners have never started,
+// how many carry a usable figure, how large the field is, and whether the
+// distance is outside what flat-racing figures describe.
+//
+// DISPLAY ONLY. It does not suppress, override or alter the Pick. It is logged
+// beside the pick so the two can be scored separately over time — a pick made
+// in a race the data cannot describe is a different animal from one made in a
+// race it can, and that difference has never been measured here.
+function raceReadGate(rs){
+  const live = (rs.horses || []).filter(h => !h.scratched);
+  const n = live.length;
+  if (!n) return null;
+  const noStarts = live.filter(h => !(h.ppRaces || []).some(p => p.fin != null && p.fin !== '')).length;
+  const figured  = live.filter(h => (h.ppRaces || []).some(p => p.spd > 0)).length;
+  const yds = live.map(h => h.raceDistYds).find(v => v != null) || null;
+  const why = [];
+  let level = 'read';
+  if (yds != null && yds >= 3000){ level = 'none'; why.push('distance outside what flat figures describe'); }
+  if (figured < 3){ level = 'none'; why.push(`only ${figured} runner${figured === 1 ? '' : 's'} carry a figure`); }
+  if (noStarts / n >= 0.25){ level = 'none'; why.push(`${noStarts} of ${n} have never started`); }
+  if (level === 'read'){
+    if (noStarts > 0 && n >= 10){ level = 'thin'; why.push(`${noStarts} first-time starter${noStarts === 1 ? '' : 's'} in a field of ${n}`); }
+    else if (noStarts > 0){ level = 'thin'; why.push(`${noStarts} first-time starter${noStarts === 1 ? '' : 's'}`); }
+    else if (n >= 10){ level = 'thin'; why.push(`field of ${n}`); }
+  }
+  return {level, why, n, noStarts, figured};
+}
+
+function raceReadGateLine(rs){
+  const g = raceReadGate(rs);
+  if (!g) return '';
+  const label = g.level === 'read' ? 'RACE READABLE'
+              : g.level === 'thin' ? 'THIN RECORD'
+              : 'RECORD TOO THIN TO READ';
+  const tail = g.why.length ? ' \u2014 ' + escHtml(g.why.join('; ')) : '';
+  return `<div class="read-gate rg-${g.level}"><span class="rg-tag">${label}</span>${tail}`
+       + `<div class="rg-note">Describes the past-performance record available for this race, not the horse. It does not change the pick.</div></div>`;
+}
+
 function pickFor(rs){
   const horses = rs.horses || [];
   // Select on the MORNING LINE. byMarket re-sorts on whichever odds column is
@@ -3181,58 +3373,49 @@ function pickFor(rs){
   const mlOf = x => parseOdds(x.mlOddsStr);
   const priced = (rs.horses || []).filter(x => mlOf(x) != null);
   const fav = priced.length ? priced.reduce((a, b) => (mlOf(b) < mlOf(a) ? b : a)) : null;
-  const el = earningsLeader(horses);
-  if (el && el.noForm) return {none: 'Not one horse in this field has ever finished in the top three, so every earnings figure here is money for running 4th or worse. Earnings per start stands in for the class of company a horse has held its own in; with no board finish anywhere in the field it is measuring which purse paid down furthest, not class. No pick.'};
-  if (!el) return {none: 'Not enough of this field has a career record to rank on earnings per start — usually a maiden field with first-time starters. A first-time starter carries no data at all, so the board says nothing here rather than guessing.'};
   if (!fav) return {none: 'No odds available for this race yet.'};
 
-  // Rank the favourite by VALUE, not by array position, so tied earnings
-  // figures both hold the same rank.
-  const favRow = el.ranked.find(r => r.h === fav);
-  if (!favRow) return {none: `The market favourite (<b>${escHtml(fav.horse)}</b> at ${escHtml(fav.oddsStr)}) has no career record to rank on — earnings per start cannot see it. No pick.`};
-  const favEps = favRow.eps;
-  const rank = el.ranked.filter(r => r.eps > favEps).length + 1;
-  const leader = el.ranked[0];
+  // Earnings is no longer a gate on the Pick, so a field it cannot rank (a
+  // maiden field, first-time starters) is no longer declined for that reason —
+  // recent figures can still speak. Earnings is computed here only for the
+  // Price play, which still rests on it, and for display.
+  const el = earningsLeader(horses);
+  const usableEl = el && !el.noForm ? el : null;
+  const favRow = usableEl ? usableEl.ranked.find(r => r.h === fav) : null;
+  const favEps = favRow ? favRow.eps : null;
+  const rank = favRow ? usableEl.ranked.filter(r => r.eps > favEps).length + 1 : null;
+  const leader = usableEl ? usableEl.ranked[0] : null;
   // Two horses inside 5% of each other are not really first and second.
-  // a gap of a few dollars per start is not a ranking.
-  const nearTie = leader.eps > favEps && (leader.eps / favEps) < 1.05;
+  const nearTie = !!(leader && favEps != null && leader.eps > favEps && (leader.eps / favEps) < 1.05);
 
-  // ---- TWO FILTERS ----
-  //   A — the pick's MORNING LINE must be 2.5 or shorter.
-  //   D — the pick must hold the field's SINGLE highest best speed figure:
-  //       no ties, and at least three runners carrying a figure.
+  // ---- THE PICK ----
+  // ONE condition, registered 2026-09-07: the morning-line favourite must also
+  // hold the SOLE highest mean of its last three figures.
   //
-  // B (still favourite at post) and C (class fit) are retired. B needed live
-  // odds, which are not available when the card is built, and its separation
-  // did not survive on a larger sample. C fired too rarely to be assessed.
-  // Both A and D come off the data file, so a Pick is final the night before
-  // and never waits on the board.
+  // What was removed and why. Filter A gated on earnings per start; on 87
+  // races it selected the WORSE half of favourites, so it is gone as a gate and
+  // stays on the card as information. The ML <= 2.5 cap is gone: it cut the
+  // bets without improving the strike rate. Filter D (sole top BEST figure) is
+  // gone as a separate test — the best figure and the recent mean are the same
+  // dimension measured twice, and the mean is the one that was tested.
   //
-  // Rank 1 passing both is the Pick line. Rank 1 failing either is suppressed.
-  // Rank 2 fires as a Price play on its own line.
-  const ML_MAX = 2.5;
-  // parseOdds returns DECIMAL, so subtract 1 before comparing against 2.5.
-  const mlDec = parseOdds(fav.mlOddsStr);                 // decimal
-  const mlPrice = mlDec == null ? null : mlDec - 1;       // "to one", what 2.5 means
-  const mlOK = mlPrice != null && mlPrice <= ML_MAX;
-  const dCheck = topBestFigureSole(rs, fav);
-  const figOK = dCheck.ok;
-  const filtersPass = mlOK && figOK;
-  const base = {h: fav, eps: favEps, ranked: el.ranked, fav, mlPrice, mlOK, figOK, figWhy: dCheck.why};
+  // Both inputs come off the data file, so a Pick is final the night before and
+  // never waits on the board.
+  const ability = topAvg3Sole(rs, fav);
+  const base = {h: fav, eps: favEps, ranked: usableEl ? usableEl.ranked : [], fav,
+                avg3: avg3Of(fav), abilityOK: ability.ok, abilityWhy: ability.why};
 
-  if (rank === 1){
-    const second = el.ranked.find(r => r.eps < favEps);
-    if (filtersPass) return Object.assign({line: 'primary', tier: 1, second, nearTie: false}, base);
-    const why = [];
-    if (!mlOK) why.push(`its morning line is ${escHtml(fav.oddsStr)}, above the 2.5 cut-off`);
-    if (!figOK) why.push(`on best speed figure it ${escHtml(dCheck.why)}`);
-    return {none: `<b>${escHtml(fav.horse)}</b> is the earnings leader and the market's choice, but ${why.join(', and ')}. No pick.`};
+  if (ability.ok){
+    const second = usableEl && favEps != null ? usableEl.ranked.find(r => r.eps < favEps) : null;
+    return Object.assign({line: 'primary', tier: 1, second, nearTie: false}, base);
   }
-  if (rank === 2){
-    if (filtersPass) return {none: `<b>${escHtml(fav.horse)}</b> is second in the field on earnings per start, behind <b>${escHtml(leader.h.horse)}</b>. No pick.`};
-    return Object.assign({line: 'price', tier: 2, leader, nearTie}, base);
-  }
-  return {none: `The market favourite (<b>${escHtml(fav.horse)}</b> at ${escHtml(fav.oddsStr)}) is ${ordinalOf(rank)} in the field on earnings per start at ${money(favEps)}, behind <b>${escHtml(leader.h.horse)}</b> at ${money(leader.eps)}. The two measures disagree, so no pick.`};
+
+  // The favourite failed on recent figures. The Price play is a separate,
+  // separately scored line and still rests on earnings rank 2 — it was measured
+  // that way and has not been re-tested, so it is left exactly as it was.
+  if (rank === 2 && leader) return Object.assign({line: 'price', tier: 2, leader, nearTie}, base);
+
+  return {none: `<b>${escHtml(fav.horse)}</b> is the market's choice, but ${ability.why}. No pick.`};
 }
 
 // The one thing that can talk the board out of its own pick. Only live once
@@ -3959,6 +4142,7 @@ function renderRaceCard(raceSummaries, scratchedCount){
           ${concentrationTag(rs)}
         </div>
         ${raceCondsLine(rs.horses)}
+        ${raceReadGateLine(rs)}
         ${readLine}
         ${buildTiebreakRead(rs)}
         ${pickJumpLink(rs)}
@@ -4875,6 +5059,6 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.33 · released 7 September 2026 · build 2026-09-07-e</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.39 · released 8 September 2026 · build 2026-09-08-e</div>
 </body>
 </html>
