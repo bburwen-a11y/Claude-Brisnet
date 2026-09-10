@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Overlay Board v1.39 — Race Card Reader</title>
+<title>Overlay Board v1.40 — Race Card Reader</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
@@ -187,8 +187,21 @@
   .board h2::after{background:var(--paper-line);}
   .board .step-num{background:var(--amber); color:#fff;}
 
-  .race-nav{display:flex; flex-wrap:wrap; gap:6px; margin:0 0 16px; align-items:center;}
+  .race-nav{
+    display:flex; flex-wrap:wrap; gap:6px; margin:0 0 16px; align-items:center;
+    position:sticky; z-index:35; background:var(--paper); padding:8px 0;
+    /* Sits just under the sticky tabbar. The offset is an estimate of the
+       tabbar's rendered height (padding + one line of its 12px mono font) —
+       check on an actual phone and nudge if the two bars overlap or gap. */
+    top:44px;
+    box-shadow:0 6px 10px -8px rgba(0,0,0,.35);
+  }
   .race-nav .nav-lbl{font-family:var(--mono); font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-soft); margin-right:2px;}
+  /* Applied to every race block that a jump bar can land on (Race cards,
+     Full field, Picks). Leaves room under both sticky bars so the block's
+     own heading isn't hidden after the jump — same idea as the tabbar's own
+     stickiness, just applied to the landing spot instead of the bar. */
+  .race-anchor-target{scroll-margin-top:100px;}
   /* Sticky so the tabs are reachable from the bottom of a long card. The
      background is opaque because race cards scroll underneath it. */
   .tabbar{
@@ -841,7 +854,7 @@
 <body>
 <div class="wrap">
   <header>
-    <p class="eyebrow">Handicapping utility · <span class="ver">v1.39</span> · released 7 September 2026</p>
+    <p class="eyebrow">Handicapping utility · <span class="ver">v1.40</span> · released 7 September 2026</p>
     <h1><span class="flap">O</span><span class="flap">v</span><span class="flap">e</span><span class="flap">r</span><span class="flap">l</span><span class="flap">a</span><span class="flap">y</span> <span class="flap">B</span><span class="flap">o</span><span class="flap">a</span><span class="flap">r</span><span class="flap">d</span></h1>
     <p class="tagline">Upload a data file or program PDF. Overlay Board lays out the whole card: past performances, scratches, money moves, and where the board likes a horse.</p>
   </header>
@@ -857,24 +870,6 @@
           <label class="file-btn" for="drfInput">Choose .DRF / .csv</label>
           <input type="file" id="drfInput" accept=".drf,.dr2,.dr3,.dr4,.csv,.txt,.zip,text/csv,text/plain,text/*,application/zip">
           <div class="status" id="drfStatus"></div>
-        </div>
-        <div class="upload-card">
-          <h3>CSV file</h3>
-          <p>Any spreadsheet with race, horse and odds columns. Map the columns after choosing the file.</p>
-          <label class="file-btn" for="csvInput">Choose CSV</label>
-          <input type="file" id="csvInput" accept=".csv">
-          <div class="status" id="csvStatus"></div>
-          <div class="mapper" id="csvMapper">
-            <div class="map-row"><label>Race</label><select id="mapRace"></select></div>
-            <div class="map-row"><label>Post #</label><select id="mapPost"></select></div>
-            <div class="map-row"><label>Horse</label><select id="mapHorse"></select></div>
-            <div class="map-row"><label>ML odds</label><select id="mapOdds"></select></div>
-            <div class="map-row"><label>Final odds</label><select id="mapFinal"></select></div>
-            <div class="map-row"><label>Rating</label><select id="mapScore"></select></div>
-            <div class="map-row"><label>Surface fit</label><select id="mapSurface"></select></div>
-            <div class="map-row"><label>Class move</label><select id="mapClass"></select></div>
-            <button class="small-btn" id="importCsvBtn">Import mapped rows →</button>
-          </div>
         </div>
         <div class="upload-card">
           <h3>Program PDF</h3>
@@ -951,35 +946,20 @@
       <button data-tab="picks" id="tabPicks">Picks<span class="tab-count" id="pickCount">0</span></button>
       <button data-tab="cards" class="on">Race cards</button>
       <button data-tab="field">Full field</button>
-      <button data-tab="score">Benchmark</button>
-      <button data-tab="bets">My bets<span class="tab-count" id="betCount">0</span></button>
       <button data-tab="print">Printable page</button>
     </div>
 
     <section id="picksSection" style="display:none;">
       <h2><span class="step-num">★</span> Where the board likes a horse</h2>
       <div class="rss-info" style="margin:0 0 14px;">Two separate lines, and the only place this tool names a horse. <b>Pick</b> &mdash; the market favourite also holds the field's single highest average of its last three speed figures. <b>Price play</b> &mdash; a separate line, used only where a Pick is not available: the morning-line favourite is <i>second</i> in the field on career earnings per start.</div>
+      <div class="race-nav no-print" id="picksNav"></div>
       <div id="pickList"></div>
     </section>
 
     <section id="printSection" style="display:none;">
       <h2><span class="step-num">🖨</span> Printable page</h2>
-      <div class="rss-info" style="margin:0 0 14px;">The whole card on one page — picks, race cards, full field and your saved bets. Use your browser's own <b>Print</b> or <b>Share</b> from here.</div>
+      <div class="rss-info" style="margin:0 0 14px;">The whole card on one page — picks, race cards and full field. Use your browser's own <b>Print</b> or <b>Share</b> from here.</div>
       <div id="printView"></div>
-    </section>
-
-    <section id="betsSection" style="display:none;">
-      <h2><span class="step-num">$</span> My bets</h2>
-      <div class="rss-info" style="margin:0 0 14px;">Saved picks stay in this browser. Fill in what each one did and the tally is your own record. Nothing is wagered here.</div>
-      <div id="betTally"></div>
-      <div id="betList"></div>
-      <div class="table-actions" style="margin-top:14px;">
-        <button class="small-btn" id="betExportBtn">Export as JSON</button>
-        <label class="file-btn" for="betImportInput">Import JSON</label>
-        <input type="file" id="betImportInput">
-        <button class="ghost-btn" id="betClearBtn">Clear all</button>
-      </div>
-      <div class="status" id="betStatus"></div>
     </section>
 
     <section id="resultsSection" style="display:none;">
@@ -1000,22 +980,8 @@
         <button class="toggle-btn" id="showLiveBtn">Hide pretenders</button>
         <span class="sort-note">always in post order</span>
       </div>
+      <div class="race-nav no-print" id="fieldNav"></div>
       <div id="fieldTables"></div>
-    </section>
-
-    <section id="resultsScoreSection" style="display:none;">
-      <h2><span class="step-num">5</span> Score the benchmark against results</h2>
-      <div class="rss-info" style="margin:0 0 14px;">Grades the <b>market favourite</b> in each race — the benchmark, not a pick.</div>
-      <div class="upload-card no-print">
-        <h3>Paste a results chart</h3>
-        <p>Paste a results chart. It only needs the "$2 Mutuel Prices" payout lines.</p>
-        <textarea id="resultsPaste" rows="6" placeholder="FIRST RACE&#10;Canterbury Park&#10;$2 Mutuel Prices:&#10; 2- EOS HEY BUCKO . . . 4.40 2.80 2.20&#10; 5- IZA B SLICK . . . 5.40 3.20&#10; ..."></textarea>
-        <div class="table-actions" style="margin-top:10px;">
-          <button class="primary-btn" id="scoreResultsBtn">Score the benchmark →</button>
-        </div>
-        <div class="status" id="resultsStatus"></div>
-      </div>
-      <div id="scoreboard" style="margin-top:18px;"></div>
     </section>
 
 
@@ -1042,7 +1008,6 @@ if (typeof pdfjsLib !== 'undefined') {
 
 let rows = [];
 let rowId = 0;
-let lastCsvData = null;
 let lastDrfText = null;
 let computedRaces = [];   // full per-race horse data, kept around for re-sorting
 let currentSort = 'all';   // 'all' or 'live' — the field table is always post-ordered
@@ -1118,7 +1083,7 @@ document.getElementById('clearBtn').addEventListener('click', () => {
   renderRows();
   document.getElementById('resultsSection').style.display='none';
   document.getElementById('fieldSection').style.display='none';
-  document.getElementById('resultsScoreSection').style.display='none';
+  document.getElementById('picksSection').style.display='none';
 });
 
 document.getElementById('demoBtn').addEventListener('click', () => {
@@ -1837,95 +1802,6 @@ document.getElementById('drfInput').addEventListener('change', e => {
   });
 });
 
-const csvInput = document.getElementById('csvInput');
-const csvStatus = document.getElementById('csvStatus');
-const csvMapper = document.getElementById('csvMapper');
-const mapSelects = {
-  race: document.getElementById('mapRace'),
-  post: document.getElementById('mapPost'),
-  horse: document.getElementById('mapHorse'),
-  odds: document.getElementById('mapOdds'),
-  finalOdds: document.getElementById('mapFinal'),
-  score: document.getElementById('mapScore'),
-  surface: document.getElementById('mapSurface'),
-  classMove: document.getElementById('mapClass'),
-};
-
-csvInput.addEventListener('change', e => {
-  const file = e.target.files[0];
-  if (!file) return;
-  csvStatus.textContent = 'Parsing…';
-  csvStatus.className = 'status';
-  const reader = new FileReader();
-  reader.onload = ev => {
-    const parsed = parseCSV(ev.target.result);
-    if (!parsed.data.length){
-      csvStatus.textContent = 'No rows found in that file.';
-      csvStatus.className = 'status err';
-      return;
-    }
-    lastCsvData = parsed.data;
-    const fields = parsed.fields || [];
-    csvStatus.textContent = `Found ${parsed.data.length} rows, ${fields.length} columns. Map the columns below.`;
-    csvStatus.className = 'status ok';
-    populateMapper(fields);
-    csvMapper.classList.add('show');
-  };
-  reader.onerror = () => {
-    csvStatus.textContent = 'Could not read that file.';
-    csvStatus.className = 'status err';
-  };
-  reader.readAsText(file);
-});
-
-function populateMapper(fields){
-  const guess = {
-    race: /race/i, post: /post|pp|program|#|num/i, horse: /horse|name/i,
-    odds: /\bml\b|morning|^odds$/i, finalOdds: /final|close|tote|live/i,
-    score: /power|rating|speed|score|figure|fig/i,
-    surface: /surface|turf|dirt|trf|fst\b/i, classMove: /class|move|drop|rise/i
-  };
-  Object.entries(mapSelects).forEach(([key, sel]) => {
-    sel.innerHTML = '<option value="">— none —</option>' +
-      fields.map(f => `<option value="${escAttr(f)}">${escHtml(f)}</option>`).join('');
-    const match = fields.find(f => guess[key].test(f));
-    if (match) sel.value = match;
-  });
-  if (!mapSelects.odds.value){
-    const anyOdds = fields.find(f => /odds/i.test(f));
-    if (anyOdds) mapSelects.odds.value = anyOdds;
-  }
-}
-
-document.getElementById('importCsvBtn').addEventListener('click', () => {
-  if (!lastCsvData) return;
-  const m = Object.fromEntries(Object.entries(mapSelects).map(([k,s]) => [k, s.value]));
-  if (!m.horse || !m.odds){
-    csvStatus.textContent = 'Horse and ML odds columns are required.';
-    csvStatus.className = 'status err';
-    return;
-  }
-  let added = 0;
-  lastCsvData.forEach(r => {
-    const horse = (r[m.horse] || '').trim();
-    if (!horse) return;
-    rows.push(newRow({
-      race: m.race ? (r[m.race]||'').trim() : '1',
-      post: m.post ? (r[m.post]||'').trim() : '',
-      horse,
-      odds: m.odds ? (r[m.odds]||'').trim() : '',
-      finalOdds: m.finalOdds ? (r[m.finalOdds]||'').trim() : '',
-      score: m.score ? (r[m.score]||'').trim() : '',
-      surfaceRating: m.surface ? (r[m.surface]||'').trim() : '',
-      classMove: m.classMove ? (r[m.classMove]||'').trim().toLowerCase() : ''
-    }));
-    added++;
-  });
-  renderRows();
-  csvStatus.textContent = `Imported ${added} rows into the table below.`;
-  csvStatus.className = 'status ok';
-});
-
 /* ---------------- EQUIBASE CHANGES & SCRATCHES FEED ---------------- */
 // The feed is RSS whose <description> holds HTML-escaped markup, one change per
 // <br/>. A scratch line looks like:
@@ -2127,50 +2003,6 @@ function applyChangesFeed(text){
 
 document.querySelectorAll('#tabbar button').forEach(b =>
   b.addEventListener('click', () => showTab(b.dataset.tab)));
-
-document.getElementById('betExportBtn').addEventListener('click', () => {
-  const data = JSON.stringify(betsLoad(), null, 2);
-  const a = document.createElement('a');
-  a.href = 'data:application/json;charset=utf-8,' + encodeURIComponent(data);
-  a.download = 'overlay-board-bets.json';
-  a.click();
-});
-
-document.getElementById('betImportInput').addEventListener('change', e => {
-  const file = e.target.files && e.target.files[0];
-  const st = document.getElementById('betStatus');
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = ev => {
-    try {
-      const incoming = JSON.parse(ev.target.result);
-      if (!Array.isArray(incoming)) throw new Error('not a list of bets');
-      const list = betsLoad();
-      let added = 0;
-      incoming.forEach(b => {
-        if (b && b.horse && !list.some(x => betKey(x) === betKey(b))){ list.push(b); added++; }
-      });
-      betsSave(list); renderBets();
-      st.textContent = `${added} bet(s) merged in, duplicates skipped.`;
-      st.className = 'status ok';
-    } catch(err){
-      st.textContent = 'That file could not be read as a saved-bets export.';
-      st.className = 'status err';
-    }
-  };
-  reader.readAsText(file);
-  e.target.value = '';
-});
-
-document.getElementById('betClearBtn').addEventListener('click', () => {
-  if (!betsLoad().length) return;
-  if (!confirm('Delete every saved bet? Export first if you want to keep the record.')) return;
-  betsSave([]); renderBets();
-  const st = document.getElementById('betStatus');
-  st.textContent = 'Saved bets cleared.'; st.className = 'status';
-});
-
-renderBets();
 
 document.getElementById('rssInput').addEventListener('change', e => {
   const st = document.getElementById('rssStatus');
@@ -2670,7 +2502,6 @@ document.getElementById('computeBtn').addEventListener('click', () => {
   document.getElementById('tabbar').style.display = 'flex';
   document.getElementById('reportToolbar').style.display = 'flex';
   renderFullField(currentSort);
-  document.getElementById('resultsScoreSection').style.display = 'block';
 });
 
 const RACE_TYPE_LABELS = {M:'Mdn Claiming', MO:'Mdn Opt Clm', S:'Mdn Sp Wt', C:'Claiming', CO:'Opt Claiming', A:'Allowance', AO:'Alw Opt Clm', R:'Starter Alw', T:'Starter', N:'Stakes', G3:'Grade 3', G2:'Grade 2', G1:'Grade 1', H:'Handicap'};
@@ -3659,9 +3490,9 @@ function confidenceBlock(rs, h){
 
 function buildPick(rs){
   const p = pickFor(rs);
-  if (p.none) return `<div class="pick-none"><b>Race ${escHtml(rs.race)} — no pick.</b> ${p.none}</div>`;
+  if (p.none) return `<div class="pick-none race-anchor-target" id="pick-r${escAttr(rs.race)}"><b>Race ${escHtml(rs.race)} — no pick.</b> ${p.none}</div>`;
   if (isScratchedNow(rs, p.h)){
-    return `<div class="pick-none"><b>Race ${escHtml(rs.race)} — no pick.</b> `
+    return `<div class="pick-none race-anchor-target" id="pick-r${escAttr(rs.race)}"><b>Race ${escHtml(rs.race)} — no pick.</b> `
       + `${escHtml(p.h.horse)} is marked scratched. Rebuild the card to re-rank the race.</div>`;
   }
 
@@ -3678,7 +3509,7 @@ function buildPick(rs){
   if (p.line === 'primary'){
     const second = p.second;
     const gap = second ? p.eps / second.eps : null;
-    return `<div class="pick-card" id="pick-r${escAttr(rs.race)}">
+    return `<div class="pick-card race-anchor-target" id="pick-r${escAttr(rs.race)}">
       ${head}
       <div>Top career earnings in the field at <b>${money(p.eps)} per start</b>${epsBasis(h)}${second ? ` (next best ${escHtml(second.h.horse)} at ${money(second.eps)}${gap && gap >= 1.5 ? `, a ${gap.toFixed(1)}× gap` : ''})` : ''}, <b>and</b> the market's choice.</div>
       ${raceCardJumpLink(rs)}
@@ -3693,7 +3524,7 @@ function buildPick(rs){
   }
 
   const lead = p.leader;
-  return `<div class="pick-card tier2" id="pick-r${escAttr(rs.race)}">
+  return `<div class="pick-card tier2 race-anchor-target" id="pick-r${escAttr(rs.race)}">
     ${head}
     <div>The market's choice, and <b>second in the field on career earnings at ${money(p.eps)} per start</b>${epsBasis(p.h)} — behind ${escHtml(lead.h.horse)} at ${money(lead.eps)}, who the crowd does not make favourite.${p.nearTie ? ` Those two are within 5% of each other, which is not really a first and a second — on this measure they are level.` : ''}</div>
     <div class="price-warn"><b>Unproven line.</b> Fires only where the Pick filters fail, and is scored separately.</div>
@@ -4084,6 +3915,25 @@ function buildReadPanel(rs){
   return `<div class="ticket"><div class="ticket-head">Reading <a class="race-jump" data-jump="${escAttr(rs.race)}" title="Tap for every runner's past performances">race ${escHtml(rs.race)}</a></div>${buildShapeBoard(rs)}${lines.join('')}</div>`;
 }
 
+/* ---------------- SHARED RACE JUMP BAR ----------------
+   One jump bar behind Race cards, Full field and Picks, so the same tap
+   ("R6") lands correctly whichever tab it's on. Colour reuses the same
+   green/yellow/red readability level shown on the Race cards tab, since
+   that's the one piece of information worth seeing before you tap. */
+function renderRaceNav(navEl, raceSummaries, targetPrefix){
+  if (!navEl) return;
+  if (!raceSummaries.length){ navEl.innerHTML = ''; return; }
+  navEl.innerHTML = '<span class="nav-lbl">Jump to \u2014 green = best information</span>' + raceSummaries.map(rs =>
+    `<button class="race-chip ${(readability(rs) || {}).level || ''}" data-goto="${targetPrefix}${escAttr(rs.race)}">R${escHtml(rs.race)}</button>`
+  ).join('');
+  navEl.querySelectorAll('.race-chip').forEach(b => {
+    b.addEventListener('click', () => {
+      const el = document.getElementById(b.dataset.goto);
+      if (el) el.scrollIntoView({behavior:'smooth', block:'start'});
+    });
+  });
+}
+
 /* ---------------- RACE CARD ---------------- */
 function renderRaceCard(raceSummaries, scratchedCount){
   const resultsSection = document.getElementById('resultsSection');
@@ -4101,15 +3951,7 @@ function renderRaceCard(raceSummaries, scratchedCount){
     return;
   }
 
-  nav.innerHTML = '<span class="nav-lbl">Jump to \u2014 green = best information</span>' + raceSummaries.map(rs =>
-    `<button class="race-chip ${(readability(rs) || {}).level || ''}" data-goto="card-race-${escAttr(rs.race)}">R${escHtml(rs.race)}</button>`
-  ).join('');
-  nav.querySelectorAll('.race-chip').forEach(b => {
-    b.addEventListener('click', () => {
-      const el = document.getElementById(b.dataset.goto);
-      if (el) el.scrollIntoView({behavior:'smooth', block:'start'});
-    });
-  });
+  renderRaceNav(nav, raceSummaries, 'card-race-');
 
   const scratchNote = scratchedCount > 0
     ? `<p style="color:var(--ink-soft);font-size:12.5px;margin:0 0 12px;">${scratchedCount} horse${scratchedCount>1?'s':''} marked scratched and excluded — remaining fields renormalized.</p>`
@@ -4133,7 +3975,7 @@ function renderRaceCard(raceSummaries, scratchedCount){
     const favLine = rs.favoriteNote ? `<div class="fav-note">⚑ Favorite check: ${rs.favoriteNote}</div>` : '';
     const paceLine = rs.paceNote ? `<div class="pace-note">${rs.paceNote}</div>` : '';
     return `
-      <div class="race-card read-${read ? read.level : 'yellow'}" id="card-race-${escAttr(rs.race)}">
+      <div class="race-card race-anchor-target read-${read ? read.level : 'yellow'}" id="card-race-${escAttr(rs.race)}">
         <div class="race-card-top">
           <strong class="race-no ${read ? read.level : ''}"><a class="race-jump" data-jump="${escAttr(rs.race)}" title="Tap for every runner's past performances">Race ${escHtml(rs.race)}</a></strong>
           <a class="field-jump" data-jump="${escAttr(rs.race)}" title="Jump to this race's full field table">field ▸</a>
@@ -4175,98 +4017,11 @@ function readLevelFor(raceKey){
   return r ? r.level : '';
 }
 
-/* ---------------- BET LOG ---------------- */
-// The one piece of state this tool keeps — saved bets outlive the tab.
-// Stored in this browser only: no account, no server.
-const BET_KEY = 'overlay-board-bets-v1';
-const BET_RESULTS = ['', 'won', '2nd', '3rd', 'unplaced'];
-
-function betsLoad(){
-  try {
-    const raw = localStorage.getItem(BET_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch(err){ return []; }
-}
-function betsSave(list){
-  try { localStorage.setItem(BET_KEY, JSON.stringify(list)); return true; }
-  catch(err){
-    const st = document.getElementById('betStatus');
-    if (st){
-      st.textContent = 'This browser will not let the page store data, so saved bets will not survive a reload. Use Export to keep them.';
-      st.className = 'status err';
-    }
-    return false;
-  }
-}
-function betKey(b){ return [b.date, b.track, b.race, b.horse].join('|'); }
-
-function betAdd(bet){
-  const list = betsLoad();
-  if (list.some(b => betKey(b) === betKey(bet))) return false;
-  list.push(bet);
-  betsSave(list);
-  renderBets();
-  return true;
-}
-function betRemove(key){
-  betsSave(betsLoad().filter(b => betKey(b) !== key));
-  renderBets();
-}
-function betSetResult(key, result){
-  const list = betsLoad();
-  const b = list.find(x => betKey(x) === key);
-  if (b){ b.result = result; betsSave(list); renderBets(); }
-}
-
-function renderBets(){
-  const list = betsLoad().slice().sort((a,b) =>
-    (b.date || '').localeCompare(a.date || '') || (parseInt(a.race,10) - parseInt(b.race,10)));
-  const countEl = document.getElementById('betCount');
-  if (countEl) countEl.textContent = list.length;
-
-  const graded = list.filter(b => b.result);
-  const won = graded.filter(b => b.result === 'won').length;
-  const board = graded.filter(b => ['won','2nd','3rd'].includes(b.result)).length;
-  const tally = document.getElementById('betTally');
-  if (tally){
-    tally.innerHTML = list.length ? `<div class="bl-tally">
-      <div><span class="n">${list.length}</span><span class="l">saved</span></div>
-      <div><span class="n">${graded.length}</span><span class="l">graded</span></div>
-      <div><span class="n">${won}</span><span class="l">won</span></div>
-      <div><span class="n">${graded.length ? Math.round(won / graded.length * 100) + '%' : '—'}</span><span class="l">strike rate</span></div>
-      <div><span class="n">${graded.length ? Math.round(board / graded.length * 100) + '%' : '—'}</span><span class="l">hit the board</span></div>
-    </div>` : '';
-  }
-
-  const el = document.getElementById('betList');
-  if (!el) return;
-  el.innerHTML = list.length ? list.map(b => {
-    const k = escAttr(betKey(b));
-    const opts = BET_RESULTS.map(r =>
-      `<option value="${r}"${b.result === r ? ' selected' : ''}>${r || 'result?'}</option>`).join('');
-    return `<div class="betlog-row">
-      <span class="bl-main">
-        <span class="bl-horse">${escHtml(b.horse)}</span>
-        <br><span class="bl-meta">${escHtml(b.track || '')} ${escHtml(b.date || '')} · R${escHtml(b.race)} · #${escHtml(b.post || '?')} · ${escHtml(b.odds || '')}</span>
-      </span>
-      <select class="bl-result" data-betkey="${k}">${opts}</select>
-      <button class="bl-del" data-betdel="${k}" title="Remove">&times;</button>
-    </div>`;
-  }).join('') : `<div class="pick-none"><b>Nothing saved yet.</b> Build a card, open the Picks tab, and tap Save on any selection you want to track.</div>`;
-
-  el.querySelectorAll('select[data-betkey]').forEach(sel =>
-    sel.addEventListener('change', () => betSetResult(sel.dataset.betkey, sel.value)));
-  el.querySelectorAll('button[data-betdel]').forEach(btn =>
-    btn.addEventListener('click', () => betRemove(btn.dataset.betdel)));
-}
-
 const TABS = {
   picks: ['picksSection'],
-  bets: ['betsSection'],
   print: ['printSection'],
   cards: ['resultsSection'],
-  field: ['fieldSection'],
-  score: ['resultsScoreSection']
+  field: ['fieldSection']
 };
 function showTab(name){
   if (name === 'print') renderPrintView();
@@ -4339,13 +4094,8 @@ function buildBestOfDay(raceSummaries){
   if (!picks.length) return '';
   const t1 = picks.filter(p => p.line === 'primary');
   const t2 = picks.filter(p => p.line === 'price');
-  const saved = betsLoad();
 
   const rowFor = (p, i) => {
-    const bet = {date: cardDate(), track: cardTrack(), race: String(p.rs.race),
-                 horse: p.h.horse, post: p.h.post || '', odds: p.h.oddsStr,
-                 result: '', tier: p.tier};
-    const already = saved.some(b => betKey(b) === betKey(bet));
     return `
     <div class="bo-row${p.line === 'price' ? ' t2' : ''}">
       <span class="bo-rank">${i + 1}</span>
@@ -4355,7 +4105,6 @@ function buildBestOfDay(raceSummaries){
         ${p.others.length ? `<br><span class="bo-with">with ${p.others.map(o => `#${escHtml(o.post || '?')} ${escHtml(o.horse)} ${escHtml(o.oddsStr)}`).join(' · ')}</span>`
                           : (p.fieldSize ? '<br><span class="bo-with">no other contender</span>' : '')}
       </span>
-      <button class="bo-save${already ? ' saved' : ''}" data-bet='${escAttr(JSON.stringify(bet))}'>${already ? 'Saved' : 'Save'}</button>
     </div>`;
   };
 
@@ -4407,19 +4156,15 @@ function isScratchedNow(rs, h){
 
 function renderPicks(raceSummaries){
   const list = document.getElementById('pickList');
+  renderRaceNav(document.getElementById('picksNav'), raceSummaries, 'pick-r');
   const blocks = raceSummaries.map(rs => buildPick(rs));
   const best = buildBestOfDay(raceSummaries);
   const n = blocks.filter(b => b.indexOf('pick-card') !== -1).length;
   document.getElementById('pickCount').textContent = n;
   list.innerHTML = n
     ? best + blocks.join('')
-    : `<div class="pick-none"><b>No picks on this card.</b> The rule needs the earnings-per-start leader to also be the market favourite, and a maiden or first-time-starter field cannot be ranked at all. A quiet card is normal.</div>` + blocks.join('');
+    : `<div class="pick-none"><b>No picks on this card.</b> The rule needs the market favourite to also hold the field's single highest average of its last three speed figures. A quiet card is normal.</div>` + blocks.join('');
   bindTapHandlers(list);
-  list.querySelectorAll('button[data-bet]').forEach(btn =>
-    btn.addEventListener('click', () => {
-      const bet = JSON.parse(btn.dataset.bet);
-      if (betAdd(bet)){ btn.classList.add('saved'); btn.textContent = 'Saved'; }
-    }));
 }
 
 // The field table is ALWAYS in post order. Sorting it by edge or market rank
@@ -4439,6 +4184,7 @@ function renderFullField(mode){
     return;
   }
   fieldSection.style.display = 'block';
+  renderRaceNav(document.getElementById('fieldNav'), computedRaces, 'field-race-');
 
   container.innerHTML = computedRaces.map(rc => {
     const split = contenderSplit({race: rc.race, horses: rc.horses,
@@ -4486,7 +4232,7 @@ function renderFullField(mode){
       ? `<div class="sparse-warning">⚠ Only ${ratedCount} of ${horses.length} horses have a Prime Power rating — Model % here reflects only that they're the sole rated entrant, not real confidence.</div>`
       : '';
     return `
-      <div class="field-race" id="field-race-${escAttr(rc.race)}">
+      <div class="field-race race-anchor-target" id="field-race-${escAttr(rc.race)}">
         <div class="field-race-head">
           <strong class="race-no ${readLevelFor(rc.race)}"><a class="race-jump" data-jump="${escAttr(rc.race)}" title="Tap for every runner's past performances">Race ${escHtml(rc.race)}</a></strong>
           <span class="race-metric">${(() => { const d = raceDateOf(horses); return d ? escHtml(d) + ' · ' : ''; })()}${metaLine ? escHtml(metaLine) + ' · ' : ''}${horses.length} runners · post order · book ${pct(rc.overround)}${rc.hasRatings ? '' : ' · no ratings supplied'}${hiddenNote}</span>
@@ -4887,130 +4633,6 @@ function escHtml(s){
   return String(s==null?'':s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 }
 
-/* ---------------- RESULTS SCORING ---------------- */
-function parseResultsText(text){
-  const ordinals = {FIRST:1,SECOND:2,THIRD:3,FOURTH:4,FIFTH:5,SIXTH:6,SEVENTH:7,EIGHTH:8,NINTH:9,TENTH:10,
-    ELEVENTH:11,TWELFTH:12};
-  const headRe = /\b(FIRST|SECOND|THIRD|FOURTH|FIFTH|SIXTH|SEVENTH|EIGHTH|NINTH|TENTH|ELEVENTH|TWELFTH)\s+RACE\b/g;
-  const marks = [];
-  let m;
-  while ((m = headRe.exec(text)) !== null) marks.push({race: ordinals[m[1]], index: m.index});
-  if (!marks.length) return {};
-  const blocks = marks.map((mk,i) => ({
-    race: mk.race,
-    text: text.slice(mk.index, i+1 < marks.length ? marks[i+1].index : text.length)
-  }));
-  const lineRe = /^\s*(\d{1,2})-\s*([A-Z0-9' \-]+?)\s*(?:\.\s?){2,}\s*([\d.\s]+?)\s*$/;
-  const results = {};
-  blocks.forEach(b => {
-    const lines = b.text.split(/\r?\n/);
-    const finishers = [];
-    for (const line of lines){
-      if (finishers.length >= 3) break;
-      const lm = line.match(lineRe);
-      if (!lm) continue;
-      const nums = lm[3].trim().split(/\s+/).filter(Boolean).map(Number);
-      const idx = finishers.length;
-      const entry = {post: lm[1], name: lm[2].trim()};
-      if (idx === 0){ entry.finish = 'win'; entry.win = nums[0]; entry.place = nums[1]; entry.show = nums[2]; }
-      else if (idx === 1){ entry.finish = 'place'; entry.place = nums[0]; entry.show = nums[1]; }
-      else { entry.finish = 'show'; entry.show = nums[0]; }
-      finishers.push(entry);
-    }
-    if (finishers.length) results[b.race] = finishers;
-  });
-  return results;
-}
-
-function normName(s){
-  return String(s||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
-}
-
-document.getElementById('scoreResultsBtn').addEventListener('click', () => {
-  const statusEl = document.getElementById('resultsStatus');
-  const text = document.getElementById('resultsPaste').value;
-  if (!text.trim()){
-    statusEl.textContent = 'Paste a results chart first.';
-    statusEl.className = 'status err';
-    return;
-  }
-  if (!computedRaces.length){
-    statusEl.textContent = 'Compute first (step 2) so there are races to score.';
-    statusEl.className = 'status err';
-    return;
-  }
-  const results = parseResultsText(text);
-  if (!Object.keys(results).length){
-    statusEl.textContent = 'Could not find any recognizable "$2 Mutuel Prices" lines in that text. Check the format and try again.';
-    statusEl.className = 'status err';
-    return;
-  }
-
-  const scored = [];
-  computedRaces.forEach(rc => {
-    const res = results[rc.race];
-    if (!res) return;
-    // Grades the MARKET FAVOURITE as the benchmark, not a model pick.
-    const horses = rc.horses.slice().sort((a,b) => b.marketProb - a.marketProb);
-    const pick = horses[0];
-    if (!pick) return;
-    const pickKey = normName(pick.horse);
-    const win = res.find(r => normName(r.name) === pickKey && r.finish === 'win');
-    const place = res.find(r => normName(r.name) === pickKey && r.finish === 'place');
-    const show = res.find(r => normName(r.name) === pickKey && r.finish === 'show');
-    let outcome, payout = 0;
-    if (win){ outcome = 'win'; payout = win.win; }
-    else if (place){ outcome = 'place'; payout = 0; }
-    else if (show){ outcome = 'show'; payout = 0; }
-    else { outcome = 'miss'; payout = 0; }
-    scored.push({
-      race: rc.race, horse: pick.horse, oddsStr: pick.oddsStr, edge: pick.edge,
-      hasRatings: rc.hasRatings, outcome, payout
-    });
-  });
-
-  if (!scored.length){
-    statusEl.textContent = 'None of the races in your pasted text matched a race you computed.';
-    statusEl.className = 'status err';
-    return;
-  }
-
-  statusEl.textContent = `Scored ${scored.length} race(s) against the pasted results.`;
-  statusEl.className = 'status ok';
-  renderScoreboard(scored);
-});
-
-function renderScoreboard(scored){
-  const wins = scored.filter(s => s.outcome === 'win').length;
-  const itm = scored.filter(s => s.outcome === 'win' || s.outcome === 'place' || s.outcome === 'show').length;
-  const staked = scored.length * 2;
-  const returned = scored.reduce((s,x) => s + (x.outcome === 'win' ? x.payout : 0), 0);
-  const roi = staked > 0 ? ((returned - staked) / staked) * 100 : 0;
-
-  const board = document.getElementById('scoreboard');
-  board.innerHTML = `
-    <div class="score-summary">
-      <div class="score-stat"><div class="num">${scored.length}</div><div class="lbl">Races scored</div></div>
-      <div class="score-stat"><div class="num">${wins}/${scored.length}</div><div class="lbl">Favourite won</div></div>
-      <div class="score-stat"><div class="num">${itm}/${scored.length}</div><div class="lbl">Favourite hit board</div></div>
-      <div class="score-stat"><div class="num ${roi>=0?'roi-pos':'roi-neg'}">${roi>=0?'+':''}${roi.toFixed(1)}%</div><div class="lbl">ROI, $2 to win</div></div>
-    </div>
-    ${scored.map(s => {
-      const tag = s.outcome === 'win' ? `<span class="score-tag win">Won · $${s.payout.toFixed(2)}</span>`
-        : s.outcome === 'place' ? `<span class="score-tag place">Placed</span>`
-        : s.outcome === 'show' ? `<span class="score-tag show">Showed</span>`
-        : `<span class="score-tag miss">Unplaced or worse</span>`;
-      const edgeStr = ' · market favourite';
-      return `<div class="score-row">
-        <div class="sr-left"><a class="race-jump" data-jump="${escAttr(s.race)}" title="Tap for every runner's past performances">Race ${escHtml(s.race)}</a>: <b>${escHtml(s.horse)}</b> (${escHtml(s.oddsStr)})${edgeStr}</div>
-        ${tag}
-      </div>`;
-    }).join('')}
-    <p style="font-size:12px;color:var(--ink-soft);margin-top:10px;">"Placed" and "showed" count toward the hit-board rate but not ROI, since a $2 win bet on a horse that ran 2nd or 3rd returns $0.</p>
-  `;
-  bindTapHandlers(board);
-}
-
 /* ---------------- PRINT & EXPORT ---------------- */
 document.getElementById('printBtn').addEventListener('click', () => {
   showTab('print');
@@ -5037,13 +4659,9 @@ function reportParts(){
   const header = `<header><p class="eyebrow">Overlay Board \u00b7 race card</p><h1 style="font-size:30px;">Race Card${titleLine ? ' \u2014 ' + escHtml(titleLine) : ''}</h1><p class="tagline">Generated ${stamp}. ${srcLine} Scratched horses were excluded before computing.</p>${scratchLine}</header>`;
   const picksBlock = grab('pickList')
     ? `<section><h2>Picks</h2>${grab('pickList')}</section>` : '';
-  const betsBlock = (grab('betTally') || grab('betList'))
-    ? `<section class="page-break"><h2>My bets</h2>${grab('betTally')}${grab('betList')}</section>` : '';
-  const scoreBlock = grab('scoreboard')
-    ? `<section class="page-break"><h2>Scored against results</h2>${grab('scoreboard')}</section>` : '';
-  const inner = picksBlock + betsBlock +
+  const inner = picksBlock +
     `<section class="page-break"><h2>Every race, in race order</h2>${grab('raceCardList')}</section>` +
-    `<section class="page-break"><h2>Full field, race by race</h2>${grab('fieldTables')}</section>` + scoreBlock;
+    `<section class="page-break"><h2>Full field, race by race</h2>${grab('fieldTables')}</section>`;
   return {header, inner};
 }
 
@@ -5059,6 +4677,6 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.39 · released 8 September 2026 · build 2026-09-08-e</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.40 · released 9 September 2026 · build 2026-09-09-a</div>
 </body>
 </html>
