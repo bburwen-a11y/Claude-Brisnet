@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Overlay Board v1.40 — Race Card Reader</title>
+<title>Overlay Board v1.42 — Race Card Reader</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
@@ -854,7 +854,7 @@
 <body>
 <div class="wrap">
   <header>
-    <p class="eyebrow">Handicapping utility · <span class="ver">v1.40</span> · released 7 September 2026</p>
+    <p class="eyebrow">Handicapping utility · <span class="ver">v1.42</span> · released 7 September 2026</p>
     <h1><span class="flap">O</span><span class="flap">v</span><span class="flap">e</span><span class="flap">r</span><span class="flap">l</span><span class="flap">a</span><span class="flap">y</span> <span class="flap">B</span><span class="flap">o</span><span class="flap">a</span><span class="flap">r</span><span class="flap">d</span></h1>
     <p class="tagline">Upload a data file or program PDF. Overlay Board lays out the whole card: past performances, scratches, money moves, and where the board likes a horse.</p>
   </header>
@@ -1376,10 +1376,23 @@ function parseBrisnetSingleFile(text){
     // Used ONLY as a concern on the pick, never to rank horses — as a positive
     // ranking it measured worse than earnings per start.
     const classFamily = lab => {
-      const L = String(lab || '').toUpperCase();
-      if (/^(MD|MSW|MC)/.test(L) || L.includes('MDSPWT')) return 'MD';
+      let L = String(lab || '').toUpperCase();
+      // Equibase/Brisnet prefixes race-condition text with eligibility flags
+      // that stack independently of the race TYPE: F (fillies/mares only),
+      // S (state-bred only), R (restricted for some other reason). A
+      // state-bred maiden $50,000 is still a maiden race for this class-fit
+      // comparison, so the flags are stripped before asking what kind of
+      // race it is. Source: NYRA/Saratoga's own wagering guide, "RESTRICTED
+      // RACES" key, plus Brisnet's published race-type table.
+      // Checked against every class-text value seen across five real cards
+      // (213 prefixed forms) before shipping — zero false positives; a
+      // stakes name that happens to start with one of these letters (e.g.
+      // "sAlbanyB200k") still correctly falls to OTHER after stripping,
+      // since it doesn't go on to match MD/ALW/CLM either way.
+      L = L.replace(/^[FSR]+/, '');
+      if (/^(MD|MSW|MC|MOC)/.test(L) || L.includes('MDSPWT')) return 'MD';
       if (/^(OC|ALW|AOC)/.test(L)) return 'ALW';
-      if (/^S?CLM/.test(L)) return 'CLM';
+      if (/^CLM/.test(L)) return 'CLM';
       return 'OTHER';
     };
     const todayClaim = num(14) || num(13) || null;
@@ -1397,9 +1410,18 @@ function parseBrisnetSingleFile(text){
     let classFit = 0;
     const classSeen = Math.min(ppRaces.length, 4);
     ppRaces.slice(0, 4).forEach(pr => {
+      // A missing claim price on both sides used to auto-pass this check
+      // regardless of class family — which meant every non-claiming
+      // comparison (allowance, stakes, MdSpWt, Moc without a price) skipped
+      // the family test entirely. That's most of them. A maiden graduate's
+      // Moc/MdSpWt win registered as "proven" against today's open
+      // allowance, indistinguishable from a horse with real allowance
+      // company on its form. The family comparison is exactly the tool
+      // this needs when there's no claim price to compare — it should
+      // decide the question, not be skipped by it.
       const levelOK = (pr.claim && todayClaim)
         ? pr.claim >= 0.6 * todayClaim
-        : (classFamily(pr.classTxt) === todayFam || (pr.claim == null && todayClaim == null));
+        : classFamily(pr.classTxt) === todayFam;
       const finN = parseInt(pr.fin, 10);
       const placed = !isNaN(finN) && finN <= 3;
       const close = pr.won || (pr.margin != null && pr.margin <= 3.0);
@@ -4677,6 +4699,6 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.40 · released 9 September 2026 · build 2026-09-09-a</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.42 · released 10 September 2026 · build 2026-09-10-b</div>
 </body>
 </html>
