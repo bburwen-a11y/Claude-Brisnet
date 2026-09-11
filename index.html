@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Overlay Board v1.42 — Race Card Reader</title>
+<title>Overlay Board v1.43 — Race Card Reader</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
@@ -854,7 +854,7 @@
 <body>
 <div class="wrap">
   <header>
-    <p class="eyebrow">Handicapping utility · <span class="ver">v1.42</span> · released 7 September 2026</p>
+    <p class="eyebrow">Handicapping utility · <span class="ver">v1.43</span> · released 7 September 2026</p>
     <h1><span class="flap">O</span><span class="flap">v</span><span class="flap">e</span><span class="flap">r</span><span class="flap">l</span><span class="flap">a</span><span class="flap">y</span> <span class="flap">B</span><span class="flap">o</span><span class="flap">a</span><span class="flap">r</span><span class="flap">d</span></h1>
     <p class="tagline">Upload a data file or program PDF. Overlay Board lays out the whole card: past performances, scratches, money moves, and where the board likes a horse.</p>
   </header>
@@ -1323,16 +1323,6 @@ function parseBrisnetSingleFile(text){
       }
     }
 
-    const pastMeets = [];
-    for (let i = 0; i < 10; i++){
-      const d = get(256+i);
-      if (!d) continue;
-      pastMeets.push({
-        date: d, track: get(276+i), raceNum: get(296+i), finPos: get(616+i),
-        winner: get(406+i).toUpperCase(), second: get(416+i).toUpperCase(), third: get(426+i).toUpperCase()
-      });
-    }
-
     const last3Fins = [];
     for (let i = 0; i < 3; i++){
       if (!get(256+i)) continue;
@@ -1495,7 +1485,6 @@ function parseBrisnetSingleFile(text){
       daysSinceWork,
       worksAtTrack,
       lastFinMargin,
-      pastMeets,
       tjStarts,
       tjWins,
       keyStats,
@@ -1518,138 +1507,6 @@ function parseBrisnetSingleFile(text){
       ppWorks
     });
   });
-
-  // Penalty stack — distance debut, turf debut, stale work, no work at
-  // today's track, beaten 10L+ last time at a similar distance. Each ~10%,
-  // TOTAL capped at 15% so individually fair flags can't compound into
-  // burying a horse.
-  const DIST_ZERO_PENALTY = 0.10;
-  const TURF_DEBUT_PENALTY = 0.10;
-  const STALE_WORK_DAYS = 30;
-  const STALE_WORK_PENALTY = 0.10;
-  const NO_TRACK_WORK_PENALTY = 0.05;
-  const BAD_LAST_MARGIN = 10;
-  const BAD_LAST_PENALTY = 0.10;
-  const MAX_PENALTY_STACK = 0.15;
-  out.forEach(h => {
-    const ppNum = parseFloat(h.score);
-    if (isNaN(ppNum) || ppNum <= 0) return;
-    const flags = [];
-    if (h.distStarts === 0) flags.push({p: DIST_ZERO_PENALTY, hard: true});
-    if (/^[Tt]$/.test(h.surface) && h.turfStarts === 0) flags.push({p: TURF_DEBUT_PENALTY, hard: true});
-    if (h.daysSinceWork != null && h.daysSinceWork > STALE_WORK_DAYS) flags.push({p: STALE_WORK_PENALTY, hard: false});
-    if (h.worksAtTrack === 0) flags.push({p: NO_TRACK_WORK_PENALTY, hard: false});
-    if (h.lastFinMargin != null && h.lastFinMargin > BAD_LAST_MARGIN) flags.push({p: BAD_LAST_PENALTY, hard: true});
-    if (!flags.length) return;
-    let factor = 1;
-    flags.forEach(f => { factor *= (1 - f.p); });
-    const capped = Math.max(factor, 1 - MAX_PENALTY_STACK);
-    h.score = String(Math.round(ppNum * capped * 100) / 100);
-    h.distAdjusted = true;
-    h.stackCapped = capped > factor;
-    if (flags.some(f => f.hard)) h.hardFlag = true;
-  });
-
-  // Trainer/jockey meet win% blended relative to the field average.
-  const CONNECTIONS_WEIGHT = 4;
-  const byRace = {};
-  out.forEach(h => { (byRace[h.race] = byRace[h.race] || []).push(h); });
-  Object.values(byRace).forEach(group => {
-    const withTrn = group.filter(h => h.trnPct != null);
-    const withJky = group.filter(h => h.jkyPct != null);
-    if (!withTrn.length && !withJky.length) return;
-    const avgTrn = withTrn.length ? withTrn.reduce((s,h)=>s+h.trnPct,0)/withTrn.length : 0;
-    const avgJky = withJky.length ? withJky.reduce((s,h)=>s+h.jkyPct,0)/withJky.length : 0;
-    group.forEach(h => {
-      if (h.trnPct == null && h.jkyPct == null) return;
-      const trnPart = h.trnPct != null ? (h.trnPct - avgTrn) : 0;
-      const jkyPart = h.jkyPct != null ? (h.jkyPct - avgJky) : 0;
-      const connFactor = (trnPart + jkyPart) / 2;
-      const ppNum = parseFloat(h.score);
-      if (!isNaN(ppNum) && ppNum > 0){
-        h.score = String(Math.round(ppNum * (1 + (connFactor/100) * CONNECTIONS_WEIGHT) * 100) / 100);
-        h.connAdjusted = true;
-      }
-    });
-  });
-
-  // Head-to-head: ±10% per confirmed prior meeting between two horses in
-  // today's field.
-  const H2H_BOOST = 0.10;
-  const H2H_PENALTY = 0.10;
-  const byRaceH2H = {};
-  out.forEach(h => { (byRaceH2H[h.race] = byRaceH2H[h.race] || []).push(h); });
-  Object.values(byRaceH2H).forEach(group => {
-    const topRated = group.filter(h => !isNaN(parseFloat(h.score)) && parseFloat(h.score) > 0)
-      .slice().sort((a,b) => parseFloat(b.score) - parseFloat(a.score)).slice(0, 3);
-    const favByOdds = group.filter(h => !isNaN(parseFloat(h.odds)))
-      .slice().sort((a,b) => parseFloat(a.odds) - parseFloat(b.odds))[0];
-    const relevant = topRated.slice();
-    if (favByOdds && !relevant.includes(favByOdds)) relevant.push(favByOdds);
-
-    function findMeeting(a, b){
-      const bName = (b.horse || '').toUpperCase();
-      for (const m of (a.pastMeets || [])){
-        let bPos = null;
-        if (m.winner === bName) bPos = 1;
-        else if (m.second === bName) bPos = 2;
-        else if (m.third === bName) bPos = 3;
-        if (bPos != null){
-          const aPos = parseInt(m.finPos, 10);
-          if (!isNaN(aPos) && aPos !== bPos) return {m, aPos, bPos};
-        }
-      }
-      return null;
-    }
-
-    for (let i = 0; i < group.length; i++){
-      for (let j = i+1; j < group.length; j++){
-        const a = group[i], b = group[j];
-        const fwd = findMeeting(a, b);
-        const rev = fwd ? null : findMeeting(b, a);
-        let aWon = null;
-        if (fwd) aWon = fwd.aPos < fwd.bPos;
-        else if (rev) aWon = rev.bPos < rev.aPos;
-        if (aWon === null) continue;
-        const winnerH = aWon ? a : b, loserH = aWon ? b : a;
-        const wScore = parseFloat(winnerH.score), lScore = parseFloat(loserH.score);
-        if (!isNaN(wScore) && wScore > 0){
-          winnerH.score = String(Math.round(wScore * (1 + H2H_BOOST) * 100) / 100);
-          winnerH.distAdjusted = true;
-        }
-        if (!isNaN(lScore) && lScore > 0){
-          loserH.score = String(Math.round(lScore * (1 - H2H_PENALTY) * 100) / 100);
-          loserH.distAdjusted = true;
-        }
-      }
-    }
-
-    const notes = [];
-    const seen = new Set();
-    for (let i = 0; i < relevant.length; i++){
-      for (let j = i+1; j < relevant.length; j++){
-        const a = relevant[i], b = relevant[j];
-        const found = findMeeting(a, b) || (() => {
-          const r = findMeeting(b, a);
-          return r ? {m: r.m, aPos: r.bPos, bPos: r.aPos} : null;
-        })();
-        if (!found) continue;
-        const key = `${found.m.date}-${found.m.track}-${found.m.raceNum}-${a.horse}-${b.horse}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        const winner = found.aPos < found.bPos ? a : b;
-        const loser = found.aPos < found.bPos ? b : a;
-        const wPos = Math.min(found.aPos, found.bPos);
-        const lPos = Math.max(found.aPos, found.bPos);
-        const d = `${found.m.date.slice(4,6)}/${found.m.date.slice(6,8)}/${found.m.date.slice(2,4)}`;
-        notes.push(`${winner.horse} beat ${loser.horse} (${d}, ${found.m.track} R${found.m.raceNum}: ${wPos}${ordinalSuffix(wPos)} vs ${lPos}${ordinalSuffix(lPos)})`);
-      }
-    }
-    if (notes.length){
-      group.forEach(h => { h.h2hNote = notes.slice(0, 2).join(' · '); });
-    }
-  });
-  out.forEach(h => { delete h.pastMeets; });
 
   return out;
 }
@@ -2680,9 +2537,18 @@ function findMatchups(horses){
           else { winner = b; loser = a; wp = fb; lp = fa; }
         }
         let sep = null;
-        // Signed, or a winner-vs-loser pair reports the wrong gap: A won by 2
-        // and B beaten 5 is a 7-length separation, not |2-5| = 3.
-        if (pa.lenBehind != null && pb.lenBehind != null) sep = Math.abs(pa.lenBehind - pb.lenBehind);
+        // lenBehind is signed for the WINNER's own line (-margin over 2nd),
+        // not 0 — useful for that horse's own form trend elsewhere, but it
+        // means a plain difference here double-counts whenever one of this
+        // pair actually won: winner vs 2nd was showing 5L for a race the
+        // winner took by 2.5, because -2.5 minus +2.5 is -5, not the true
+        // 2.5L gap. When one of the two won, the OTHER horse's own recorded
+        // distance behind the winner already IS the gap between them — no
+        // differencing needed. Only two beaten horses (neither the winner)
+        // sit on a common zero point where subtracting is correct.
+        if (pa.won && !pb.won && pb.lenBehind != null) sep = pb.lenBehind;
+        else if (pb.won && !pa.won && pa.lenBehind != null) sep = pa.lenBehind;
+        else if (!pa.won && !pb.won && pa.lenBehind != null && pb.lenBehind != null) sep = Math.abs(pa.lenBehind - pb.lenBehind);
         out.push({a, b, pa, pb, winner, loser, wp, lp, sep,
                   date: pa.date, track: pa.track, raceNum: pa.raceNum,
                   distYds: pa.distYds != null ? pa.distYds : pb.distYds,
@@ -4699,6 +4565,6 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.42 · released 10 September 2026 · build 2026-09-10-b</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.43 · released 10 September 2026 · build 2026-09-10-c</div>
 </body>
 </html>
