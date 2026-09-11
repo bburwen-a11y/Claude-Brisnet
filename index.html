@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Overlay Board v1.43 — Race Card Reader</title>
+<title>Overlay Board v1.44 — Race Card Reader</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
@@ -854,7 +854,7 @@
 <body>
 <div class="wrap">
   <header>
-    <p class="eyebrow">Handicapping utility · <span class="ver">v1.43</span> · released 10 September 2026</p>
+    <p class="eyebrow">Handicapping utility · <span class="ver">v1.44</span> · released 7 September 2026</p>
     <h1><span class="flap">O</span><span class="flap">v</span><span class="flap">e</span><span class="flap">r</span><span class="flap">l</span><span class="flap">a</span><span class="flap">y</span> <span class="flap">B</span><span class="flap">o</span><span class="flap">a</span><span class="flap">r</span><span class="flap">d</span></h1>
     <p class="tagline">Upload a data file or program PDF. Overlay Board lays out the whole card: past performances, scratches, money moves, and where the board likes a horse.</p>
   </header>
@@ -1699,7 +1699,7 @@ function decodeEntities(t){
 }
 
 function parseChangesFeed(text){
-  const out = {track:'', feedDate:'', scratches:[], riders:[], conditions:[], courses: [], other:0};
+  const out = {track:'', feedDate:'', scratches:[], riders:[], conditions:[], courses: [], distances: [], other:0};
   const titleMatch = text.match(/<title>\s*Equibase\s+([A-Z0-9]{2,4})\s+Changes/i);
   if (titleMatch) out.track = titleMatch[1].toUpperCase();
   const pub = text.match(/<pubDate>([^<]+)<\/pubDate>/);
@@ -1747,6 +1747,13 @@ function parseChangesFeed(text){
       // the score, and the readability turf deduction all refer to a surface
       // the race is no longer being run on. Applied to the rows, not just noted.
       out.courses.push({race, from: mm[1].trim(), to: mm[2].trim()});
+    } else if ((mm = body.match(/Distance\s*-\s*([A-Za-z ]+?)\s+changed to\s+([A-Za-z ]+?)\s*$/i))){
+      // A track moved off the turf almost always changes the distance too —
+      // the two lines arrive together in the same feed item. Distance drives
+      // the readability distance-band check and every "comparable trip"
+      // figure read; left stale, those keep comparing against a trip the
+      // race is no longer being run at.
+      out.distances.push({race, from: mm[1].trim(), to: mm[2].trim()});
     } else if (/Track Condition/i.test(body)){
       out.conditions.push({race, text: body.replace(/\s+/g,' ').trim()});
     } else {
@@ -1754,6 +1761,46 @@ function parseChangesFeed(text){
     }
   });
   return out;
+}
+
+function distanceTextToYards(text){
+  // Equibase's written distance, e.g. "Seven And One Half Furlongs" or
+  // "One Mile And Seventy Yards", parsed back to yards. Covers the standard
+  // vocabulary; returns null rather than guess at a phrasing it doesn't know,
+  // since a silent wrong number is worse than leaving the old one in place.
+  const t = String(text || '').trim();
+  if (!t) return null;
+  const WORDS = {zero:0,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,
+                 nine:9,ten:10,eleven:11,twelve:12,thirteen:13,fourteen:14,
+                 fifteen:15,sixteen:16,seventeen:17,eighteen:18,nineteen:19,
+                 twenty:20,thirty:30,forty:40,fifty:50,sixty:60,seventy:70,
+                 eighty:80,ninety:90};
+  const wordVal = w => {
+    const k = w.trim().toLowerCase();
+    return WORDS[k] != null ? WORDS[k] : (/^\d+(\.\d+)?$/.test(k) ? parseFloat(k) : null);
+  };
+  let m = t.match(/^([\w\s]+?)\s*Miles?(?:\s+And\s+([\w\s]+?)\s+Yards?)?\s*$/i);
+  if (m){
+    const miles = wordVal(m[1]);
+    if (miles != null){
+      const extraYards = m[2] ? wordVal(m[2]) : 0;
+      if (extraYards != null) return Math.round(miles * 1760 + extraYards);
+    }
+  }
+  m = t.match(/^([\w\s]+?)\s+Furlongs?\s*$/i);
+  if (m){
+    let body = m[1].trim();
+    let frac = 0;
+    const fracMatch = body.match(/\s+And\s+(One Half|One Quarter|Three Quarters)\s*$/i);
+    if (fracMatch){
+      const key = fracMatch[1].toLowerCase();
+      frac = key === 'one half' ? 0.5 : key === 'one quarter' ? 0.25 : 0.75;
+      body = body.slice(0, fracMatch.index).trim();
+    }
+    const whole = wordVal(body);
+    if (whole != null) return Math.round((whole + frac) * 220);
+  }
+  return null;
 }
 
 function applyChangesFeed(text){
@@ -1862,6 +1909,27 @@ function applyChangesFeed(text){
       `<br>Surface fit, the turf-debut flag and the readability turf deduction are recomputed against the surface the race is now being run on.</div>`);
   }
 
+  let distApplied = 0, distUnread = [];
+  if (feed.distances.length){
+    feed.distances.forEach(d => {
+      const yds = distanceTextToYards(d.to);
+      if (yds == null){ distUnread.push(d); return; }
+      rows.filter(r => String(r.race).trim() === String(d.race).trim()).forEach(r => {
+        if (r.raceDistYds !== yds){ r.raceDistYds = yds; distApplied++; }
+      });
+    });
+    if (distApplied){
+      parts.push(`<div class="rss-warn">⚑ <b>Distance change${feed.distances.length===1?'':'s'} applied.</b><br>` +
+        feed.distances.filter(d => distanceTextToYards(d.to) != null)
+          .map(d => `R${escHtml(d.race)}: ${escHtml(d.from)} → <b>${escHtml(d.to)}</b>`).join('<br>') +
+        `<br>The readability distance-band check and comparable-trip figure reads now use the actual distance being run.</div>`);
+    }
+    if (distUnread.length){
+      parts.push(`<div class="rss-warn">⚑ Distance change noted but not in a recognized format, so left as-is: ` +
+        distUnread.map(d => `R${escHtml(d.race)}: "${escHtml(d.to)}"`).join(', ') + `.</div>`);
+    }
+  }
+
   if (feed.conditions.length){
     parts.push(`<div class="rss-info"><b>Track condition / rail notes:</b><br>` +
       feed.conditions.map(c => `R${escHtml(c.race)}: ${escHtml(c.text)}`).join('<br>') + `</div>`);
@@ -1869,7 +1937,7 @@ function applyChangesFeed(text){
 
   reportEl.innerHTML = parts.join('');
   statusEl.textContent = (applied || courseApplied)
-    ? `${applied} horse(s) marked scratched${courseApplied ? `, ${courseApplied} row(s) moved to a new surface` : ''}. Recomputing…`
+    ? `${applied} horse(s) marked scratched${courseApplied ? `, ${courseApplied} row(s) moved to a new surface` : ''}${distApplied ? `, ${distApplied} row(s) moved to a new distance` : ''}. Recomputing…`
     : 'No new scratches or course changes to apply — the table already matched the feed.';
   statusEl.className = 'status ok';
 
@@ -4565,6 +4633,6 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.43 · released 10 September 2026 · build 2026-09-10-c</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.44 · released 11 September 2026 · build 2026-09-11-a</div>
 </body>
 </html>
