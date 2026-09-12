@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Overlay Board v1.48 — Race Card Reader</title>
+<title>Overlay Board v1.49 — Race Card Reader</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
@@ -865,7 +865,7 @@
 <body>
 <div class="wrap">
   <header>
-    <p class="eyebrow">Handicapping utility · <span class="ver">v1.48</span> · released 11 September 2026</p>
+    <p class="eyebrow">Handicapping utility · <span class="ver">v1.49</span> · released 11 September 2026</p>
     <h1><span class="flap">O</span><span class="flap">v</span><span class="flap">e</span><span class="flap">r</span><span class="flap">l</span><span class="flap">a</span><span class="flap">y</span> <span class="flap">B</span><span class="flap">o</span><span class="flap">a</span><span class="flap">r</span><span class="flap">d</span></h1>
     <p class="tagline">Upload a data file or program PDF. Overlay Board lays out the whole card: past performances, scratches, money moves, and where the board likes a horse.</p>
   </header>
@@ -957,6 +957,7 @@
       <button data-tab="picks" id="tabPicks">Picks<span class="tab-count" id="pickCount">0</span></button>
       <button data-tab="cards" class="on">Race cards</button>
       <button data-tab="field">Full field</button>
+      <button data-tab="top4">Top 4</button>
       <button data-tab="print">Printable page</button>
     </div>
 
@@ -993,6 +994,13 @@
       </div>
       <div class="race-nav no-print" id="fieldNav"></div>
       <div id="fieldTables"></div>
+    </section>
+
+    <section id="top4Section" style="display:none;">
+      <h2><span class="step-num">4</span> Top 4 probable, every race at a glance</h2>
+      <div class="rss-info" style="margin:0 0 14px;">Quick-scan companion to the fuller Top 4 block on each race card &mdash; post, name, and the same avg-3 figure the Pick uses, no scoring, nothing invented for this view.</div>
+      <div class="race-nav no-print" id="top4Nav"></div>
+      <div id="top4List"></div>
     </section>
 
 
@@ -2457,6 +2465,7 @@ document.getElementById('computeBtn').addEventListener('click', () => {
 
   renderRaceCard(raceSummaries, scratchedCount);
   renderPicks(raceSummaries);
+  renderTop4(raceSummaries);
   document.getElementById('tabbar').style.display = 'flex';
   document.getElementById('reportToolbar').style.display = 'flex';
   renderFullField(currentSort);
@@ -3274,7 +3283,7 @@ function contenderSplit(rs){
 // changes the Contender/Questionable/Pretender split. This only re-presents
 // the field's own top Contenders more fully: the same avg-3 figure the Pick
 // rule already trusts, each with its complete past-performance table, and
-// any head-to-head meeting among the three of them specifically (the
+// any head-to-head meeting among the four of them specifically (the
 // whole-field matchup block above already covers meetings against anyone
 // else in the race, so this isn't repeating that).
 // Fact-by-fact, not a score. Each row is one measured thing; whichever horse
@@ -3284,7 +3293,7 @@ function contenderSplit(rs){
 // has no highlighted leader at all: shorter isn't reliably better (fresher)
 // or worse (rushed back) without more context than this table has, so it's
 // shown as a plain fact, not a contest.
-function compareThreeBlock(ranked){
+function compareTopBlock(ranked){
   const horses = ranked.map(r => r.h);
   if (horses.length < 2) return '';
   const metrics = [
@@ -3312,20 +3321,24 @@ function compareThreeBlock(ranked){
     return c.length ? `<div class="cmp-concern"><b>${escHtml(h.horse)}:</b> ${c.join('; ')}.</div>` : '';
   }).filter(Boolean).join('');
   return `<div class="cmp-block">
-    <div class="cmp-head">How these three compare \u2014 each row is a measured fact, not a score. A horse can lead one row and trail the next; nothing here adds up to a call.</div>
+    <div class="cmp-head">How these ${horses.length} compare \u2014 each row is a measured fact, not a score. A horse can lead one row and trail the next; nothing here adds up to a call.</div>
     <div class="table-wrap"><table class="cmp-table"><thead><tr><th></th>${header}</tr></thead><tbody>${rows}</tbody></table></div>
     ${concernNotes}
   </div>`;
 }
 
-function buildTopProbableBlock(rs){
+function topProbableRanked(rs){
   const s = contenderSplit(rs);
-  if (!s || !s.contenders.length) return '';
-  const ranked = s.contenders
+  if (!s || !s.contenders.length) return [];
+  return s.contenders
     .map(x => ({h: x.h, v: avg3Of(x.h)}))
     .filter(x => x.v != null)
     .sort((a, b) => b.v - a.v)
-    .slice(0, 3);
+    .slice(0, 4);
+}
+
+function buildTopProbableBlock(rs){
+  const ranked = topProbableRanked(rs);
   if (ranked.length < 2) return '';
   const blocks = ranked.map((r, i) => {
     const tag = i === 0 ? 'TOP' : `NEXT ${i}`;
@@ -3335,10 +3348,10 @@ function buildTopProbableBlock(rs){
   const matchups = buildMatchupBlock(horses, horses[0].raceDistYds)
                  + buildCommonCompanyBlock(horses, horses[0].raceDistYds);
   return `<div class="cp" style="margin-top:14px;">
-    <div class="cp-head">Top 3 probable \u2014 ranked by the same figure the Pick uses</div>
-    ${compareThreeBlock(ranked)}
+    <div class="cp-head">Top ${ranked.length} probable \u2014 ranked by the same figure the Pick uses</div>
+    ${compareTopBlock(ranked)}
     ${blocks}
-    ${matchups || '<div class="cp-why" style="padding:4px 2px;">No prior meeting on file among these three.</div>'}
+    ${matchups || `<div class="cp-why" style="padding:4px 2px;">No prior meeting on file among these ${ranked.length}.</div>`}
   </div>`;
 }
 
@@ -4060,7 +4073,8 @@ const TABS = {
   picks: ['picksSection'],
   print: ['printSection'],
   cards: ['resultsSection'],
-  field: ['fieldSection']
+  field: ['fieldSection'],
+  top4: ['top4Section']
 };
 function showTab(name){
   if (name === 'print') renderPrintView();
@@ -4191,6 +4205,32 @@ function isScratchedNow(rs, h){
   if (!name) return false;
   return rows.some(r => r.scratched && String(r.race || '').trim() === race &&
                         String(r.horse || '').trim().toLowerCase() === name);
+}
+
+// Quick-scan companion to the per-race Top 4 block: same ranking (avg-3
+// among Contenders, the figure the Pick already trusts), same restriction
+// to genuine contenders — just laid out for scanning the whole card at
+// once instead of reading one race in full at a time. Post, name, avg-3,
+// nothing else; the full detail stays on the race card where it's already
+// verified to work.
+function renderTop4(raceSummaries){
+  const nav = document.getElementById('top4Nav');
+  const list = document.getElementById('top4List');
+  if (!nav || !list) return;
+  renderRaceNav(nav, raceSummaries, 'top4-r-');
+  list.innerHTML = raceSummaries.map(rs => {
+    const ranked = topProbableRanked(rs);
+    const rows = ranked.length
+      ? ranked.map((r, i) => `<tr><td class="cmp-metric">${i === 0 ? 'TOP' : 'NEXT ' + i}</td>` +
+          `<td>#${escHtml(r.h.post)} ${escHtml(r.h.horse)}</td><td>${r.v.toFixed(1)}</td>` +
+          `<td>${escHtml(r.h.oddsStr || '')}</td></tr>`).join('')
+      : `<tr><td colspan="4" class="cp-why">Not enough rated Contenders in this race to rank.</td></tr>`;
+    return `<div class="race-card race-anchor-target" id="top4-r-${escAttr(rs.race)}">
+      <div class="race-card-top"><strong class="race-no">Race ${escHtml(rs.race)}</strong></div>
+      <div class="table-wrap"><table class="cmp-table"><thead><tr><th></th><th>Horse</th><th>Avg-3</th><th>ML</th></tr></thead>
+      <tbody>${rows}</tbody></table></div>
+    </div>`;
+  }).join('');
 }
 
 function renderPicks(raceSummaries){
@@ -4716,6 +4756,6 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.48 · released 11 September 2026 · build 2026-09-11-e</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.49 · released 11 September 2026 · build 2026-09-11-f</div>
 </body>
 </html>
