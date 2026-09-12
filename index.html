@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Overlay Board v1.46 — Race Card Reader</title>
+<title>Overlay Board v1.48 — Race Card Reader</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
@@ -425,6 +425,14 @@
   .tp-slot{margin-top:14px; padding-top:12px; border-top:1px dashed var(--paper-line);}
   .tp-slot:first-of-type{margin-top:6px; padding-top:0; border-top:none;}
   .tp-tag{font-family:var(--mono); font-size:9.5px; letter-spacing:.08em; font-weight:800; color:var(--amber-dim); margin-bottom:4px;}
+  .cmp-block{margin:8px 0 16px;}
+  .cmp-head{font-size:11.5px; color:var(--ink-soft); line-height:1.5; margin-bottom:8px;}
+  .cmp-table{width:100%; min-width:0; font-size:12.5px; border-collapse:collapse;}
+  .cmp-table th{text-align:left; padding:6px 8px; font-family:var(--mono); font-size:10.5px; background:var(--board-950); color:var(--paper);}
+  .cmp-table td{padding:6px 8px; border-bottom:1px solid var(--paper-line);}
+  .cmp-metric{font-weight:700; color:var(--ink-soft); white-space:nowrap;}
+  .cmp-lead{background:rgba(46,110,69,.10); font-weight:800;}
+  .cmp-concern{font-size:11.5px; color:var(--ink-soft); margin-top:4px; line-height:1.5;}
   .rg-note{margin-top:4px; font-size:11px; opacity:.75;}
   .race-conds{margin:8px 0 2px; padding:8px 10px; background:rgba(0,0,0,.03);
     border-left:3px solid var(--paper-line); border-radius:2px;
@@ -857,7 +865,7 @@
 <body>
 <div class="wrap">
   <header>
-    <p class="eyebrow">Handicapping utility · <span class="ver">v1.46</span> · released 11 September 2026</p>
+    <p class="eyebrow">Handicapping utility · <span class="ver">v1.48</span> · released 11 September 2026</p>
     <h1><span class="flap">O</span><span class="flap">v</span><span class="flap">e</span><span class="flap">r</span><span class="flap">l</span><span class="flap">a</span><span class="flap">y</span> <span class="flap">B</span><span class="flap">o</span><span class="flap">a</span><span class="flap">r</span><span class="flap">d</span></h1>
     <p class="tagline">Upload a data file or program PDF. Overlay Board lays out the whole card: past performances, scratches, money moves, and where the board likes a horse.</p>
   </header>
@@ -2936,6 +2944,16 @@ function readability(rs){
   const notes = [];
   let pts = 0, hardRed = null;
 
+  // Distance lives on rs.raceDistYds where the caller already built it that
+  // way (raceSummaries does). Callers working from computedRaces don't carry
+  // that field at all — it's undefined, not just unset — which silently
+  // dropped the whole distance-match check and read as a worse race than it
+  // was. Falling back to the field's own horses fixes it at the source
+  // instead of requiring every caller to remember to pre-populate it.
+  const raceDistYds = rs.raceDistYds != null
+    ? rs.raceDistYds
+    : (horses.find(h => h.raceDistYds != null && h.raceDistYds !== '') || {}).raceDistYds ?? null;
+
   // 1. Does the field have a record at all? This is the single biggest input —
   //    every display in this tool reads past performances.
   const withPP = horses.filter(h => (h.ppRaces || []).length >= 3).length;
@@ -2948,9 +2966,9 @@ function readability(rs){
   // 2. Is that record at anything like today's trip? Form at the wrong
   //    distance compares badly, which was the whole point of the form read.
   let atDist = 0;
-  if (rs.raceDistYds != null){
+  if (raceDistYds != null){
     atDist = horses.filter(h => (h.ppRaces || []).some(p =>
-      p.distYds != null && Math.abs(p.distYds - rs.raceDistYds) <= 440)).length;
+      p.distYds != null && Math.abs(p.distYds - raceDistYds) <= 440)).length;
     const df = atDist / n;
     if (df >= 0.70){ pts += 3; notes.push(`${atDist} of ${n} have form within 2f of today's trip`); }
     else if (df >= 0.50){ pts += 2; notes.push(`${atDist} of ${n} have form at a comparable distance`); }
@@ -2971,8 +2989,8 @@ function readability(rs){
   if (turf && turfDebut / n >= 0.50){ pts -= 2; notes.push(`${turfDebut} of ${n} have never raced on turf, so the surface figures are guesses for half the field`); }
 
   // Hard reds — no score can rescue these.
-  if (rs.raceDistYds != null && rs.raceDistYds >= 3520){
-    hardRed = `at ${fmtDistY(rs.raceDistYds)} this is a marathon or jump race — Prime Power, speed figures and Quirin points are flat-racing constructs and do not transfer`;
+  if (raceDistYds != null && raceDistYds >= 3520){
+    hardRed = `at ${fmtDistY(raceDistYds)} this is a marathon or jump race — Prime Power, speed figures and Quirin points are flat-racing constructs and do not transfer`;
   }
 
   const max = 8;
@@ -3124,34 +3142,21 @@ function topAvg3Sole(rs, h){
 // beside the pick so the two can be scored separately over time — a pick made
 // in a race the data cannot describe is a different animal from one made in a
 // race it can, and that difference has never been measured here.
-function raceReadGate(rs){
-  const live = (rs.horses || []).filter(h => !h.scratched);
-  const n = live.length;
-  if (!n) return null;
-  const noStarts = live.filter(h => !(h.ppRaces || []).some(p => p.fin != null && p.fin !== '')).length;
-  const figured  = live.filter(h => (h.ppRaces || []).some(p => p.spd > 0)).length;
-  const yds = live.map(h => h.raceDistYds).find(v => v != null) || null;
-  const why = [];
-  let level = 'read';
-  if (yds != null && yds >= 3000){ level = 'none'; why.push('distance outside what flat figures describe'); }
-  if (figured < 3){ level = 'none'; why.push(`only ${figured} runner${figured === 1 ? '' : 's'} carry a figure`); }
-  if (noStarts / n >= 0.25){ level = 'none'; why.push(`${noStarts} of ${n} have never started`); }
-  if (level === 'read'){
-    if (noStarts > 0 && n >= 10){ level = 'thin'; why.push(`${noStarts} first-time starter${noStarts === 1 ? '' : 's'} in a field of ${n}`); }
-    else if (noStarts > 0){ level = 'thin'; why.push(`${noStarts} first-time starter${noStarts === 1 ? '' : 's'}`); }
-    else if (n >= 10){ level = 'thin'; why.push(`field of ${n}`); }
-  }
-  return {level, why, n, noStarts, figured};
-}
-
 function raceReadGateLine(rs){
-  const g = raceReadGate(rs);
+  // Was a second, separately-computed readability check (distance/first-timer
+  // counts only) that disagreed with the fuller one above on real cards —
+  // Maddy Mania at Churchill Downs and Skyliner at Gulfstream both showed a
+  // red/BLIND colour next to text saying the race was fine. One computation
+  // now drives both the colour and this text, so they can't say different
+  // things about the same race again.
+  const g = readability(rs);
   if (!g) return '';
-  const label = g.level === 'read' ? 'RACE READABLE'
-              : g.level === 'thin' ? 'THIN RECORD'
+  const label = g.level === 'green' ? 'RACE READABLE'
+              : g.level === 'yellow' ? 'THIN RECORD'
               : 'RECORD TOO THIN TO READ';
-  const tail = g.why.length ? ' \u2014 ' + escHtml(g.why.join('; ')) : '';
-  return `<div class="read-gate rg-${g.level}"><span class="rg-tag">${label}</span>${tail}`
+  const cls = g.level === 'green' ? 'read' : g.level === 'yellow' ? 'thin' : 'none';
+  const tail = g.why ? ' \u2014 ' + escHtml(g.why) : '';
+  return `<div class="read-gate rg-${cls}"><span class="rg-tag">${label}</span>${tail}`
        + `<div class="rg-note">Describes the past-performance record available for this race, not the horse. It does not change the pick.</div></div>`;
 }
 
@@ -3272,6 +3277,47 @@ function contenderSplit(rs){
 // any head-to-head meeting among the three of them specifically (the
 // whole-field matchup block above already covers meetings against anyone
 // else in the race, so this isn't repeating that).
+// Fact-by-fact, not a score. Each row is one measured thing; whichever horse
+// leads on THAT thing is marked, and nothing is summed across rows into an
+// overall verdict — a horse can lead on one row and trail on the next, and
+// that's shown as-is rather than resolved into a single call. Layoff length
+// has no highlighted leader at all: shorter isn't reliably better (fresher)
+// or worse (rushed back) without more context than this table has, so it's
+// shown as a plain fact, not a contest.
+function compareThreeBlock(ranked){
+  const horses = ranked.map(r => r.h);
+  if (horses.length < 2) return '';
+  const metrics = [
+    {label: 'Avg-3 figure', get: h => avg3Of(h), fmt: v => v != null ? v.toFixed(1) : '\u2014', lead: true},
+    {label: 'Competitive at today\u2019s level', get: h => (h.classSeen >= 1 ? h.classFit : null),
+     fmt: (v, h) => v != null ? `${v} of ${h.classSeen}` : 'not enough starts to judge', lead: true},
+    {label: 'Career earnings per start', get: h => (h.ltStarts && h.ltEarn != null) ? h.ltEarn / h.ltStarts : null,
+     fmt: v => v != null ? money(v) : '\u2014', lead: true},
+    {label: 'Days since last race', get: h => h.layoffDays, fmt: v => v != null ? `${v}d` : '\u2014', lead: false},
+  ];
+  const rows = metrics.map(m => {
+    const vals = horses.map(h => m.get(h));
+    let bestI = null;
+    if (m.lead){
+      const valid = vals.map((v, i) => ({v, i})).filter(x => x.v != null).sort((a, b) => b.v - a.v);
+      if (valid.length >= 2 && valid[0].v !== valid[1].v) bestI = valid[0].i;
+    }
+    return `<tr><td class="cmp-metric">${m.label}</td>` +
+      horses.map((h, i) => `<td class="${i === bestI ? 'cmp-lead' : ''}">${m.fmt(vals[i], h)}</td>`).join('') +
+      `</tr>`;
+  }).join('');
+  const header = horses.map(h => `<th>#${escHtml(h.post)} ${escHtml(h.horse)}</th>`).join('');
+  const concernNotes = horses.map(h => {
+    const c = pickConcerns({horses}, h);
+    return c.length ? `<div class="cmp-concern"><b>${escHtml(h.horse)}:</b> ${c.join('; ')}.</div>` : '';
+  }).filter(Boolean).join('');
+  return `<div class="cmp-block">
+    <div class="cmp-head">How these three compare \u2014 each row is a measured fact, not a score. A horse can lead one row and trail the next; nothing here adds up to a call.</div>
+    <div class="table-wrap"><table class="cmp-table"><thead><tr><th></th>${header}</tr></thead><tbody>${rows}</tbody></table></div>
+    ${concernNotes}
+  </div>`;
+}
+
 function buildTopProbableBlock(rs){
   const s = contenderSplit(rs);
   if (!s || !s.contenders.length) return '';
@@ -3290,6 +3336,7 @@ function buildTopProbableBlock(rs){
                  + buildCommonCompanyBlock(horses, horses[0].raceDistYds);
   return `<div class="cp" style="margin-top:14px;">
     <div class="cp-head">Top 3 probable \u2014 ranked by the same figure the Pick uses</div>
+    ${compareThreeBlock(ranked)}
     ${blocks}
     ${matchups || '<div class="cp-why" style="padding:4px 2px;">No prior meeting on file among these three.</div>'}
   </div>`;
@@ -4669,6 +4716,6 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.46 · released 11 September 2026 · build 2026-09-11-c</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.48 · released 11 September 2026 · build 2026-09-11-e</div>
 </body>
 </html>
