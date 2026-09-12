@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Overlay Board v1.45 — Race Card Reader</title>
+<title>Overlay Board v1.46 — Race Card Reader</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
@@ -422,6 +422,9 @@
   .read-gate.rg-thin{background:rgba(217,167,59,.10); border-left:3px solid #C08A2E;}
   .read-gate.rg-none{background:rgba(139,42,42,.07); border-left:3px solid #8B2A2A;}
   .rg-tag{font-family:var(--mono); font-size:9.5px; letter-spacing:.07em; font-weight:800; margin-right:7px;}
+  .tp-slot{margin-top:14px; padding-top:12px; border-top:1px dashed var(--paper-line);}
+  .tp-slot:first-of-type{margin-top:6px; padding-top:0; border-top:none;}
+  .tp-tag{font-family:var(--mono); font-size:9.5px; letter-spacing:.08em; font-weight:800; color:var(--amber-dim); margin-bottom:4px;}
   .rg-note{margin-top:4px; font-size:11px; opacity:.75;}
   .race-conds{margin:8px 0 2px; padding:8px 10px; background:rgba(0,0,0,.03);
     border-left:3px solid var(--paper-line); border-radius:2px;
@@ -854,7 +857,7 @@
 <body>
 <div class="wrap">
   <header>
-    <p class="eyebrow">Handicapping utility · <span class="ver">v1.45</span> · released 11 September 2026</p>
+    <p class="eyebrow">Handicapping utility · <span class="ver">v1.46</span> · released 11 September 2026</p>
     <h1><span class="flap">O</span><span class="flap">v</span><span class="flap">e</span><span class="flap">r</span><span class="flap">l</span><span class="flap">a</span><span class="flap">y</span> <span class="flap">B</span><span class="flap">o</span><span class="flap">a</span><span class="flap">r</span><span class="flap">d</span></h1>
     <p class="tagline">Upload a data file or program PDF. Overlay Board lays out the whole card: past performances, scratches, money moves, and where the board likes a horse.</p>
   </header>
@@ -3260,6 +3263,38 @@ function contenderSplit(rs){
   return out;
 }
 
+// Backtested before shipping: a figure-rank-vs-market-rank gap was tested as
+// a way to rescue Pretenders to Questionable and found to do nothing (2.2%
+// vs 1.9% win rate across 584 flagged horses, z=0.32 — noise). Nothing here
+// changes the Contender/Questionable/Pretender split. This only re-presents
+// the field's own top Contenders more fully: the same avg-3 figure the Pick
+// rule already trusts, each with its complete past-performance table, and
+// any head-to-head meeting among the three of them specifically (the
+// whole-field matchup block above already covers meetings against anyone
+// else in the race, so this isn't repeating that).
+function buildTopProbableBlock(rs){
+  const s = contenderSplit(rs);
+  if (!s || !s.contenders.length) return '';
+  const ranked = s.contenders
+    .map(x => ({h: x.h, v: avg3Of(x.h)}))
+    .filter(x => x.v != null)
+    .sort((a, b) => b.v - a.v)
+    .slice(0, 3);
+  if (ranked.length < 2) return '';
+  const blocks = ranked.map((r, i) => {
+    const tag = i === 0 ? 'TOP' : `NEXT ${i}`;
+    return `<div class="pp-horse tp-slot"><div class="tp-tag">${tag} \u00b7 avg-3 ${r.v.toFixed(1)}</div>${ppHorseBlock(r.h, rs.race, false)}</div>`;
+  }).join('');
+  const horses = ranked.map(r => r.h);
+  const matchups = buildMatchupBlock(horses, horses[0].raceDistYds)
+                 + buildCommonCompanyBlock(horses, horses[0].raceDistYds);
+  return `<div class="cp" style="margin-top:14px;">
+    <div class="cp-head">Top 3 probable \u2014 ranked by the same figure the Pick uses</div>
+    ${blocks}
+    ${matchups || '<div class="cp-why" style="padding:4px 2px;">No prior meeting on file among these three.</div>'}
+  </div>`;
+}
+
 function buildContenderBlock(rs){
   const s = contenderSplit(rs);
   if (!s || (!s.pretenders.length && !s.questionable.length)) return '';
@@ -3946,6 +3981,7 @@ function renderRaceCard(raceSummaries, scratchedCount){
         ${pickJumpLink(rs)}
         ${buildRiderChangeBlock(rs)}
         ${buildContenderBlock(rs)}
+        ${buildTopProbableBlock(rs)}
         ${buildCommonCompanyBlock(rs.horses || [], (rs.horses && rs.horses.length) ? rs.horses[0].raceDistYds : null)}
         ${buildReadPanel(rs)}
         ${moveLine}
@@ -4633,6 +4669,6 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.45 · released 11 September 2026 · build 2026-09-11-b</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.46 · released 11 September 2026 · build 2026-09-11-c</div>
 </body>
 </html>
