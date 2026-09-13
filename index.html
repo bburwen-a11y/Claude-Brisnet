@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Overlay Board v1.54 — Race Card Reader</title>
+<title>Overlay Board v1.55 — Race Card Reader</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
@@ -875,7 +875,7 @@
 <body>
 <div class="wrap">
   <header>
-    <p class="eyebrow">Handicapping utility · <span class="ver">v1.54</span> · released 12 September 2026</p>
+    <p class="eyebrow">Handicapping utility · <span class="ver">v1.55</span> · released 12 September 2026</p>
     <h1><span class="flap">O</span><span class="flap">v</span><span class="flap">e</span><span class="flap">r</span><span class="flap">l</span><span class="flap">a</span><span class="flap">y</span> <span class="flap">B</span><span class="flap">o</span><span class="flap">a</span><span class="flap">r</span><span class="flap">d</span></h1>
     <p class="tagline">Upload a data file or program PDF. Overlay Board lays out the whole card: past performances, scratches, money moves, and where the board likes a horse.</p>
   </header>
@@ -1114,10 +1114,33 @@ document.getElementById('addRowBtn').addEventListener('click', () => {
 document.getElementById('clearBtn').addEventListener('click', () => {
   rows = [];
   computedRaces = [];
+  crossCheck = {};
+  trackConditions = {};
+  window.__ccRaceSummaries = [];
+  oddsSourceMode = 'ml';
+  document.getElementById('oddsMLBtn').classList.add('active');
+  document.getElementById('oddsFinalBtn').classList.remove('active');
   renderRows();
+
   document.getElementById('resultsSection').style.display='none';
   document.getElementById('fieldSection').style.display='none';
   document.getElementById('picksSection').style.display='none';
+  document.getElementById('top4Section').style.display='none';
+  document.getElementById('tabbar').style.display='none';
+
+  // A "clear" that leaves the DRF and feed panels showing stale file names,
+  // status text and pasted XML from the card just cleared isn't actually
+  // clear — it looks loaded when it isn't. Reset both fully, not just the
+  // entry table, so a fresh card starts from a genuinely blank screen.
+  document.getElementById('drfInput').value = '';
+  document.getElementById('drfStatus').textContent = '';
+  document.getElementById('drfStatus').className = 'status';
+
+  document.getElementById('rssInput').value = '';
+  document.getElementById('rssPaste').value = '';
+  document.getElementById('rssStatus').textContent = '';
+  document.getElementById('rssStatus').className = 'status';
+  document.getElementById('rssReport').innerHTML = '';
 });
 
 document.getElementById('demoBtn').addEventListener('click', () => {
@@ -4901,6 +4924,6 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.54 · released 12 September 2026 · build 2026-09-12-e</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.55 · released 12 September 2026 · build 2026-09-12-f</div>
 </body>
 </html>
