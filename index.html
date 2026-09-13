@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Overlay Board v1.52 — Race Card Reader</title>
+<title>Overlay Board v1.53 — Race Card Reader</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
@@ -874,7 +874,7 @@
 <body>
 <div class="wrap">
   <header>
-    <p class="eyebrow">Handicapping utility · <span class="ver">v1.52</span> · released 12 September 2026</p>
+    <p class="eyebrow">Handicapping utility · <span class="ver">v1.53</span> · released 12 September 2026</p>
     <h1><span class="flap">O</span><span class="flap">v</span><span class="flap">e</span><span class="flap">r</span><span class="flap">l</span><span class="flap">a</span><span class="flap">y</span> <span class="flap">B</span><span class="flap">o</span><span class="flap">a</span><span class="flap">r</span><span class="flap">d</span></h1>
     <p class="tagline">Upload a data file or program PDF. Overlay Board lays out the whole card: past performances, scratches, money moves, and where the board likes a horse.</p>
   </header>
@@ -1968,17 +1968,17 @@ function applyChangesFeed(text){
       feed.conditions.map(c => `R${escHtml(c.race)}: ${escHtml(c.text)}`).join('<br>') + `</div>`);
   }
 
+  parts.push(`<div class="rss-info">When final odds are posted near post time, enter them in the <b>tote</b> column on the entry table for each horse, switch <b>Compute from</b> to <b>final odds</b> above the table, and press Compute again. Nothing here is overwritten \u2014 morning line stays in its own column, and any race missing a final odds entry still falls back to morning line for that horse.</div>`);
+
   reportEl.innerHTML = parts.join('');
   statusEl.textContent = (applied || courseApplied)
     ? `${applied} horse(s) marked scratched${courseApplied ? `, ${courseApplied} row(s) moved to a new surface` : ''}${distApplied ? `, ${distApplied} row(s) moved to a new distance` : ''}. Recomputing…`
-    : 'No new scratches or course changes to apply — the table already matched the feed.';
+    : 'No new scratches or course changes to apply — the table already matched the feed. Recomputing…';
   statusEl.className = 'status ok';
 
-  // Only recompute when a card is already on screen; otherwise leave it to the
-  // Compute button so the person sees the table state first.
-  if ((applied || courseApplied) && document.getElementById('resultsSection').style.display === 'block'){
-    document.getElementById('computeBtn').click();
-  }
+  // Compute immediately on every feed apply, first time or a refresh alike,
+  // so applying the feed and seeing the card is one step, not two.
+  document.getElementById('computeBtn').click();
 }
 
 document.querySelectorAll('#tabbar button').forEach(b =>
@@ -4877,6 +4877,6 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.52 · released 12 September 2026 · build 2026-09-12-c</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.53 · released 12 September 2026 · build 2026-09-12-d</div>
 </body>
 </html>
