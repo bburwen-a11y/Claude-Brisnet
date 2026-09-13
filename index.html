@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Overlay Board v1.50 — Race Card Reader</title>
+<title>Overlay Board v1.51 — Race Card Reader</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
@@ -874,7 +874,7 @@
 <body>
 <div class="wrap">
   <header>
-    <p class="eyebrow">Handicapping utility · <span class="ver">v1.50</span> · released 12 September 2026</p>
+    <p class="eyebrow">Handicapping utility · <span class="ver">v1.51</span> · released 12 September 2026</p>
     <h1><span class="flap">O</span><span class="flap">v</span><span class="flap">e</span><span class="flap">r</span><span class="flap">l</span><span class="flap">a</span><span class="flap">y</span> <span class="flap">B</span><span class="flap">o</span><span class="flap">a</span><span class="flap">r</span><span class="flap">d</span></h1>
     <p class="tagline">Upload a data file or program PDF. Overlay Board lays out the whole card: past performances, scratches, money moves, and where the board likes a horse.</p>
   </header>
@@ -3366,6 +3366,46 @@ function topOverlayChoice(rs){
   return ranked.length ? ranked[0].h : null;
 }
 
+// Same criteria as the backtest, exactly — nothing new invented for display.
+// Questionable-tier, classFit at least 3-of-4 competitive, top-2 earnings per
+// start in the field. Across the 26-card pool this hit 1 of 11 (9.1% win,
+// roughly the 9.4% baseline for all Questionable horses) but 5 of 11 to the
+// board (45.5% vs a 32.7% baseline) — a real-looking gap on a sample far too
+// small to trust either way. Shown only when the race itself declined a
+// pick, as plain fact with the actual numbers attached, never as an alert
+// or a call — the backtest didn't earn it that status.
+function bestQuestionableCandidate(rs){
+  const p = pickFor(rs);
+  if (p && (p.line === 'primary' || p.line === 'price')) return null;
+  const s = contenderSplit(rs);
+  if (!s || !s.questionable.length) return null;
+  const scored = s.questionable.map(x => {
+    const h = x.h;
+    const fitOK = h.classFit != null && (h.classSeen || 0) >= 2 && (h.classFit / h.classSeen) >= 0.75;
+    const eps = (h.ltStarts && h.ltEarn != null) ? h.ltEarn / h.ltStarts : null;
+    return {h, fitOK, eps};
+  }).filter(x => x.fitOK && x.eps != null);
+  if (!scored.length) return null;
+  const field = (rs.horses || []).filter(x => !x.scratched);
+  scored.forEach(x => {
+    const vals = field.map(f => (f.ltStarts && f.ltEarn != null) ? f.ltEarn / f.ltStarts : null)
+      .filter(v => v != null).sort((a, b) => b - a);
+    x.epsRank = vals.indexOf(x.eps) + 1;
+  });
+  const hit = scored.filter(x => x.epsRank <= 2).sort((a, b) => (b.h.classFit / b.h.classSeen) - (a.h.classFit / a.h.classSeen))[0];
+  return hit || null;
+}
+
+function bestQuestionableBlockHTML(rs){
+  const hit = bestQuestionableCandidate(rs);
+  if (!hit) return '';
+  const h = hit.h;
+  return `<div class="cc-block">
+    <div class="cc-head">Best-supported Questionable horse \u2014 information, not a call</div>
+    <div class="cc-row"><label>#${escHtml(h.post)} <b>${escHtml(h.horse)}</b> \u2014 ${escHtml(h.oddsStr || '')} \u00b7 competitive at today\u2019s level ${h.classFit} of ${h.classSeen} \u00b7 ${hit.epsRank}${ordinalSuffix(hit.epsRank)} on earnings per start (${money(hit.eps)})</label></div>
+    <div class="cc-agree cc-some">Backtested against 26 pool cards, same criteria: 1 of 11 won (9.1%, close to the 9.4% baseline for all Questionable horses) but 5 of 11 hit the board (45.5% vs a 32.7% baseline). A real-looking gap on a sample too small to trust. This is not a pick and has not been shown to work \u2014 it's shown because the data exists and this race declined one.</div>
+  </div>`;
+}
 function crossCheckBlockHTML(rs){
   const mine = topOverlayChoice(rs);
   const saved = crossCheck[rs.race] || {};
@@ -4105,6 +4145,7 @@ function renderRaceCard(raceSummaries, scratchedCount){
         ${buildContenderBlock(rs)}
         ${buildTopProbableBlock(rs)}
         ${crossCheckBlockHTML(rs)}
+        ${bestQuestionableBlockHTML(rs)}
         ${buildCommonCompanyBlock(rs.horses || [], (rs.horses && rs.horses.length) ? rs.horses[0].raceDistYds : null)}
         ${buildReadPanel(rs)}
         ${moveLine}
@@ -4834,6 +4875,6 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.50 · released 12 September 2026 · build 2026-09-12-a</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.51 · released 12 September 2026 · build 2026-09-12-b</div>
 </body>
 </html>
