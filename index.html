@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Overlay Board v1.49 — Race Card Reader</title>
+<title>Overlay Board v1.50 — Race Card Reader</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
@@ -433,6 +433,15 @@
   .cmp-metric{font-weight:700; color:var(--ink-soft); white-space:nowrap;}
   .cmp-lead{background:rgba(46,110,69,.10); font-weight:800;}
   .cmp-concern{font-size:11.5px; color:var(--ink-soft); margin-top:4px; line-height:1.5;}
+  .cc-block{margin:14px 0 6px; padding:10px 12px; border:1px dashed var(--paper-line); border-radius:5px; background:rgba(0,0,0,.015);}
+  .cc-head{font-size:11px; color:var(--ink-soft); margin-bottom:8px;}
+  .cc-row{display:flex; gap:14px; flex-wrap:wrap; margin-bottom:6px; font-size:12.5px;}
+  .cc-row label{display:flex; flex-direction:column; gap:3px; flex:1 1 160px;}
+  .cc-row input{padding:5px 7px; border:1px solid var(--paper-line); border-radius:3px; font-size:12.5px; background:#fff;}
+  .cc-agree{font-size:12.5px; padding:6px 8px; border-radius:3px; margin-top:4px;}
+  .cc-all{background:rgba(46,110,69,.12); color:#1F5231;}
+  .cc-some{background:rgba(217,167,59,.12); color:#7a5c1e;}
+  .cc-none{background:rgba(0,0,0,.03); color:var(--ink-soft);}
   .rg-note{margin-top:4px; font-size:11px; opacity:.75;}
   .race-conds{margin:8px 0 2px; padding:8px 10px; background:rgba(0,0,0,.03);
     border-left:3px solid var(--paper-line); border-radius:2px;
@@ -865,7 +874,7 @@
 <body>
 <div class="wrap">
   <header>
-    <p class="eyebrow">Handicapping utility · <span class="ver">v1.49</span> · released 11 September 2026</p>
+    <p class="eyebrow">Handicapping utility · <span class="ver">v1.50</span> · released 12 September 2026</p>
     <h1><span class="flap">O</span><span class="flap">v</span><span class="flap">e</span><span class="flap">r</span><span class="flap">l</span><span class="flap">a</span><span class="flap">y</span> <span class="flap">B</span><span class="flap">o</span><span class="flap">a</span><span class="flap">r</span><span class="flap">d</span></h1>
     <p class="tagline">Upload a data file or program PDF. Overlay Board lays out the whole card: past performances, scratches, money moves, and where the board likes a horse.</p>
   </header>
@@ -1030,6 +1039,11 @@ let rowId = 0;
 let lastDrfText = null;
 let computedRaces = [];   // full per-race horse data, kept around for re-sorting
 let currentSort = 'all';   // 'all' or 'live' — the field table is always post-ordered
+// Manual log of what the other two programs named as their top choice, so
+// three-way agreement is visible without leaving this tool. Never fetched,
+// never inferred — Robert types it in after checking the other program
+// himself, keyed by race number, kept across recomputes for the session.
+let crossCheck = {};
 
 const rowsBody = document.getElementById('rowsBody');
 const emptyNote = document.getElementById('emptyNote');
@@ -2463,6 +2477,7 @@ document.getElementById('computeBtn').addEventListener('click', () => {
     })
     .sort((a,b) => Number(a.race) - Number(b.race));
 
+  window.__ccRaceSummaries = raceSummaries;
   renderRaceCard(raceSummaries, scratchedCount);
   renderPicks(raceSummaries);
   renderTop4(raceSummaries);
@@ -3337,6 +3352,53 @@ function topProbableRanked(rs){
     .slice(0, 4);
 }
 
+function normHorseName(s){
+  return String(s || '').toUpperCase().replace(/[^A-Z]/g, '');
+}
+
+// The Pick if one fired, otherwise the field's own top Contender by avg-3 —
+// "regardless of picks," since the frozen rule declines most races and a
+// three-way check needs Overlay Board's own answer even on a no-pick race.
+function topOverlayChoice(rs){
+  const p = pickFor(rs);
+  if (p && p.h) return p.h;
+  const ranked = topProbableRanked(rs);
+  return ranked.length ? ranked[0].h : null;
+}
+
+function crossCheckBlockHTML(rs){
+  const mine = topOverlayChoice(rs);
+  const saved = crossCheck[rs.race] || {};
+  const chatVal = saved.chat || '';
+  const grokVal = saved.grok || '';
+  const mineNorm = mine ? normHorseName(mine.horse) : '';
+  const chatNorm = normHorseName(chatVal);
+  const grokNorm = normHorseName(grokVal);
+  const entered = [chatNorm, grokNorm].filter(Boolean);
+  let agree = '';
+  if (mine && entered.length){
+    const matches = entered.filter(n => n === mineNorm).length;
+    if (matches === entered.length && entered.length === 2){
+      agree = `<div class="cc-agree cc-all">All three keyed on <b>${escHtml(mine.horse)}</b>.</div>`;
+    } else if (matches > 0){
+      agree = `<div class="cc-agree cc-some">${matches} of ${entered.length} entered agree with this program's <b>${escHtml(mine.horse)}</b>.</div>`;
+    } else {
+      agree = `<div class="cc-agree cc-none">No agreement — this program has <b>${escHtml(mine ? mine.horse : 'no live choice')}</b>.</div>`;
+    }
+  }
+  return `<div class="cc-block">
+    <div class="cc-head">Cross-check \u2014 typed in by hand after checking the other two, never fetched</div>
+    <div class="cc-row">
+      <label>This program: <b>${mine ? escHtml(mine.horse) : '\u2014'}</b></label>
+    </div>
+    <div class="cc-row">
+      <label>Chat's top choice <input type="text" data-crosscheck="chat" data-race="${escAttr(rs.race)}" value="${escAttr(chatVal)}" placeholder="horse name"></label>
+      <label>Grok's top choice <input type="text" data-crosscheck="grok" data-race="${escAttr(rs.race)}" value="${escAttr(grokVal)}" placeholder="horse name"></label>
+    </div>
+    <div class="cc-result" id="cc-result-${escAttr(rs.race)}">${agree}</div>
+  </div>`;
+}
+
 function buildTopProbableBlock(rs){
   const ranked = topProbableRanked(rs);
   if (ranked.length < 2) return '';
@@ -4042,6 +4104,7 @@ function renderRaceCard(raceSummaries, scratchedCount){
         ${buildRiderChangeBlock(rs)}
         ${buildContenderBlock(rs)}
         ${buildTopProbableBlock(rs)}
+        ${crossCheckBlockHTML(rs)}
         ${buildCommonCompanyBlock(rs.horses || [], (rs.horses && rs.horses.length) ? rs.horses[0].raceDistYds : null)}
         ${buildReadPanel(rs)}
         ${moveLine}
@@ -4652,6 +4715,21 @@ function openPP(race, horseName){
 
 function bindTapHandlers(root){
   if (!root) return;
+  root.querySelectorAll('[data-crosscheck]').forEach(input => {
+    input.addEventListener('input', () => {
+      const race = input.dataset.race;
+      const src = input.dataset.crosscheck;
+      crossCheck[race] = crossCheck[race] || {};
+      crossCheck[race][src] = input.value;
+      const rs = (window.__ccRaceSummaries || []).find(r => String(r.race) === String(race));
+      const target = document.getElementById('cc-result-' + race);
+      if (rs && target){
+        const fresh = crossCheckBlockHTML(rs);
+        const m = fresh.match(/<div class="cc-result"[^>]*>([\s\S]*)<\/div>$/);
+        target.innerHTML = m ? m[1] : '';
+      }
+    });
+  });
   root.querySelectorAll('.race-jump').forEach(a => {
     a.addEventListener('click', e => {
       e.preventDefault(); e.stopPropagation();
@@ -4756,6 +4834,6 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.49 · released 11 September 2026 · build 2026-09-11-f</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.50 · released 12 September 2026 · build 2026-09-12-a</div>
 </body>
 </html>
