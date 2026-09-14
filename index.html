@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Overlay Board v1.59 — Race Card Reader</title>
+<title>Overlay Board v1.61 — Race Card Reader</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
@@ -875,7 +875,7 @@
 <body>
 <div class="wrap">
   <header>
-    <p class="eyebrow">Handicapping utility · <span class="ver">v1.59</span> · released 12 September 2026</p>
+    <p class="eyebrow">Handicapping utility · <span class="ver">v1.61</span> · released 13 September 2026</p>
     <h1><span class="flap">O</span><span class="flap">v</span><span class="flap">e</span><span class="flap">r</span><span class="flap">l</span><span class="flap">a</span><span class="flap">y</span> <span class="flap">B</span><span class="flap">o</span><span class="flap">a</span><span class="flap">r</span><span class="flap">d</span></h1>
     <p class="tagline">Upload a data file or program PDF. Overlay Board lays out the whole card: past performances, scratches, money moves, and where the board likes a horse.</p>
   </header>
@@ -1314,6 +1314,12 @@ function parseBrisnetSingleFile(text){
     const mlOdds = num(44);
     const odds = mlOdds != null ? mlOdds.toFixed(2) : '';
     const surface = get(7);
+    // v7.53's own all-weather fix: field 7 alone can't tell true dirt from
+    // synthetic. Field 25 is the explicit current All-Weather flag; field
+    // 1403+i is the same flag on each past race. Kept under chat-prefixed
+    // names — Overlay Board's own surface/ppRaces.surf stay on field 7/326
+    // unchanged, since fixing that split is outside what was asked here.
+    const chatSurfaceToday = get(25) === 'A' ? 'A' : surface;
     const pp = get(251);
     const rtype = get(9);
     const todayClassTxt = get(11);
@@ -1402,7 +1408,7 @@ function parseBrisnetSingleFile(text){
       const finTxt = get(616+i);
       const rawMargin = num(736+i);
       const wonIt = String(finTxt).trim() === '1';
-      ppRaces.push({date: d, track: get(276+i), raceNum: get(296+i), distYds: num(316+i), surf: get(326+i), fin: finTxt, margin: rawMargin, won: wonIt, lenBehind: (rawMargin == null ? null : (wonIt ? -rawMargin : rawMargin)), comment: get(396+i), pastPost: num(356+i), pastField: num(346+i), winner: get(406+i), second: get(416+i), third: get(426+i), rtype: get(1086+i), claim: num(546+i), classTxt: get(536+i), spd: num(846+i), pace2: num(766+i), pace4: num(776+i), pace6: num(786+i), pace8: num(796+i), latePace: num(816+i), purse: num(556+i), trackCond: get(306+i)});
+      ppRaces.push({date: d, track: get(276+i), raceNum: get(296+i), distYds: num(316+i), surf: get(326+i), fin: finTxt, margin: rawMargin, won: wonIt, lenBehind: (rawMargin == null ? null : (wonIt ? -rawMargin : rawMargin)), comment: get(396+i), pastPost: num(356+i), pastField: num(346+i), winner: get(406+i), second: get(416+i), third: get(426+i), rtype: get(1086+i), claim: num(546+i), classTxt: get(536+i), spd: num(846+i), pace2: num(766+i), pace4: num(776+i), pace6: num(786+i), pace8: num(796+i), latePace: num(816+i), purse: num(556+i), trackCond: get(306+i), chatSurf: get(1403+i) === 'A' ? 'A' : get(326+i)});
     }
     // BRIS SPEED RATING, fields 846-855, one per past race. Identified from a
     // a real card rather than taken on trust: the pace blocks at 766,
@@ -1545,6 +1551,9 @@ function parseBrisnetSingleFile(text){
       chatTjStarts: num(219), chatTjWins: num(220), chatTjPlaces: num(221), chatTjShows: num(222), chatTjROI: num(223),
       chatBestFast: num(1178), chatBestTurf: num(1179), chatBestOff: num(1180),
       chatBestDist: num(1181), chatBestTrack: num(1331), chatBestLife: num(1328),
+      chatSurfaceToday, chatBestAW: num(236),
+      chatAWStarts: num(231), chatAWWins: num(232), chatAWPlaces: num(233),
+      chatAWShows: num(234), chatAWEarn: num(235),
       surface: surface,
       daysSinceWork,
       worksAtTrack,
@@ -1971,6 +1980,12 @@ function applyChangesFeed(text){
       const to = surfCode(c.to);
       rows.filter(r => String(r.race).trim() === String(c.race).trim()).forEach(r => {
         if (r.surface !== to){ r.surface = to; courseApplied++; }
+        // chatSurfaceToday mirrors r.surface but starts from a different raw
+        // field (BRIS field 25's explicit all-weather flag) — it needs the
+        // same live update or it goes stale the moment weather changes a
+        // turf card to synthetic, which is exactly when the all-weather fix
+        // actually matters.
+        r.chatSurfaceToday = to;
       });
     });
     parts.push(`<div class="rss-warn">⚑ <b>Course change${feed.courses.length===1?'':'s'} applied.</b><br>` +
@@ -2358,6 +2373,23 @@ document.getElementById('computeBtn').addEventListener('click', () => {
       ltStarts: r.ltStarts, ltWins: r.ltWins, ltPlaces: r.ltPlaces,
       ltShows: r.ltShows, ltEarn: r.ltEarn,
       ppRaces: r.ppRaces || [],
+      // The Chat port's own fields — never copied into this object before,
+      // so every surface-dependent read in it (surface itself, all six
+      // best-speed variants, trainer/jockey combo, today's raceType and
+      // track condition) was silently reading undefined. Found while
+      // checking Chat's own reported all-weather fix against real data —
+      // the actual bug here was upstream of anything Chat described.
+      surface: r.surface || '',
+      trackCode: r.trackCode || '', raceDateYmd: r.raceDateYmd || '',
+      chatRaceType: r.chatRaceType || '', chatTrackCond: r.chatTrackCond || '',
+      chatTjStarts: r.chatTjStarts, chatTjWins: r.chatTjWins,
+      chatTjPlaces: r.chatTjPlaces, chatTjShows: r.chatTjShows, chatTjROI: r.chatTjROI,
+      chatBestFast: r.chatBestFast, chatBestTurf: r.chatBestTurf, chatBestOff: r.chatBestOff,
+      chatBestDist: r.chatBestDist, chatBestTrack: r.chatBestTrack, chatBestLife: r.chatBestLife,
+      chatSurfaceToday: r.chatSurfaceToday || '', chatBestAW: r.chatBestAW,
+      chatAWStarts: r.chatAWStarts, chatAWWins: r.chatAWWins, chatAWPlaces: r.chatAWPlaces,
+      chatAWShows: r.chatAWShows, chatAWEarn: r.chatAWEarn,
+      trnPlaces: r.trnPlaces, trnShows: r.trnShows,
       ppWorks: r.ppWorks || []
     });
   });
@@ -3594,12 +3626,12 @@ function grok_convictionVetoes(rs, p){
 }
 function chat_calculateHorseScore(horse, field, allRows){
   const pp = chat_relativeFeature(horse, field, x => chat_number(x.rawPP));
-  const todaySurface = chat_surfaceGroup(horse.surface);
+  const todaySurface = chat_surfaceGroup(horse.chatSurfaceToday);
   const currentSpeed = todaySurface==='T'
     ? chat_relativeFeature(horse, field, x => chat_lastSurfaceSpeed(x))
     : chat_relativeFeature(horse, field, x => chat_number(x.lastSpd));
   const recentSpeed = todaySurface==='T'
-    ? chat_relativeFeature(horse, field, x => { const vals=(x.ppRaces||[]).filter(r=>chat_sameSurface(x.surface,r.surf)).slice(0,5).map(r=>chat_number(r.spd)).filter(v=>v>0); return chat_avg(vals); })
+    ? chat_relativeFeature(horse, field, x => { const vals=(x.ppRaces||[]).filter(r=>chat_sameSurface(x.chatSurfaceToday,r.chatSurf)).slice(0,5).map(r=>chat_number(r.spd)).filter(v=>v>0); return chat_avg(vals); })
     : chat_speedFormFit(horse, field);
   const bestSpeed = chat_bestSpeedFit(horse, field);
   const form = chat_formScore(horse);
@@ -3626,6 +3658,8 @@ function chat_calculateHorseScore(horse, field, allRows){
   score += (postFit-.5)*.05;
   const turfProof = chat_turfProofStatus(horse);
   score += turfProof.adjust;
+  const allWeatherProof = chat_allWeatherProofStatus(horse);
+  score += allWeatherProof.adjust;
   const days = chat_number(horse.layoffDays);
   if (days>120) score -= .015; else if (days>60) score -= .006;
   const drop = chat_classDropStatus(horse);
@@ -3702,7 +3736,7 @@ function chat_performanceEarningsSupport(field, horse){
   let points=0, max=0;
   const ce = chat_rankValue(horse, active, chat_careerEPS);
   if (ce.count>=3 && ce.rank!==null){ max+=2; if (ce.rank===1) points+=2; else if (ce.rank<=3) points+=1; }
-  const g = chat_surfaceGroup(horse.surface), cg = chat_conditionGroup(horse.chatTrackCond);
+  const g = chat_surfaceGroup(horse.chatSurfaceToday), cg = chat_conditionGroup(horse.chatTrackCond);
   let surfRank=null;
   if (g==='T') surfRank = chat_rankValue(horse, active, chat_turfEPS);
   else if (g==='D' && cg==='OFF') surfRank = chat_rankValue(horse, active, chat_wetEPS);
@@ -3792,7 +3826,7 @@ function chat_competitiveAtLevel(pp){
   const fin = chat_number(pp && pp.fin), bl = chat_number(pp && pp.margin);
   return (fin>0 && fin<=4) || (bl>=0 && bl<=5);
 }
-function chat_surfaceMatchesToday(pp, horse){ return chat_sameSurface(pp && pp.surf, horse && horse.surface); }
+function chat_surfaceMatchesToday(pp, horse){ return chat_sameSurface(pp && pp.surf, horse && horse.chatSurfaceToday); }
 function chat_entryLevelFit(horse){
   const nowProfile = chat_todayClassProfile(horse);
   const recent = (horse.ppRaces||[]).slice(0,6).map(p => ({p, delta: chat_classLevelDelta(chat_ppClassProfile(p), nowProfile)})).filter(x => x.delta!==null);
@@ -3851,7 +3885,7 @@ function chat_modelBestBetProfile(scored, field){
   const quality = top.components.quality;
   const separation = second ? (top.probability-second.probability) : top.probability;
   const structural = chat_raceDecision(top, active);
-  const surfGroup = chat_surfaceGroup(horse.surface);
+  const surfGroup = chat_surfaceGroup(horse.chatSurfaceToday);
   const turf = chat_turfProofStatus(horse);
   const surfaceOK = surfGroup!=='T' || turf.code==='PROVEN' || turf.code==='COMPETITIVE';
   const consensus = chat_signalConsensus(active, horse);
@@ -3983,19 +4017,23 @@ function chat_conditionGroup(value){
   return s;
 }
 function chat_surfaceBestSpeed(horse){
-  const g = chat_surfaceGroup(horse.surface);
+  const g = chat_surfaceGroup(horse.chatSurfaceToday);
   const cond = chat_conditionGroup(horse.chatTrackCond);
+  // v7.53 fix: all-weather gets its own dedicated BRIS field, not a dirt or
+  // lifetime fallback that may really be a turf figure in disguise — this
+  // is the exact mechanism behind the Kalik/American Reign misreads.
   if (g === 'T') return chat_number(horse.chatBestTurf);
+  if (g === 'A') return chat_number(horse.chatBestAW);
   if (g === 'D' && cond === 'OFF') return chat_number(horse.chatBestOff) || chat_number(horse.chatBestFast) || chat_number(horse.chatBestLife);
   if (g === 'D') return chat_number(horse.chatBestFast) || chat_number(horse.chatBestLife);
   return chat_number(horse.chatBestLife);
 }
 function chat_surfaceSpeedScore(horse){
-  const vals = (horse.ppRaces||[]).filter(r => chat_sameSurface(horse.surface, r.surf)).slice(0,5).map(r => chat_number(r.spd)).filter(v => v>0);
+  const vals = (horse.ppRaces||[]).filter(r => chat_sameSurface(horse.chatSurfaceToday, r.chatSurf)).slice(0,5).map(r => chat_number(r.spd)).filter(v => v>0);
   return chat_avg(vals);
 }
 function chat_lastSurfaceSpeed(horse){
-  const pp = (horse.ppRaces||[]).find(r => chat_sameSurface(horse.surface, r.surf) && chat_number(r.spd) > 0);
+  const pp = (horse.ppRaces||[]).find(r => chat_sameSurface(horse.chatSurfaceToday, r.chatSurf) && chat_number(r.spd) > 0);
   return pp ? chat_number(pp.spd) : 0;
 }
 function chat_conditionSpeedScore(horse){
@@ -4005,11 +4043,11 @@ function chat_conditionSpeedScore(horse){
   return chat_avg(vals);
 }
 function chat_turfProofStatus(horse){
-  if (chat_surfaceGroup(horse.surface) !== 'T') return {code:'NA', label:'', adjust:0, detail:''};
+  if (chat_surfaceGroup(horse.chatSurfaceToday) !== 'T') return {code:'NA', label:'', adjust:0, detail:''};
   const starts = chat_number(horse.turfStarts), wins = chat_number(horse.turfWins),
         places = chat_number(horse.turfPlaces), shows = chat_number(horse.turfShows);
   const itm = wins+places+shows;
-  const recent = (horse.ppRaces||[]).filter(r => chat_sameSurface('T', r.surf)).slice(0,5);
+  const recent = (horse.ppRaces||[]).filter(r => chat_sameSurface('T', r.chatSurf)).slice(0,5);
   const competitive = recent.filter(r => {
     const fin = chat_number(r.fin), bl = chat_number(r.margin);
     return (fin>0 && fin<=4) || (bl>=0 && bl<=5);
@@ -4019,6 +4057,25 @@ function chat_turfProofStatus(horse){
   if (wins>0 || competitive>=2) return {code:'PROVEN', label:'PROVEN TURF', adjust:0.035, detail:`${starts} turf starts; ${wins} wins; ${competitive} recent competitive efforts.`};
   if (itm>0 || competitive===1) return {code:'COMPETITIVE', label:'TURF COMPETITIVE', adjust:0.015, detail:`Competitive turf effort; ${starts} turf starts.`};
   return {code:'EXPERIENCED', label:'TURF EXPERIENCE', adjust:-0.01, detail:`${starts} turf starts, limited competitive evidence.`};
+}
+// v7.53's actual all-weather fix, ported: a dedicated proof check using the
+// BRIS lifetime all-weather record and best-speed field, instead of falling
+// through to a dirt or lifetime figure that may really be a turf number.
+function chat_allWeatherProofStatus(horse){
+  if (chat_surfaceGroup(horse.chatSurfaceToday) !== 'A') return {code:'NA', label:'', adjust:0, detail:''};
+  const starts = chat_number(horse.chatAWStarts), wins = chat_number(horse.chatAWWins),
+        places = chat_number(horse.chatAWPlaces), shows = chat_number(horse.chatAWShows);
+  const itm = wins+places+shows;
+  const recent = (horse.ppRaces||[]).filter(r => chat_sameSurface('A', r.chatSurf)).slice(0,5);
+  const competitive = recent.filter(r => {
+    const fin = chat_number(r.fin), bl = chat_number(r.margin);
+    return (fin>0 && fin<=3) || (bl>=0 && bl<=3);
+  }).length;
+  if (starts<=0) return {code:'UNPROVEN', label:'UNPROVEN ALL-WEATHER', adjust:-0.055, detail:'No prior all-weather starts in the BRIS lifetime record.'};
+  if (wins>0 && (itm/starts)>=.40) return {code:'PROVEN', label:'PROVEN ALL-WEATHER', adjust:0.03, detail:`${starts} all-weather starts; ${wins} wins; ${itm} in the money.`};
+  if (itm>0 || competitive>0) return {code:'COMPETITIVE', label:'ALL-WEATHER COMPETITIVE', adjust:0.01, detail:`${starts} all-weather starts; ${itm} in the money; ${competitive} recent competitive effort${competitive===1?'':'s'}.`};
+  if (starts>=3) return {code:'WEAK', label:'WEAK ALL-WEATHER RECORD', adjust:-0.04, detail:`${starts} all-weather starts with no in-the-money finish.`};
+  return {code:'THIN', label:'THIN ALL-WEATHER', adjust:-0.02, detail:`Only ${starts} all-weather start${starts===1?'':'s'} and limited evidence.`};
 }
 function chat_dataQuality(horse){
   const core = [
@@ -4144,7 +4201,7 @@ function chat_postFinishPerformance(fin, entrants){
 // rather than reaching for a global, and callers pass Overlay Board's rows.
 function chat_postPositionEvidence(horse, field, allRows){
   const targetTrack = String(horse.trackCode || '').trim().toUpperCase();
-  const targetSurface = horse.surface;
+  const targetSurface = horse.chatSurfaceToday;
   const targetDistance = Math.abs(chat_number(horse.raceDistYds));
   if (!targetSurface || targetDistance<=0) return {score:.5, sample:0, bucket:'MIDDLE', source:'none'};
   const todaysSpan = Math.max(field.length, ...field.map(h => chat_number(h.post)).filter(v=>v>0));
@@ -4159,7 +4216,7 @@ function chat_postPositionEvidence(horse, field, allRows){
         const priorPost = chat_number(r.pastPost);
         const performance = chat_postFinishPerformance(r.fin, entrants);
         if (performance===null) return;
-        if (!chat_sameSurface(targetSurface, r.surf)) return;
+        if (!chat_sameSurface(targetSurface, r.chatSurf)) return;
         if (targetDistance>0 && priorDistance>0 && Math.abs(priorDistance-targetDistance)>220) return;
         if (trackOnly && targetTrack && priorTrack!==targetTrack) return;
         observations.push({bucket: chat_postBucket(priorPost, entrants), performance});
@@ -5439,7 +5496,7 @@ function paceShapeText(p){
   return 'even shape';
 }
 
-function ppHorseBlock(h, race, standalone){
+function ppHorseBlock(h, race, standalone, inModal){
   const wpsSets = raceRunnerSets(race);
   const races = (h.ppRaces || []).map(p => `
     <tr><td>${fmtPPDate(p.date)}</td><td>${escHtml(p.track||'')}</td><td>${fmtDistY(p.distYds)}${/^[Tt]$/.test(p.surf||'') ? '<span class="pp-turf" title="run on turf">T</span>' : ''}</td><td class="pp-class">${escHtml(p.classTxt || fmtClass(p.rtype, p.claim))}${classLadder(p, h)}</td><td class="pp-post">${(p.pastPost != null && p.pastField != null && p.pastPost >= 1 && p.pastPost <= p.pastField) ? `${p.pastPost}<span class="pp-of">/${p.pastField}</span>` : ''}</td><td>${escHtml(p.fin||'')}</td><td>${p.margin != null ? (p.won ? '<span class="pp-wonby">won ' + p.margin + 'L</span>' : p.margin + 'L') : ''}</td><td class="pp-spd">${p.spd != null && p.spd > 0 ? p.spd : ''}</td><td class="pp-pace">${escHtml(paceCallsText(p))}${paceShapeText(p) ? `<br><span class="pp-of">${escHtml(paceShapeText(p))}</span>` : ''}</td><td>${escHtml((p.comment||'').slice(0,36))}</td><td class="pp-wps">${wpsCell([p.winner, p.second, p.third], wpsSets)}</td></tr>`).join('');
@@ -5448,9 +5505,15 @@ function ppHorseBlock(h, race, standalone){
     return `${bullet ? '● ' : ''}${fmtPPDate(w.date)} ${escHtml(w.track||'')} ${escHtml((w.time||'').replace('-',''))} ${escHtml(w.desc||'')}`;
   }).join('<br>');
   const oddsBit = h.finalOddsStr ? `ML ${escHtml(h.mlOddsStr)} · final ${escHtml(h.finalOddsStr)}` : `ML ${escHtml(h.oddsStr)}`;
+  // Inside the modal only — tapping the name you just tapped to get here
+  // should take you back, same gesture, instead of hunting for the small
+  // back button. The inline embedded use (Top 4 etc.) is untouched: that
+  // tap still opens the modal, it doesn't try to close one that isn't open.
+  const headCls = inModal ? 'pp-head pp-back' : 'pp-head';
+  const headTitle = inModal ? ' title="Tap to go back"' : '';
   const head = standalone
-    ? `<h3 class="pp-head">${escHtml(h.horse)} <span style="font-family:var(--mono);font-size:13px;font-weight:400;">post ${escHtml(h.post || '–')} · ${oddsBit}</span></h3>`
-    : `<h3 class="pp-head" style="font-size:16px;">#${escHtml(h.post || '?')} ${escHtml(h.horse)} <span style="font-family:var(--mono);font-size:12.5px;font-weight:400;">${oddsBit}</span></h3>`;
+    ? `<h3 class="${headCls}"${headTitle}>${escHtml(h.horse)} <span style="font-family:var(--mono);font-size:13px;font-weight:400;">post ${escHtml(h.post || '–')} · ${oddsBit}</span></h3>`
+    : `<h3 class="${headCls}" style="font-size:16px;"${headTitle}>#${escHtml(h.post || '?')} ${escHtml(h.horse)} <span style="font-family:var(--mono);font-size:12.5px;font-weight:400;">${oddsBit}</span></h3>`;
   return `${head}
     <div class="pp-sub">${standalone ? `Race ${escHtml(race)}` : ''}${h.rawPP != null ? `${standalone ? ' · ' : ''}Prime Power ${h.rawPP}` : ''}${h.surfaceRating != null ? ` · surface fit <b class="pp-adj">${h.surfaceRating}</b>` : ''}${h.classMove === 'down' ? ' · <b class="pp-adj">class drop</b>' : h.classMove === 'up' ? ' · <b class="pp-adj">class rise</b>' : ''}${h.runStyle ? ` · run style ${escHtml(h.runStyle)}` : ''}${h.quirin != null ? ` · Quirin ${h.quirin}` : ''}${h.distStarts != null ? ` · starts at today's distance: ${h.distStarts}` : ''}${h.daysSinceWork != null ? ` · last work ${h.daysSinceWork}d ago` : ''}${h.lastSpd != null ? ` · speed last <b class="pp-adj">${h.lastSpd}</b>, best ${h.bestSpd}` : ''}</div>
     ${(() => {
@@ -5524,7 +5587,7 @@ let ppReturn = null;
 
 function markPPReturn(srcEl){
   const onBtn = document.querySelector('#tabbar button.on');
-  const anchor = srcEl && srcEl.closest ? srcEl.closest('.pick-card, .bo-row, .ticket, .field-race, .score-row') : null;
+  const anchor = srcEl && srcEl.closest ? srcEl.closest('.pick-card, .bo-row, .ticket, .field-race, .score-row, .race-anchor-target') : null;
   if (anchor && !anchor.id) anchor.id = 'ppret-' + Math.random().toString(36).slice(2, 9);
   ppReturn = {
     tab: onBtn ? onBtn.dataset.tab : null,
@@ -5577,7 +5640,7 @@ function openRacePP(race, filter, focusName){
   if (focusKey && !showing.some(h => ppKey(h.horse) === focusKey)) showing = all;
   const meta = raceMeta(all);
   const blocks = showing.map(h =>
-    `<div class="pp-horse" id="ppb-${escAttr(ppKey(h.horse))}">${ppHorseBlock(h, race, false)}</div>`).join('');
+    `<div class="pp-horse" id="ppb-${escAttr(ppKey(h.horse))}">${ppHorseBlock(h, race, false, true)}</div>`).join('');
   const matchups = buildMatchupBlock(showing, showing.length ? showing[0].raceDistYds : null)
                  + buildCommonCompanyBlock(showing, showing.length ? showing[0].raceDistYds : null);
   const n = cut.size;
@@ -5614,7 +5677,7 @@ function openPP(race, horseName){
   if (!rc) return;
   const h = rc.horses.find(x => x.horse === horseName);
   if (!h) return;
-  document.getElementById('ppContent').innerHTML = `<button class="pp-back">${ppBackLabel()}</button>` + ppHorseBlock(h, race, true) + PP_FOOT;
+  document.getElementById('ppContent').innerHTML = `<button class="pp-back">${ppBackLabel()}</button>` + ppHorseBlock(h, race, true, true) + PP_FOOT;
   document.querySelector('.pp-card').classList.remove('pp-race-card');
   document.getElementById('ppOverlay').classList.add('show');
 }
@@ -5740,6 +5803,6 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.59 · released 12 September 2026 · build 2026-09-12-j</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.61 · released 13 September 2026 · build 2026-09-13-a</div>
 </body>
 </html>
