@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Overlay Board v1.58 — Race Card Reader</title>
+<title>Overlay Board v1.59 — Race Card Reader</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
@@ -875,7 +875,7 @@
 <body>
 <div class="wrap">
   <header>
-    <p class="eyebrow">Handicapping utility · <span class="ver">v1.58</span> · released 12 September 2026</p>
+    <p class="eyebrow">Handicapping utility · <span class="ver">v1.59</span> · released 12 September 2026</p>
     <h1><span class="flap">O</span><span class="flap">v</span><span class="flap">e</span><span class="flap">r</span><span class="flap">l</span><span class="flap">a</span><span class="flap">y</span> <span class="flap">B</span><span class="flap">o</span><span class="flap">a</span><span class="flap">r</span><span class="flap">d</span></h1>
     <p class="tagline">Upload a data file or program PDF. Overlay Board lays out the whole card: past performances, scratches, money moves, and where the board likes a horse.</p>
   </header>
@@ -3440,7 +3440,7 @@ function bestQuestionableBlockHTML(rs){
   const h = hit.h;
   return `<div class="cc-block">
     <div class="cc-head">Best-supported Questionable horse \u2014 information, not a call</div>
-    <div class="cc-row"><label>#${escHtml(h.post)} <b>${escHtml(h.horse)}</b> \u2014 ${escHtml(h.oddsStr || '')} \u00b7 competitive at today\u2019s level ${h.classFit} of ${h.classSeen} \u00b7 ${hit.epsRank}${ordinalSuffix(hit.epsRank)} on earnings per start (${money(hit.eps)})</label></div>
+    <div class="cc-row"><label>${horseLabel(h)} \u2014 competitive at today\u2019s level ${h.classFit} of ${h.classSeen} \u00b7 ${hit.epsRank}${ordinalSuffix(hit.epsRank)} on earnings per start (${money(hit.eps)})</label></div>
     <div class="cc-agree cc-some">Backtested against 26 pool cards, same criteria: 1 of 11 won (9.1%, close to the 9.4% baseline for all Questionable horses) but 5 of 11 hit the board (45.5% vs a 32.7% baseline). A real-looking gap on a sample too small to trust. This is not a pick and has not been shown to work \u2014 shown alongside whatever the Pick says, not instead of it, so you see it before betting rather than after.</div>
   </div>`;
 }
@@ -4179,6 +4179,43 @@ function chat_postPositionEvidence(horse, field, allRows){
   const delta = shrunk-overall;
   const score = Math.max(.20, Math.min(.80, .5+delta*2));
   return {score, sample:observations.length, bucket:currentBucket, source, delta, bucketSample:bucketRows.length};
+}
+
+function grok_shotScoreOf(h, live, figs){
+  const fi = figs.findIndex(x => x.h === h);
+  const mlOf = x => parseOdds(x.mlOddsStr);
+  const priced = live.filter(x => mlOf(x) != null).sort((a,b) => mlOf(a) - mlOf(b));
+  const mi = priced.indexOf(h) < 0 ? 99 : priced.indexOf(h) + 1;
+  let s = 0;
+  if (fi === 0) s += 4; else if (fi === 1) s += 2; else if (fi === 2) s += 1;
+  if (mi === 1) s += 3; else if (mi === 2) s += 2; else if (mi === 3) s += 1;
+  const meet = grok_lostCleanH2H({horses: live}, h);
+  if (meet && !meet.ok) s -= 2;
+  if (h.lastFinMargin != null && h.lastFinMargin > 8) s -= 1;
+  if (h.layoffDays != null && h.layoffDays >= 180) s -= 1;
+  return s;
+}
+// Sole Call's actual "shot list" — a different, broader ranking than its
+// pickFor: pools every Contender and Questionable horse, adds back the
+// figure leader and the Pick if the market cut either, scores each on
+// figure rank + market rank minus the same H2H/margin/layoff penalties as
+// its Pick veto, and returns the top 4. This is very likely the real source
+// of a "9 of 10" style claim, since — unlike pickFor — it names someone in
+// almost every race, not just the ones that clear every gate.
+function grok_shotListFor(rs){
+  const live = (rs.horses || []).filter(h => !h.scratched);
+  if (live.length < 2) return [];
+  const byMkt = live.filter(h => h.decimalOdds != null).slice().sort((a,b) => (a.decimalOdds||99) - (b.decimalOdds||99));
+  const split = contenderSplit({race: rs.race, horses: live, byMarket: byMkt})
+    || {contenders: live.map(h => ({h, why: []})), questionable: [], pretenders: []};
+  const pool = split.contenders.concat(split.questionable).map(x => x.h);
+  const figs = live.map(h => ({h, v: avg3Of(h)})).filter(x => x.v != null).sort((a,b) => b.v - a.v);
+  if (figs[0] && pool.indexOf(figs[0].h) < 0) pool.push(figs[0].h);
+  const pick = grok_pickFor(rs);
+  if (pick && pick.h && pool.indexOf(pick.h) < 0) pool.push(pick.h);
+  const rows = pool.map(h => ({h, score: grok_shotScoreOf(h, live, figs)}));
+  rows.sort((a,b) => b.score - a.score);
+  return rows.slice(0, 4);
 }
 
 function crossCheckBlockHTML(rs){
@@ -5131,7 +5168,7 @@ function renderTop4(raceSummaries){
     const ranked = topProbableRanked(rs);
     const rows = ranked.length
       ? ranked.map((r, i) => `<tr><td class="cmp-metric">${i === 0 ? 'TOP' : 'NEXT ' + i}</td>` +
-          `<td>#${escHtml(r.h.post)} ${escHtml(r.h.horse)}</td><td>${r.v.toFixed(1)}</td>` +
+          `<td>${horseLabel(r.h)}</td><td>${r.v.toFixed(1)}</td>` +
           `<td>${escHtml(r.h.oddsStr || '')}</td></tr>`).join('')
       : `<tr><td colspan="4" class="cp-why">Not enough rated Contenders in this race to rank.</td></tr>`;
     return `<div class="race-card race-anchor-target" id="top4-r-${escAttr(rs.race)}">
@@ -5703,6 +5740,6 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.58 · released 12 September 2026 · build 2026-09-12-i</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.59 · released 12 September 2026 · build 2026-09-12-j</div>
 </body>
 </html>
