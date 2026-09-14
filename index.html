@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Overlay Board v1.64 — Race Card Reader</title>
+<title>Overlay Board v1.66 — Race Card Reader</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
@@ -165,6 +165,15 @@
     background:rgba(0,0,0,.035); border-radius:4px; color:var(--ink-soft);
   }
   .rss-info b, .rss-warn b{color:var(--ink);}
+  .help-block{margin:0 0 22px;}
+  .help-block h3{font-size:15px; margin:0 0 6px; color:var(--ink);}
+  .help-block p{margin:0 0 8px; font-size:13px; line-height:1.55; color:var(--ink-soft);}
+  .help-block p b{color:var(--ink);}
+  .help-status{display:inline-block; font-family:var(--mono); font-size:10.5px; font-weight:700; padding:2px 7px; border-radius:3px; margin-left:6px;}
+  .help-tested{background:#e7f3ea; color:#1f6b3a;}
+  .help-leaning{background:#fff3d0; color:#8a6a26;}
+  .help-flat{background:#f0f0f0; color:#666;}
+  .help-display{background:#e8eef5; color:#315a7d;}
   .table-actions{display:flex; gap:10px; margin-top:12px; flex-wrap:wrap;}
   .primary-btn{
     background:var(--amber); color:var(--ink); border:none; padding:11px 22px;
@@ -877,7 +886,7 @@
 <body>
 <div class="wrap">
   <header>
-    <p class="eyebrow">Handicapping utility · <span class="ver">v1.64</span> · released 13 September 2026</p>
+    <p class="eyebrow">Handicapping utility · <span class="ver">v1.66</span> · released 13 September 2026</p>
     <h1><span class="flap">O</span><span class="flap">v</span><span class="flap">e</span><span class="flap">r</span><span class="flap">l</span><span class="flap">a</span><span class="flap">y</span> <span class="flap">B</span><span class="flap">o</span><span class="flap">a</span><span class="flap">r</span><span class="flap">d</span></h1>
     <p class="tagline">Upload a data file or program PDF. Overlay Board lays out the whole card: past performances, scratches, money moves, and where the board likes a horse.</p>
   </header>
@@ -970,6 +979,7 @@
       <button data-tab="cards" class="on">Race cards</button>
       <button data-tab="field">Full field</button>
       <button data-tab="top4">Top 4</button>
+      <button data-tab="help">Help</button>
       <button data-tab="print">Printable page</button>
     </div>
 
@@ -984,6 +994,86 @@
       <h2><span class="step-num">🖨</span> Printable page</h2>
       <div class="rss-info" style="margin:0 0 14px;">The whole card on one page — picks, race cards and full field. Use your browser's own <b>Print</b> or <b>Share</b> from here.</div>
       <div id="printView"></div>
+    </section>
+
+    <section id="helpSection" style="display:none;">
+      <h2><span class="step-num">?</span> How to read this</h2>
+
+      <div class="help-block">
+        <h3>The Pick <span class="help-status help-display">frozen rule</span></h3>
+        <p>Only the <b>morning-line favourite</b> is ever eligible — nobody else can be named. It becomes the Pick under one condition: it also holds the field's <b>sole</b> highest mean of its last three speed figures. A tie at the top doesn't count. Second on that figure doesn't count. Needs three runners in the race carrying a figure at all.</p>
+        <p>That's the whole rule. Nothing about readability, pace, works, or barn entries touches it — those all sit next to the Pick as information, never as a gate. Tested against the 26-card pool: a favourite that clears this condition wins <b>44.5%</b> of the time; a favourite that fails it wins <b>33.8%</b>; a favourite with no filter at all wins <b>38.6%</b>. The condition is doing real work (z=1.73), though not yet at full confidence.</p>
+      </div>
+
+      <div class="help-block">
+        <h3>Price play <span class="help-status help-display">fallback rule</span></h3>
+        <p>Used only when no Pick fires: the morning-line favourite is <b>second</b> in the field on career earnings per start. A separate, weaker line — logged, never treated the same as a Pick.</p>
+      </div>
+
+      <div class="help-block">
+        <h3>Contenders / Questionable / Pretenders</h3>
+        <p>Every runner sorted into one of three buckets based on price and form evidence. Contenders are live. Questionable horses lack clean evidence either way. Pretenders are priced out with nothing to rescue them. This is what "Also with a shot" and Top 4 both draw from.</p>
+      </div>
+
+      <div class="help-block">
+        <h3>Top 4 probable</h3>
+        <p>The four highest-ranked Contenders by figure, shown per race and in their own tab for a quick scan across the whole card. Tap any name to open its full past performances; tap the name again inside that view to come straight back to Top 4.</p>
+      </div>
+
+      <div class="help-block">
+        <h3>Also with a shot</h3>
+        <p>The rest of the field, ordered by the same read that flagged Army's Marauder — competitive-at-today's-level ratio first, earnings per start as the tiebreaker. Not by price. A horse with no comparable starts to judge sorts to the end, not the top.</p>
+      </div>
+
+      <div class="help-block">
+        <h3>Best-supported Questionable <span class="help-status help-display">display only</span></h3>
+        <p>Fires when a Questionable horse clears a real bar — competitive at today's level, top-2 on earnings per start. Shown next to the Pick whether or not one fired. Doesn't change the Pick.</p>
+      </div>
+
+      <div class="help-block">
+        <h3>Worth a second look — pace <span class="help-status help-leaning">real-looking, not confirmed</span></h3>
+        <p>Fires when the Pick's own last three starts show a fading majority (2 of 3, read from the pace figures below) <b>and</b> a genuine Contender in the same field shows the opposite. Pool test: a figure leader with a fading pattern wins <b>24.6%</b> (n=61) vs <b>36.5%</b> when it doesn't (n=96) — z=1.56. Real-looking, short of the 1.96 bar for confirmed. Doesn't change the Pick.</p>
+      </div>
+
+      <div class="help-block">
+        <h3>Cross-check — Overlay Board / Grok / Chat</h3>
+        <p>All three computed natively from the same field, nothing typed in. Grok is Sole Call's actual pick logic, ported from its real source. Chat is Horse Handicap's full scoring pipeline, same treatment, including its own all-weather fix. Agreement across all three, even unanimous, is information — not a verdict. Tested directly: on a full card where all six fired picks got exact 3-way agreement, one of those six still lost.</p>
+      </div>
+
+      <div class="help-block">
+        <h3>Readability <span class="help-status help-display">display only</span></h3>
+        <p>How thick the field's data actually is — green, yellow (thin), or red (blind). Never suppresses or overrides the Pick. A blind-record Pick still fires; the color just tells you how much you're trusting a thin field when it does.</p>
+      </div>
+
+      <div class="help-block">
+        <h3>"Too close to call" <span class="help-status help-flat">tested, no signal</span></h3>
+        <p>Flags when the top few horses are within 3 points of each other on <b>Prime Power</b> — a different rating from the speed figure the Pick uses, so this can fire even when the Pick's own figure has a clean, sole leader. Tested directly: fired picks won 44.9% when Prime Power was tight at the top, 43.3% when it wasn't — z=-0.16, essentially flat. The flag is real information about the field; it doesn't mean the Pick is less trustworthy.</p>
+      </div>
+
+      <div class="help-block">
+        <h3>Reading a past-performance line</h3>
+        <p>Date, track, distance, surface, post, class move (▲ tougher · = about the same · ▼ easier than today), finish, who won/placed/showed, the BRIS speed figure, <b>Pace</b>, class text, trip comment.</p>
+        <p><b>Pace</b> shows the BRIS pace-call figures for that race in order (2-call, 4-call, 6-call, 8-call, late pace — same rating scale as Speed) plus a plain read of the shape: <b>faded late</b> if the early number drops off, <b>closed late</b> if it climbs, <b>even shape</b> otherwise. A fact about that one race, not a score. Tested field-wide (1,305 runners): winners show a fading majority 46.7% of the time, losers 53.1% — z=1.54, real-looking, not confirmed on its own. Restricted to figure leaders specifically it firms up a little (24.6% vs 36.5%, z=1.56) — see "Worth a second look" above.</p>
+      </div>
+
+      <div class="help-block">
+        <h3>Full Field columns</h3>
+        <p><b>Form arrow</b> — beaten-lengths trend across the last few starts, oldest to newest: green ▲ closing (finishing closer than before), red ▼ widening (falling further behind), dash flat. Tap the arrow to reveal the actual sequence. Tested twice tonight (recency-of-figure, works-at-track) with no signal found either time — this stays a display fact, same as pace.</p>
+        <p><b>Speed column with LONE tag</b> — Quirin speed points, BRIS's own 0–8 scale for early-speed tendency, not a speed figure. LONE means the top horse is at least 5 on that scale and at least 2 points clear of the next — likely gets an uncontested early lead. The 8-point scale has nothing to do with field size.</p>
+        <p><b>The numeric speed column</b> (e.g. "94 (88)") — the actual BRIS speed figure: last race, best figure in parentheses if different. This is the number the Pick rule is built on.</p>
+      </div>
+
+      <div class="help-block">
+        <h3>Tapping around</h3>
+        <p>Any horse name with a dotted underline opens its full past performances. Inside that view, tap the horse's own name again to return to wherever you came from — Top 4, Full Field, a race card. Closing normally (the ✕ or tapping outside) does the same.</p>
+      </div>
+
+      <div class="help-block">
+        <h3>What's actually been tested, and what hasn't</h3>
+        <p><span class="help-status help-tested">tested / real</span> Fired Pick (favourite + sole top figure) vs favourite alone — z=1.73, the strongest number found.</p>
+        <p><span class="help-status help-leaning">leaning, unconfirmed</span> Pace fade in the Pick vs a closing Contender — z=1.56. Three-horse barn entries — a real-looking drop, but n=23, far too small to trust.</p>
+        <p><span class="help-status help-flat">tested, flat</span> H2H rematch pattern. Declared-longshot pattern (n too small either way). Prime Power tightness. Most-recent-race-is-weakest pattern. Zero works at today's track. Multi-entry barns generally. Pure figure-only or Prime-Power-only ranking, ignoring the market entirely — actually <b>worse</b> than just trusting the favourite (29–30% vs 38.6%).</p>
+      </div>
     </section>
 
     <section id="resultsSection" style="display:none;">
@@ -5118,7 +5208,8 @@ const TABS = {
   print: ['printSection'],
   cards: ['resultsSection'],
   field: ['fieldSection'],
-  top4: ['top4Section']
+  top4: ['top4Section'],
+  help: ['helpSection']
 };
 function showTab(name){
   if (name === 'print') renderPrintView();
@@ -5257,6 +5348,15 @@ function isScratchedNow(rs, h){
 // once instead of reading one race in full at a time. Post, name, avg-3,
 // nothing else; the full detail stays on the race card where it's already
 // verified to work.
+function raceConditionsAbbrev(rs){
+  const h = (rs.horses || []).find(x => x.raceDistYds != null || x.classTxtToday);
+  if (!h) return '';
+  const dist = fmtDistY(h.raceDistYds);
+  const surf = (h.surface || '').trim().toUpperCase() || '?';
+  const cls = (h.classTxtToday || '').trim();
+  const parts = [dist, surf].filter(Boolean).join(' ');
+  return [parts, cls].filter(Boolean).join(' \u00b7 ');
+}
 function renderTop4(raceSummaries){
   const nav = document.getElementById('top4Nav');
   const list = document.getElementById('top4List');
@@ -5270,7 +5370,7 @@ function renderTop4(raceSummaries){
           `<td>${escHtml(r.h.oddsStr || '')}</td></tr>`).join('')
       : `<tr><td colspan="4" class="cp-why">Not enough rated Contenders in this race to rank.</td></tr>`;
     return `<div class="race-card race-anchor-target" id="top4-r-${escAttr(rs.race)}">
-      <div class="race-card-top"><strong class="race-no">Race ${escHtml(rs.race)}</strong></div>
+      <div class="race-card-top"><strong class="race-no">Race ${escHtml(rs.race)}</strong> <span class="cp-why">${escHtml(raceConditionsAbbrev(rs))}</span></div>
       <div class="table-wrap"><table class="cmp-table"><thead><tr><th></th><th>Horse</th><th>Avg-3</th><th>ML</th></tr></thead>
       <tbody>${rows}</tbody></table></div>
     </div>`;
@@ -5855,6 +5955,6 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.64 · released 13 September 2026 · build 2026-09-13-d</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.66 · released 13 September 2026 · build 2026-09-13-f</div>
 </body>
 </html>
