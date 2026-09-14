@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Overlay Board v1.55 — Race Card Reader</title>
+<title>Overlay Board v1.57 — Race Card Reader</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
@@ -875,7 +875,7 @@
 <body>
 <div class="wrap">
   <header>
-    <p class="eyebrow">Handicapping utility · <span class="ver">v1.55</span> · released 12 September 2026</p>
+    <p class="eyebrow">Handicapping utility · <span class="ver">v1.57</span> · released 12 September 2026</p>
     <h1><span class="flap">O</span><span class="flap">v</span><span class="flap">e</span><span class="flap">r</span><span class="flap">l</span><span class="flap">a</span><span class="flap">y</span> <span class="flap">B</span><span class="flap">o</span><span class="flap">a</span><span class="flap">r</span><span class="flap">d</span></h1>
     <p class="tagline">Upload a data file or program PDF. Overlay Board lays out the whole card: past performances, scratches, money moves, and where the board likes a horse.</p>
   </header>
@@ -3432,14 +3432,175 @@ function bestQuestionableBlockHTML(rs){
     <div class="cc-agree cc-some">Backtested against 26 pool cards, same criteria: 1 of 11 won (9.1%, close to the 9.4% baseline for all Questionable horses) but 5 of 11 hit the board (45.5% vs a 32.7% baseline). A real-looking gap on a sample too small to trust. This is not a pick and has not been shown to work \u2014 shown alongside whatever the Pick says, not instead of it, so you see it before betting rather than after.</div>
   </div>`;
 }
+// ===== GROK (SOLE CALL) PICK, PORTED FROM ITS ACTUAL SOURCE =====
+// Not a guess at what Grok would do — this is Sole Call v1.51's own pickFor
+// and its supporting functions, copied over and run against the same parsed
+// field. Everything here that's identical to Overlay Board's own code
+// (topAvg3Sole, avg3Of, findMatchups, confidenceOf, earningsLeader,
+// escHtml, ordinalSuffix, isScratchedNow) is reused directly, verified
+// identical against Grok's actual source before reuse. Only the five
+// functions that genuinely diverge are copied in below, under their own
+// names so nothing here can touch Overlay Board's own frozen rule.
+function grok_todayYdsOf(rs){
+  const live = (rs.horses || []).filter(h => !h.scratched);
+  return live.map(h => h.raceDistYds).find(v => v != null) || null;
+}
+function grok_comparableFigs(h, yds){
+  if (yds == null) return [];
+  return ((h && h.ppRaces) || [])
+    .filter(p => p.spd != null && p.spd > 0 && p.distYds != null && Math.abs(p.distYds - yds) <= 440)
+    .slice(0, 3)
+    .map(p => p.spd);
+}
+function grok_topComparableAvg3Sole(rs, h){
+  const yds = grok_todayYdsOf(rs);
+  if (yds == null) return {ok: false, why: 'today\u2019s distance is not on file'};
+  const rated = (rs.horses || []).filter(x => !x.scratched)
+    .map(x => ({x, figs: grok_comparableFigs(x, yds)}))
+    .filter(t => t.figs.length >= 2)
+    .map(t => ({x: t.x, v: t.figs.reduce((a,b)=>a+b,0) / t.figs.length, n: t.figs.length}))
+    .sort((a, b) => b.v - a.v);
+  if (rated.length < 3) return {ok: false, why: 'fewer than three runners carry two figures at today\u2019s trip'};
+  if (rated[0].v === rated[1].v) return {ok: false, why: 'the top trip-matched figure average is tied'};
+  if (rated[0].x !== h){
+    const place = rated.findIndex(r => r.x === h);
+    return {ok: false, why: place < 0
+      ? 'does not carry two figures at today\u2019s trip'
+      : `it is ${ordinalSuffix(place + 1)} on trip-matched figures, behind ${escHtml(rated[0].x.horse)}`};
+  }
+  return {ok: true, why: '', rated};
+}
+function grok_tripBlocksPick(trip){
+  if (!trip || trip.ok) return false;
+  const w = String(trip.why || '');
+  if (w.indexOf('distance is not on file') !== -1) return false;
+  if (w.indexOf('fewer than three') !== -1) return false;
+  return true;
+}
+function grok_lostCleanH2H(rs, h){
+  const live = (rs.horses || []).filter(x => !x.scratched);
+  if (!h || live.length < 2) return {ok: true, why: ''};
+  const yds = grok_todayYdsOf(rs);
+  const TROUBLE = ['bump','bmp','check','chk','stumbl','bobbl','awk','reluctant','veer','clip','jostl','squeez','forced wide','broke slow','steadied','stdy','shuffl','blocked','boxed','traffic','crowd','pinch','wide trip','no room','lost iron','fractious'];
+  const hits = findMatchups(live).filter(m => {
+    if (!m.winner || m.loser !== h) return false;
+    if (yds != null && m.distYds != null && Math.abs(m.distYds - yds) > 440) return false;
+    const pp = m.loser === m.a ? m.pa : m.pb;
+    const cmt = String((pp && pp.comment) || '').toLowerCase();
+    if (cmt && TROUBLE.some(k => cmt.includes(k))) return false;
+    return true;
+  });
+  if (!hits.length) return {ok: true, why: ''};
+  const m = hits[0];
+  const when = m.date ? String(m.date) : '';
+  return {ok: false, why: `already beaten by ${escHtml(m.winner.horse)} in this field` +
+    (when ? ` (${escHtml(when)})` : '') + ' at a comparable trip, with no trouble note to excuse it'};
+}
+function grok_soleMorningLineFav(rs, fav){
+  const mlOf = x => parseOdds(x.mlOddsStr);
+  const priced = (rs.horses || []).filter(x => !x.scratched && mlOf(x) != null);
+  if (!fav || priced.length < 2) return {ok: false, why: 'no second price to compare'};
+  const favMl = mlOf(fav);
+  const tied = priced.filter(x => x !== fav && Math.abs(mlOf(x) - favMl) < 0.05);
+  if (tied.length) return {ok: false, why: `co-favourite with ${tied.map(x => x.horse).join(', ')}`};
+  return {ok: true, why: ''};
+}
+function grok_raceReadGate(rs){
+  const live = (rs.horses || []).filter(h => !h.scratched);
+  const n = live.length;
+  if (!n) return null;
+  const noStarts = live.filter(h => !(h.ppRaces || []).some(p => p.fin != null && p.fin !== '')).length;
+  const figured  = live.filter(h => (h.ppRaces || []).some(p => p.spd > 0)).length;
+  const yds = live.map(h => h.raceDistYds).find(v => v != null) || null;
+  const why = [];
+  let level = 'read';
+  if (yds != null && yds >= 3000){ level = 'none'; why.push('distance outside what flat figures describe'); }
+  if (figured < 3){ level = 'none'; why.push(`only ${figured} runner${figured === 1 ? '' : 's'} carry a figure`); }
+  if (noStarts / n >= 0.25){ level = 'none'; why.push(`${noStarts} of ${n} have never started`); }
+  if (level === 'read'){
+    if (noStarts > 0 && n >= 10){ level = 'thin'; why.push(`${noStarts} first-time starter${noStarts === 1 ? '' : 's'} in a field of ${n}`); }
+    else if (noStarts > 0){ level = 'thin'; why.push(`${noStarts} first-time starter${noStarts === 1 ? '' : 's'}`); }
+    else if (n >= 10){ level = 'thin'; why.push(`field of ${n}`); }
+  }
+  return {level, why, n, noStarts, figured};
+}
+function grok_pickFor(rs){
+  const horses = (rs.horses || []).filter(h => !h.scratched);
+  if (!horses.length) return {none: 'Every runner in this race is scratched.'};
+  const mlOf = x => parseOdds(x.mlOddsStr);
+  const priced = horses.filter(x => mlOf(x) != null);
+  const fav = priced.length ? priced.reduce((a, b) => (mlOf(b) < mlOf(a) ? b : a)) : null;
+  if (!fav) return {none: 'No odds available for this race yet.'};
+  const ability = topAvg3Sole(rs, fav);
+  const trip = grok_topComparableAvg3Sole(rs, fav);
+  const meet = grok_lostCleanH2H(rs, fav);
+  const tripBlocks = grok_tripBlocksPick(trip);
+  if (ability.ok && tripBlocks){
+    return {none: `${fav.horse} leads on last-three figures, but not at today's trip \u2014 ${trip.why}.`};
+  }
+  if (ability.ok && meet && !meet.ok){
+    return {none: `${fav.horse} is the market's choice and tops recent figures, but ${meet.why}.`};
+  }
+  if (ability.ok){
+    const conf = confidenceOf(rs, fav);
+    if (conf.level === 'questionable'){
+      return {none: `${fav.horse} is the market's choice and tops recent figures, but the form carries two measured concerns (${conf.concerns.join('; ')}).`};
+    }
+    return {line: 'primary', h: fav};
+  }
+  const el = earningsLeader(horses);
+  const usableEl = el && !el.noForm ? el : null;
+  const favRow = usableEl ? usableEl.ranked.find(r => r.h === fav) : null;
+  const favEps = favRow ? favRow.eps : null;
+  const rank = favRow ? usableEl.ranked.filter(r => r.eps > favEps).length + 1 : null;
+  const leader = usableEl ? usableEl.ranked[0] : null;
+  if (rank === 2 && leader) return {line: 'price', h: fav};
+  return {none: `${fav.horse} is the market's choice, but ${ability.why}.`};
+}
+function grok_convictionVetoes(rs, p){
+  const vetoes = [];
+  if (!p || p.none || p.line !== 'primary'){
+    vetoes.push(p && p.none ? String(p.none).replace(/<[^>]+>/g, '') : 'not a Pick');
+    return vetoes;
+  }
+  const h = p.h;
+  const gate = grok_raceReadGate(rs);
+  if (!gate || gate.level !== 'read'){
+    vetoes.push(gate && gate.why.length ? `record is not thick enough to read (${gate.why.join('; ')})` : 'record is not thick enough to read');
+  }
+  const conf = confidenceOf(rs, h);
+  if (conf.level !== 'high'){
+    vetoes.push(conf.concerns.length ? `measured concern: ${conf.concerns.join('; ')}` : 'form carries a measured concern');
+  }
+  const sole = grok_soleMorningLineFav(rs, h);
+  if (!sole.ok) vetoes.push(sole.why);
+  const trip = grok_topComparableAvg3Sole(rs, h);
+  if (!trip.ok) vetoes.push(trip.why);
+  const meet = grok_lostCleanH2H(rs, h);
+  if (meet && !meet.ok) vetoes.push(meet.why.replace(/<[^>]+>/g, ''));
+  return vetoes;
+}
 function crossCheckBlockHTML(rs){
   const mine = topOverlayChoice(rs);
   const saved = crossCheck[rs.race] || {};
   const chatVal = saved.chat || '';
-  const grokVal = saved.grok || '';
   const mineNorm = mine ? normHorseName(mine.horse) : '';
   const chatNorm = normHorseName(chatVal);
-  const grokNorm = normHorseName(grokVal);
+
+  // Grok's is computed, not typed in — grok_pickFor is Sole Call v1.51's
+  // actual pickFor, ported and verified against its real source, run here
+  // against the same field. Chat's full scoring pipeline (30+ interdependent
+  // functions — percentile ranking across a dozen dimensions, workout
+  // scoring, a post-position read that scans every row in the file) is a
+  // much larger port to do at the same standard of verification, so it
+  // stays a manual entry for now rather than a rushed, unverified guess.
+  const grokPick = grok_pickFor(rs);
+  const grokHorse = grokPick && grokPick.h ? grokPick.h : null;
+  const grokNorm = grokHorse ? normHorseName(grokHorse.horse) : '';
+  const grokLine = grokHorse
+    ? `<b>${escHtml(grokHorse.horse)}</b> (${escHtml(grokPick.line)})`
+    : `no pick \u2014 ${escHtml((grokPick && grokPick.none || '').replace(/^\S+\s/, m => m))}`;
+
   const entered = [chatNorm, grokNorm].filter(Boolean);
   let agree = '';
   if (mine && entered.length){
@@ -3447,19 +3608,21 @@ function crossCheckBlockHTML(rs){
     if (matches === entered.length && entered.length === 2){
       agree = `<div class="cc-agree cc-all">All three keyed on <b>${escHtml(mine.horse)}</b>.</div>`;
     } else if (matches > 0){
-      agree = `<div class="cc-agree cc-some">${matches} of ${entered.length} entered agree with this program's <b>${escHtml(mine.horse)}</b>.</div>`;
+      agree = `<div class="cc-agree cc-some">${matches} of ${entered.length} agree with this program's <b>${escHtml(mine.horse)}</b>.</div>`;
     } else {
-      agree = `<div class="cc-agree cc-none">No agreement — this program has <b>${escHtml(mine ? mine.horse : 'no live choice')}</b>.</div>`;
+      agree = `<div class="cc-agree cc-none">No agreement \u2014 this program has <b>${escHtml(mine ? mine.horse : 'no live choice')}</b>.</div>`;
     }
   }
   return `<div class="cc-block">
-    <div class="cc-head">Cross-check \u2014 typed in by hand after checking the other two, never fetched</div>
+    <div class="cc-head">Cross-check \u2014 Grok computed from Sole Call's own source, run on this field; Chat typed in until its full model is ported the same way</div>
     <div class="cc-row">
       <label>This program: <b>${mine ? escHtml(mine.horse) : '\u2014'}</b></label>
     </div>
     <div class="cc-row">
+      <label>Grok (computed): ${grokLine}</label>
+    </div>
+    <div class="cc-row">
       <label>Chat's top choice <input type="text" data-crosscheck="chat" data-race="${escAttr(rs.race)}" value="${escAttr(chatVal)}" placeholder="horse name"></label>
-      <label>Grok's top choice <input type="text" data-crosscheck="grok" data-race="${escAttr(rs.race)}" value="${escAttr(grokVal)}" placeholder="horse name"></label>
     </div>
     <div class="cc-result" id="cc-result-${escAttr(rs.race)}">${agree}</div>
   </div>`;
@@ -3606,14 +3769,26 @@ function confidenceOf(rs, h){
 // ones: the value of the cut is that it drops a large slice of the field while
 // keeping nearly every winner, and that is worth seeing whether or
 // not anything argues against the selection.
+// Same read as the Army's Marauder case: competitive-at-today's-level ratio
+// first, earnings per start as the tiebreaker. Horses with no comparable
+// starts or no earnings on file sort last, not first, since there's nothing
+// there to rank them on.
+function ppQualitySort(a, b){
+  const fitA = (a.h.classFit != null && a.h.classSeen) ? a.h.classFit / a.h.classSeen : -1;
+  const fitB = (b.h.classFit != null && b.h.classSeen) ? b.h.classFit / b.h.classSeen : -1;
+  if (fitB !== fitA) return fitB - fitA;
+  const epsA = (a.h.ltStarts && a.h.ltEarn != null) ? a.h.ltEarn / a.h.ltStarts : -1;
+  const epsB = (b.h.ltStarts && b.h.ltEarn != null) ? b.h.ltEarn / b.h.ltStarts : -1;
+  return epsB - epsA;
+}
 function pickContenders(rs, h){
   const split = contenderSplit(rs);
   if (!split) return '';
   const isPick = x => x === h || (x.horse === h.horse && x.post === h.post);
-  const others = split.contenders.filter(x => !isPick(x.h));
-  const quest = split.questionable.filter(x => !isPick(x.h));
+  const others = split.contenders.filter(x => !isPick(x.h)).slice().sort(ppQualitySort);
+  const quest = split.questionable.filter(x => !isPick(x.h)).slice().sort(ppQualitySort);
   const nRunners = (rs.horses || []).filter(x => x.decimalOdds != null).length;
-  const cell = x => `${horseLabel(x.h)}${x.h.lastSpd != null ? ` <span class="cp-why">fig ${x.h.lastSpd}</span>` : ''}`;
+  const cell = x => `${horseLabel(x.h)}${x.h.lastSpd != null ? ` <span class="cp-why">fig ${x.h.lastSpd}</span>` : ''}${(x.h.classFit != null && x.h.classSeen) ? ` <span class="cp-why">${x.h.classFit}/${x.h.classSeen} at level</span>` : ''}`;
   // NB the handlers read data-jump, not data-race. Using the wrong attribute
   // renders a link that looks live and does nothing.
   const link = `<a href="#" class="race-jump" data-jump="${escAttr(rs.race)}" title="Tap for every runner's past performances">read the whole race \u25b8</a>`;
@@ -3621,7 +3796,7 @@ function pickContenders(rs, h){
     return `<div class="conf-others">No other contender in this race \u2014 the rest of the field is priced out. ${link}</div>`;
   }
   return `<div class="conf-others">`
-    + `<b>Also with a shot</b> <span class="cp-order">shortest price first, ${others.length + quest.length + 1} of ${nRunners} runners</span><br>`
+    + `<b>Also with a shot</b> <span class="cp-order">best past-performance read first, ${others.length + quest.length + 1} of ${nRunners} runners</span><br>`
     + others.map(cell).join(' \u00b7 ')
     + (quest.length ? `${others.length ? '<br>' : ''}<span class="cp-why">questionable:</span> ` + quest.map(cell).join(' \u00b7 ') : '')
     + ` &nbsp;${link}</div>`;
@@ -4924,6 +5099,6 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.55 · released 12 September 2026 · build 2026-09-12-f</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.57 · released 12 September 2026 · build 2026-09-12-h</div>
 </body>
 </html>
