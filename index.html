@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Overlay Board v1.62 — Race Card Reader</title>
+<title>Overlay Board v1.64 — Race Card Reader</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
@@ -323,6 +323,8 @@
   .cp-meet{margin-top:10px;}
   .cp-horse{font-weight:700;}
   .cp-why{font-family:var(--mono); font-size:11.5px; color:var(--ink-soft);}
+  .form-arrow-tap{border-bottom:1px dotted var(--rule); cursor:pointer; display:inline-block; padding:12px 6px; margin:-12px -6px; min-width:20px; text-align:center;}
+  .form-arrow-detail{font-family:var(--mono); font-size:10.5px; color:var(--ink-soft); margin-top:3px; white-space:normal; line-height:1.4; max-width:220px;}
   .cp-foot{margin-top:6px; padding-top:8px; border-top:1px solid var(--paper-line);
            font-size:12px; line-height:1.55; color:var(--ink-soft);}
   .cp-foot b{color:var(--ink);}
@@ -875,7 +877,7 @@
 <body>
 <div class="wrap">
   <header>
-    <p class="eyebrow">Handicapping utility · <span class="ver">v1.62</span> · released 13 September 2026</p>
+    <p class="eyebrow">Handicapping utility · <span class="ver">v1.64</span> · released 13 September 2026</p>
     <h1><span class="flap">O</span><span class="flap">v</span><span class="flap">e</span><span class="flap">r</span><span class="flap">l</span><span class="flap">a</span><span class="flap">y</span> <span class="flap">B</span><span class="flap">o</span><span class="flap">a</span><span class="flap">r</span><span class="flap">d</span></h1>
     <p class="tagline">Upload a data file or program PDF. Overlay Board lays out the whole card: past performances, scratches, money moves, and where the board likes a horse.</p>
   </header>
@@ -2679,8 +2681,11 @@ function formArrow(h){
   const f = formRead(h);
   if (!f) return '<span class="form-arrow none">\u2014</span>';
   const glyph = f.trend === 'closing' ? '\u25B2' : f.trend === 'widening' ? '\u25BC' : '\u2013';
-  const title = `Beaten lengths, oldest to newest: ${f.seq} (${f.n} starts${f.comparable ? ' at a comparable distance' : ', mixed distances'}). Display only.`;
-  return `<span class="form-arrow ${f.trend}" title="${escAttr(title)}">${glyph}</span>`;
+  const detail = `Beaten lengths, oldest to newest: ${f.seq} (${f.n} starts${f.comparable ? ' at a comparable distance' : ', mixed distances'}). Display only.`;
+  // title= is a hover tooltip and never fires on a touch screen, so the
+  // sequence behind the arrow was effectively invisible on the phone this
+  // tool is built for. Tapping now reveals the same text inline instead.
+  return `<span class="form-arrow ${f.trend} form-arrow-tap" data-detail="${escAttr(detail)}">${glyph}</span><span class="form-arrow-detail" style="display:none;"></span>`;
 }
 
 // MATCHUPS: pairs in today's field who have already met, matched on exact race
@@ -5788,6 +5793,17 @@ document.addEventListener('click', e => {
     document.body.classList.add('printing-pp');
     window.print();
   }
+  const arrow = e.target.closest ? e.target.closest('.form-arrow-tap') : null;
+  if (arrow){
+    e.preventDefault();
+    const detailEl = arrow.nextElementSibling;
+    if (detailEl && detailEl.classList.contains('form-arrow-detail')){
+      const showing = detailEl.style.display !== 'none';
+      detailEl.style.display = showing ? 'none' : 'block';
+      detailEl.textContent = showing ? '' : arrow.dataset.detail;
+    }
+    return;
+  }
 });
 window.addEventListener('afterprint', () => document.body.classList.remove('printing-pp'));
 
@@ -5839,6 +5855,6 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.62 · released 13 September 2026 · build 2026-09-13-b</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.64 · released 13 September 2026 · build 2026-09-13-d</div>
 </body>
 </html>
