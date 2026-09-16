@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Overlay Board v1.67 — Race Card Reader</title>
+<title>Overlay Board v1.68 — Race Card Reader</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
@@ -881,23 +881,12 @@
     .board{box-shadow:none; border:1px solid #bbb;}
     .race-card, .field-table{page-break-inside:avoid;}
   }
-  /* SURFACE-WINDOW RULE — a second live rule, scored on its own record. */
-  .surf-rule{margin-top:10px; padding:9px 11px; border-left:3px solid #7A6A4C;
-    background:rgba(122,106,76,.07); border-radius:0 4px 4px 0; font-size:12.5px; line-height:1.5;}
-  .surf-rule .sr-tag{display:inline-block; font-family:var(--mono); font-size:9.5px;
-    letter-spacing:.08em; text-transform:uppercase; padding:2px 6px; border-radius:3px;
-    background:#7A6A4C; color:#fff; margin-right:7px; vertical-align:1px;}
-  .surf-rule.sr-fire{border-left-color:#5E7C52; background:rgba(94,124,82,.09);}
-  .surf-rule.sr-fire .sr-tag{background:#5E7C52;}
-  .surf-rule .sr-note{margin-top:5px; font-size:11px; opacity:.72;}
-  .surf-rule .sr-agree{font-family:var(--mono); font-size:10.5px; letter-spacing:.04em;
-    text-transform:uppercase; opacity:.8; margin-top:4px;}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <p class="eyebrow">Handicapping utility · <span class="ver">v1.67</span> · released 15 September 2026</p>
+    <p class="eyebrow">Handicapping utility · <span class="ver">v1.68</span> · released 16 September 2026</p>
     <h1><span class="flap">O</span><span class="flap">v</span><span class="flap">e</span><span class="flap">r</span><span class="flap">l</span><span class="flap">a</span><span class="flap">y</span> <span class="flap">B</span><span class="flap">o</span><span class="flap">a</span><span class="flap">r</span><span class="flap">d</span></h1>
     <p class="tagline">Upload a data file or program PDF. Overlay Board lays out the whole card: past performances, scratches, money moves, and where the board likes a horse.</p>
   </header>
@@ -3329,98 +3318,33 @@ function topAvg3Sole(rs, h){
   return {ok: true, why: '', rated};
 }
 
-// ---- SURFACE-WINDOW RULE: a SECOND live rule, not a filter on the first ----
-// Registered 2026-09-15. Identical to the Pick in every respect except the
-// figure window: instead of the last three figures at any surface, it uses the
-// last three figures run on TODAY'S surface. Everything else is unchanged —
-// morning-line favourite, sole highest mean, at least three rated runners.
+// ---- SURFACE-WINDOW RULE: TESTED AND WITHDRAWN 2026-09-16 ----
+// Shipped in v1.67 as a second live rule (same test as the Pick, with the
+// last-three-figure window restricted to today's surface) on the strength of
+// ONE card. Removed the next day after a proper test. Recorded here so it is
+// not proposed again without new evidence.
 //
-// WHY IT IS SEPARATE AND NOT A REPLACEMENT. The frozen Pick rule is carrying a
-// live record; folding a new window into it would reset that record and end
-// the freeze. This line fires independently, is logged independently and is
-// scored independently, so after N cards the two windows can be compared on
-// the same races instead of argued about.
+// THE TEST: 38 cards paired DRF-to-chart, 351 races scored, across Saratoga,
+// Gulfstream, Churchill, Thistledown, Kentucky Downs and Indianapolis.
+//   frozen Pick (any surface)  104 fires  49 wins  47.1%  flat $2 ROI +17.3%
+//   surface-filtered window    119 fires  54 wins  45.4%  flat $2 ROI +10.2%
+//   distance-filtered window   117 fires  52 wins  44.4%  flat $2 ROI +10.1%
+//   benchmark, ML favourite    351 races 121 wins  34.5%  flat $2 ROI  -9.9%
 //
-// WHAT THE ONE CARD OF EVIDENCE SAYS, recorded here so it is not lost: on IND
-// 2026-09-15 the surface window agreed with the Pick on R3 and R4 (both won)
-// and additionally fired on R8 Luckies Joy, who ran 6th at 0.80. It fired
-// there because the unfiltered window had an exact tie at 72.67 that the
-// surface filter broke by dropping a rival's figure earned at another trip.
-// So its only independent action on the only card tested converted a correct
-// decline into a loser. That is n=1 and is the reason this ships as its own
-// line rather than as a change to the Pick.
+// WHY IT FAILS, which is the part worth keeping. Where both rules fire they
+// name the SAME HORSE in all 92 cases — the windows never disagree about who,
+// only about whether. So the filter's entire effect is in the divergences:
+//   27 races it ADDS that the Pick declines:     10 wins, 37.0%, ROI -10.6%
+//   12 races it SUPPRESSES that the Pick takes:   5 wins, 41.7%, ROI +25.1%
+// It adds losing bets and removes winning ones. Both directions negative.
+// Distance-filtering is worse: its 21 extra fires went 6-for-21, ROI -39.0%.
+// Split at the 2026-09-07 registration date the ordering holds out of sample
+// (frozen 42.1% / +6.2% on 19 fires, surface 38.5% / +0.8% on 26), so this is
+// not an in-sample artefact of the block the Pick was built on.
 //
-// COVERAGE IS THE KNOWN WEAKNESS. On turf races the filter rates far fewer
-// runners (4 of 7 and 6 of 7 on that card), and a turf card of shippers
-// carrying no BRIS figures — Kentucky Downs — is where it will thin out most,
-// which is also where the Pick rule already struggles.
-//
-// Needs two figures rather than three: requiring three on-surface figures
-// silences almost every lightly raced horse and most turf fields.
-function avg3SurfOf(h){
-  if (!h || !h.ppRaces) return null;
-  const figs = h.ppRaces
-    .filter(p => p && p.spd != null && p.spd > 0
-              && chat_sameSurface(p.chatSurf || p.surf, h.chatSurfaceToday))
-    .map(p => p.spd).slice(0, 3);
-  if (figs.length < 2) return null;
-  return figs.reduce((a, b) => a + b, 0) / figs.length;
-}
-
-function topAvg3SurfSole(rs, h){
-  const rated = (rs.horses || []).filter(x => !x.scratched && avg3SurfOf(x) != null)
-                                 .map(x => ({x, v: avg3SurfOf(x)}))
-                                 .sort((a, b) => b.v - a.v);
-  if (rated.length < 3) return {ok: false, why: `only ${rated.length} runner${rated.length === 1 ? '' : 's'} carr${rated.length === 1 ? 'ies' : 'y'} two figures on today's surface`, rated};
-  if (rated[0].v === rated[1].v) return {ok: false, why: 'the top on-surface average is tied', rated};
-  if (rated[0].x !== h) return {ok: false, why: `it is ${ordinalOf(rated.findIndex(r => r.x === h) + 1 || rated.length)} on on-surface figures, behind ${escHtml(rated[0].x.horse)}`, rated};
-  return {ok: true, why: '', rated};
-}
-
-// Computed independently of pickFor so it still reports in races where the
-// Pick declines. Selects on the MORNING LINE for the same reason pickFor does:
-// reading the live odds column would silently switch the horse once final
-// odds are entered.
-function surfacePickFor(rs){
-  const mlOf = x => parseOdds(x.mlOddsStr);
-  const priced = (rs.horses || []).filter(x => !x.scratched && mlOf(x) != null);
-  if (!priced.length) return {none: 'No morning line for this race yet.'};
-  const fav = priced.reduce((a, b) => (mlOf(b) < mlOf(a) ? b : a));
-  const r = topAvg3SurfSole(rs, fav);
-  const mine = avg3SurfOf(fav);
-  const runner = r.rated && r.rated.length > 1 ? r.rated[1] : null;
-  return {ok: r.ok, why: r.why, h: fav, avg: mine, rated: r.rated || [],
-          next: r.ok ? runner : null};
-}
-
-function surfaceRuleLine(rs){
-  const s = surfacePickFor(rs);
-  if (!s || s.none) return '';
-  const surfWordToday = (() => {
-    const g = chat_surfaceGroup((rs.horses && rs.horses[0] && rs.horses[0].chatSurfaceToday) || '');
-    return g === 'T' ? 'turf' : g === 'A' ? 'all-weather' : 'dirt';
-  })();
-  const ratedTxt = `${s.rated.length} of ${(rs.horses || []).filter(x => !x.scratched).length} runners rated on ${surfWordToday}`;
-  const pick = pickFor(rs);
-  const pickName = pick && !pick.none && pick.line === 'primary' ? pick.h : null;
-  const agree = s.ok && pickName === s.h ? 'AGREES WITH THE PICK'
-              : s.ok && pickName ? 'DISAGREES — the Pick names ' + escHtml(pickName.horse)
-              : s.ok ? 'FIRES WHERE THE PICK DECLINES'
-              : pickName ? 'SILENT — the Pick names ' + escHtml(pickName.horse)
-              : 'SILENT, and so is the Pick';
-  if (s.ok){
-    return `<div class="surf-rule sr-fire"><span class="sr-tag">Surface window</span>`
-      + `<b>#${escHtml(s.h.post || '?')} ${escHtml(s.h.horse)}</b> — sole highest mean of its last three ${escHtml(surfWordToday)} figures at <b>${s.avg.toFixed(1)}</b>`
-      + `${s.next ? `, ahead of ${escHtml(s.next.x.horse)} at ${s.next.v.toFixed(1)}` : ''}, and the morning-line favourite.`
-      + `<div class="sr-agree">${agree} · ${escHtml(ratedTxt)}</div>`
-      + `<div class="sr-note">Second live rule, registered 2026-09-15, scored on its own record and kept apart from the Pick. Same test as the Pick with the figure window restricted to today's surface. Untested beyond a single card, where its only independent call lost.</div></div>`;
-  }
-  return `<div class="surf-rule"><span class="sr-tag">Surface window</span>`
-    + `No call — ${escHtml(s.h.horse)} is the market's choice, but ${s.why}.`
-    /* s.why already carries escaped horse names from topAvg3SurfSole — do not escape it again */
-    + `<div class="sr-agree">${agree} · ${escHtml(ratedTxt)}</div>`
-    + `<div class="sr-note">Second live rule, registered 2026-09-15, scored on its own record and kept apart from the Pick.</div></div>`;
-}
+// THE PICK ITSELF REPLICATED on the same 351 races: 47.1% against a 34.5%
+// favourite benchmark over 104 fires, a 12.6-point separation on four times
+// the data it was registered from (87 races). That is the finding to keep.
 
 // ---- CAN THIS RACE BE READ AT ALL? ----
 // A data-availability check on the RACE, separate from which horse is named.
@@ -4776,7 +4700,7 @@ function confidenceBlock(rs, h){
 
 function buildPick(rs){
   const p = pickFor(rs);
-  if (p.none) return `<div class="pick-none race-anchor-target" id="pick-r${escAttr(rs.race)}"><b>Race ${escHtml(rs.race)} — no pick.</b> ${p.none}${surfaceRuleLine(rs)}</div>`;
+  if (p.none) return `<div class="pick-none race-anchor-target" id="pick-r${escAttr(rs.race)}"><b>Race ${escHtml(rs.race)} — no pick.</b> ${p.none}</div>`;
   if (isScratchedNow(rs, p.h)){
     return `<div class="pick-none race-anchor-target" id="pick-r${escAttr(rs.race)}"><b>Race ${escHtml(rs.race)} — no pick.</b> `
       + `${escHtml(p.h.horse)} is marked scratched. Rebuild the card to re-rank the race.</div>`;
@@ -4804,7 +4728,6 @@ function buildPick(rs){
       ${buildEvidenceBlock(rs, h)}
       ${pickFigLine(rs, h)}
       ${h.jockey || h.riderChange ? `<div class="pick-jky">${h.riderChange ? '' : 'Jockey '}${jockeyLine(h)}</div>` : ''}
-      ${surfaceRuleLine(rs)}
       ${blindSpotNote(rs)}
       ${driftDowngrade(h)}
     </div>`;
@@ -4821,7 +4744,6 @@ function buildPick(rs){
     ${buildEvidenceBlock(rs, h)}
     ${pickFigLine(rs, p.h)}
     ${p.h.jockey || p.h.riderChange ? `<div class="pick-jky">${p.h.riderChange ? '' : 'Jockey '}${jockeyLine(p.h)}</div>` : ''}
-    ${surfaceRuleLine(rs)}
     ${blindSpotNote(rs)}
     ${driftDowngrade(p.h)}
   </div>`;
@@ -6061,6 +5983,6 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.67 · released 15 September 2026 · build 2026-09-15-a</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.68 · released 16 September 2026 · build 2026-09-16-a</div>
 </body>
 </html>
