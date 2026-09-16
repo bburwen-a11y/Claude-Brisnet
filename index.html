@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Overlay Board v1.68 — Race Card Reader</title>
+<title>Overlay Board v1.74 — Race Card Reader</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
@@ -17,6 +17,10 @@
     --amber-dim:#8A6A26;
     --red:#8B2A2A;
     --red-dim:#6E2222;
+    --green:#2E6E45;
+    --blue:#315A7D;
+    --rule:#CFC2A0;
+    --paper-tint:#F6F1E2;
     --ink:#1E1B14;
     --ink-soft:#4A4433;
     --mono: ui-monospace, "SF Mono", "Roboto Mono", "Courier New", monospace;
@@ -881,12 +885,53 @@
     .board{box-shadow:none; border:1px solid #bbb;}
     .race-card, .field-table{page-break-inside:avoid;}
   }
+
+  /* PROJECTED PACE + DECISION BOARD (added 2026-09-16) */
+  .pace{margin-top:10px;border-left:3px solid var(--blue);background:rgba(49,90,125,.07);
+    border-radius:0 4px 4px 0;padding:9px 11px;}
+  .pace-head{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+    color:#fff;background:var(--blue);display:inline-block;padding:2px 8px;border-radius:3px;margin-bottom:6px;}
+  .pace-body{font-size:12.5px;line-height:1.55;}
+  .pace-foot{display:block;margin-top:5px;font-size:11px;color:var(--ink-soft);}
+  .pace-order{font-family:var(--mono);font-size:12px;}
+
+  .board-wrap{border:1px solid var(--paper-line);border-radius:4px;overflow:hidden;background:#fff;}
+  .board-row{display:grid;grid-template-columns:54px 1fr;gap:0;border-bottom:1px solid var(--paper-line);}
+  .board-row:last-child{border-bottom:none;}
+  .board-rn{display:flex !important;align-items:center;justify-content:center;font-family:var(--mono);
+    font-weight:800;font-size:17px;line-height:1;color:#fff !important;cursor:pointer;
+    padding:12px 4px;text-decoration:none !important;}
+  .board-rn.lv-green{background:var(--green);} .board-rn.lv-yellow{background:#B98222;}
+  .board-rn.lv-red{background:#9B4B42;} .board-rn.lv-grey{background:#8C8677;}
+  .board-key{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:0 0 10px;
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);}
+  .board-key i{display:inline-block;width:13px;height:13px;border-radius:3px;margin-right:5px;vertical-align:-2px;font-style:normal;}
+  .board-key .k-green{background:var(--green);} .board-key .k-yellow{background:#B98222;}
+  .board-key .k-red{background:#9B4B42;} .board-key .k-grey{background:#8C8677;}
+  .board-t4{margin-top:7px;}
+  .board-t4 summary{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--ink-soft);cursor:pointer;padding:3px 0;list-style:none;}
+  .board-t4 summary::-webkit-details-marker{display:none;}
+  .board-t4 summary::before{content:"\25B8 ";}
+  .board-t4[open] summary::before{content:"\25BE ";}
+  .board-t4 table{width:100%;margin-top:5px;}
+  .board-body{padding:9px 11px;}
+  .board-top{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;}
+  .board-named{font-weight:750;font-size:14.5px;}
+  .board-quiet{color:var(--ink-soft);font-size:13px;}
+  .board-meta{margin-top:5px;font-size:11.5px;color:var(--ink-soft);line-height:1.5;}
+  .board-meta b{color:var(--ink);font-weight:650;}
+  .btag{display:inline-block;font-family:var(--mono);font-size:9.5px;font-weight:700;
+    letter-spacing:.07em;text-transform:uppercase;padding:2px 7px;border-radius:3px;color:#fff;}
+  .btag-pick{background:var(--green);} .btag-price{background:var(--amber-dim);}
+  .btag-none{background:#8C8677;} .btag-read{background:var(--board-800);}
+  .btag-pace{background:var(--blue);}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <p class="eyebrow">Handicapping utility · <span class="ver">v1.68</span> · released 16 September 2026</p>
+    <p class="eyebrow">Handicapping utility · <span class="ver">v1.74</span> · released 16 September 2026</p>
     <h1><span class="flap">O</span><span class="flap">v</span><span class="flap">e</span><span class="flap">r</span><span class="flap">l</span><span class="flap">a</span><span class="flap">y</span> <span class="flap">B</span><span class="flap">o</span><span class="flap">a</span><span class="flap">r</span><span class="flap">d</span></h1>
     <p class="tagline">Upload a data file or program PDF. Overlay Board lays out the whole card: past performances, scratches, money moves, and where the board likes a horse.</p>
   </header>
@@ -895,7 +940,7 @@
     <!-- STEP 1: UPLOAD -->
     <section class="no-print">
       <h2><span class="step-num">1</span> Bring in your data</h2>
-      <div class="upload-grid four-col">
+      <div class="upload-grid three-col">
         <div class="upload-card">
           <h3>Brisnet data file</h3>
           <p>Brisnet’s <b>Single File</b> export, or a <b>multi-part</b> card (the four-file .DRF/.DR2/.DR3/.DR4 set some tracks ship). A <b>.zip</b> is fine and is opened for you — for a multi-part card send the whole zip, since the four files only work as a set. If .drf looks greyed out in the picker, rename it to .csv; the parser reads the contents, not the name.</p>
@@ -920,15 +965,9 @@
           <div class="status" id="pdfPasteStatus"></div>
         </div>
       </div>
-    </section>
-
-    <!-- STEP 2: TABLE -->
-    <section class="no-print">
-      <h2><span class="step-num">2</span> Check &amp; edit entries</h2>
-      <p style="font-size:12.5px; color:var(--ink-soft); margin:-6px 0 12px;"><b>ML odds</b> comes in with the file. <b>Final</b> starts empty — fill it in at the track; it never overwrites the morning line. <b>Surface fit</b> and <b>Class</b> are optional. Tick <b>Scr</b> for a scratch and rebuild the card: scratched horses drop out and the field renormalizes.</p>
-      <div class="scratch-panel">
+      <div class="scratch-panel" style="margin-top:16px;">
         <h3>Apply scratches from the Equibase feed</h3>
-        <p>Load your entries first, then choose the track’s <b>Changes &amp; Scratches</b> feed or paste it below. Scratches are ticked automatically by race and program number. Rider changes are flagged on the card, with the new rider’s meet record where the file has one.</p>
+        <p>Load the data file above first, then choose the track’s <b>Changes &amp; Scratches</b> feed or paste it below. Scratches are ticked automatically by race and program number. Rider changes are flagged on the card, with the new rider’s meet record where the file has one.</p>
         <label class="file-btn" for="rssInput">Choose RSS file</label>
         <input type="file" id="rssInput">
         <textarea id="rssPaste" rows="3" placeholder="…or paste the feed XML here" style="margin-top:10px;"></textarea>
@@ -938,6 +977,12 @@
         <div class="status" id="rssStatus"></div>
         <div id="rssReport"></div>
       </div>
+    </section>
+
+    <!-- STEP 2: TABLE -->
+    <section class="no-print">
+      <h2><span class="step-num">2</span> Check &amp; edit entries</h2>
+      <p style="font-size:12.5px; color:var(--ink-soft); margin:-6px 0 12px;"><b>ML odds</b> comes in with the file. <b>Final</b> starts empty — fill it in at the track; it never overwrites the morning line. <b>Surface fit</b> and <b>Class</b> are optional. Tick <b>Scr</b> for a scratch and rebuild the card: scratched horses drop out and the field renormalizes.</p>
       <div class="table-wrap">
         <table>
           <thead>
@@ -975,17 +1020,16 @@
     <div class="status no-print" id="printStatus"></div>
 
     <div class="tabbar no-print" id="tabbar" style="display:none;">
-      <button data-tab="picks" id="tabPicks">Picks<span class="tab-count" id="pickCount">0</span></button>
+      <button data-tab="picks" id="tabPicks">Decision board<span class="tab-count" id="pickCount">0</span></button>
       <button data-tab="cards" class="on">Race cards</button>
       <button data-tab="field">Full field</button>
-      <button data-tab="top4">Top 4</button>
       <button data-tab="help">Help</button>
       <button data-tab="print">Printable page</button>
     </div>
 
     <section id="picksSection" style="display:none;">
-      <h2><span class="step-num">★</span> Where the board likes a horse</h2>
-      <div class="rss-info" style="margin:0 0 14px;">Two separate lines, and the only place this tool names a horse. <b>Pick</b> &mdash; the market favourite also holds the field's single highest average of its last three speed figures. <b>Price play</b> &mdash; a separate line, used only where a Pick is not available: the morning-line favourite is <i>second</i> in the field on career earnings per start.</div>
+      <h2><span class="step-num">▦</span> Decision board</h2>
+      <div class="rss-info" style="margin:0 0 14px;">The whole card at a glance, then each race in full underneath. Two separate lines name a horse, and this is the only place the tool does so. <b>Pick</b> &mdash; the market favourite also holds the field's single highest average of its last three speed figures. <b>Price play</b> &mdash; a separate line, used only where a Pick is not available: the morning-line favourite is <i>second</i> in the field on career earnings per start.</div>
       <div class="race-nav no-print" id="picksNav"></div>
       <div id="pickList"></div>
     </section>
@@ -1002,7 +1046,7 @@
       <div class="help-block">
         <h3>The Pick <span class="help-status help-display">frozen rule</span></h3>
         <p>Only the <b>morning-line favourite</b> is ever eligible — nobody else can be named. It becomes the Pick under one condition: it also holds the field's <b>sole</b> highest mean of its last three speed figures. A tie at the top doesn't count. Second on that figure doesn't count. Needs three runners in the race carrying a figure at all.</p>
-        <p>That's the whole rule. Nothing about readability, pace, works, or barn entries touches it — those all sit next to the Pick as information, never as a gate. Tested against the 26-card pool: a favourite that clears this condition wins <b>44.5%</b> of the time; a favourite that fails it wins <b>33.8%</b>; a favourite with no filter at all wins <b>38.6%</b>. The condition is doing real work (z=1.73), though not yet at full confidence.</p>
+        <p>That's the whole rule. Nothing about readability, pace, works, or barn entries touches it — those all sit next to the Pick as information, never as a gate.</p>
       </div>
 
       <div class="help-block">
@@ -1068,12 +1112,6 @@
         <p>Any horse name with a dotted underline opens its full past performances. Inside that view, tap the horse's own name again to return to wherever you came from — Top 4, Full Field, a race card. Closing normally (the ✕ or tapping outside) does the same.</p>
       </div>
 
-      <div class="help-block">
-        <h3>What's actually been tested, and what hasn't</h3>
-        <p><span class="help-status help-tested">tested / real</span> Fired Pick (favourite + sole top figure) vs favourite alone — z=1.73, the strongest number found.</p>
-        <p><span class="help-status help-leaning">leaning, unconfirmed</span> Pace fade in the Pick vs a closing Contender — z=1.56. Three-horse barn entries — a real-looking drop, but n=23, far too small to trust.</p>
-        <p><span class="help-status help-flat">tested, flat</span> H2H rematch pattern. Declared-longshot pattern (n too small either way). Prime Power tightness. Most-recent-race-is-weakest pattern. Zero works at today's track. Multi-entry barns generally. Pure figure-only or Prime-Power-only ranking, ignoring the market entirely — actually <b>worse</b> than just trusting the favourite (29–30% vs 38.6%).</p>
-      </div>
     </section>
 
     <section id="resultsSection" style="display:none;">
@@ -1098,12 +1136,6 @@
       <div id="fieldTables"></div>
     </section>
 
-    <section id="top4Section" style="display:none;">
-      <h2><span class="step-num">4</span> Top 4 probable, every race at a glance</h2>
-      <div class="rss-info" style="margin:0 0 14px;">Quick-scan companion to the fuller Top 4 block on each race card &mdash; post, name, and the same avg-3 figure the Pick uses, no scoring, nothing invented for this view.</div>
-      <div class="race-nav no-print" id="top4Nav"></div>
-      <div id="top4List"></div>
-    </section>
 
 
     <div class="disclaimer">
@@ -1217,7 +1249,6 @@ document.getElementById('clearBtn').addEventListener('click', () => {
   document.getElementById('resultsSection').style.display='none';
   document.getElementById('fieldSection').style.display='none';
   document.getElementById('picksSection').style.display='none';
-  document.getElementById('top4Section').style.display='none';
   document.getElementById('tabbar').style.display='none';
 
   // A "clear" that leaves the DRF and feed panels showing stale file names,
@@ -2542,6 +2573,8 @@ document.getElementById('computeBtn').addEventListener('click', () => {
           parts.push(`Early speed contested: ${list}`);
         }
       }
+      const pace = paceProjection(horses);
+      if (pace) parts.push(pace.html);
       const debutAtDistance = horses.filter(h => h.distStarts === 0).map(h => h.horse);
       if (debutAtDistance.length){
         parts.push(`First time at today's distance: ${debutAtDistance.map(escHtml).join(', ')}`);
@@ -2640,7 +2673,6 @@ document.getElementById('computeBtn').addEventListener('click', () => {
   window.__ccRaceSummaries = raceSummaries;
   renderRaceCard(raceSummaries, scratchedCount);
   renderPicks(raceSummaries);
-  renderTop4(raceSummaries);
   document.getElementById('tabbar').style.display = 'flex';
   document.getElementById('reportToolbar').style.display = 'flex';
   renderFullField(currentSort);
@@ -2976,6 +3008,65 @@ function buildTiebreakRead(rs){
 
 // Quirin speed points read RELATIONALLY: lone speed means top Quirin and 2+
 // clear of the next horse. The raw number scores nothing.
+// ---- PROJECTED PACE ----
+// Quirin speed points measure how quickly a horse LEAVES, not how good it is.
+// Run style breaks ties between two horses on the same number, which the raw
+// figure cannot do. Display only: it names a likely shape, never a selection.
+const PACE_STYLE_BUMP = {E:1.5, EP:1.0, 'E/P':1.0, P:0, 'P/S':-0.5, S:-1.0, SS:-1.5};
+function paceRank(h){
+  if (h.quirin == null) return null;
+  const st = String(h.runStyle || '').toUpperCase().replace(/\s/g,'');
+  return h.quirin + (PACE_STYLE_BUMP[st] != null ? PACE_STYLE_BUMP[st] : 0);
+}
+function paceProjection(horses){
+  const field = (horses || []).filter(h => !h.scratched);
+  const rated = field.map(h => ({h, r: paceRank(h), q: h.quirin}))
+                     .filter(x => x.r != null)
+                     .sort((a,b) => b.r - a.r);
+  if (rated.length < 4) return null;
+  const speed = rated.filter(x => x.q >= 5);
+  const top = rated[0], second = rated[1];
+  let shape, note;
+  if (speed.length === 0){
+    shape = 'NO CLEAR SPEED';
+    note = `nothing in the field is rated to leave quickly; ${escHtml(top.h.horse)} projects to the lead by default`;
+  } else if (speed.length === 1 && (top.r - second.r) >= 2){
+    shape = 'LONE SPEED';
+    note = `${escHtml(top.h.horse)} is the only horse rated to leave quickly and projects to get the lead uncontested`;
+  } else if (speed.length === 1){
+    shape = 'PRESSED';
+    note = `${escHtml(top.h.horse)} projects to lead with ${escHtml(second.h.horse)} close enough to press`;
+  } else if (speed.length === 2){
+    shape = 'DUEL';
+    note = `${speed.map(x => escHtml(x.h.horse)).join(' and ')} are both rated to leave quickly and project to contest the lead`;
+  } else {
+    shape = 'CONTESTED';
+    note = `${speed.length} horses are rated to leave quickly \u2014 ${speed.map(x => escHtml(x.h.horse)).join(', ')} \u2014 so the early lead projects to be fought for`;
+  }
+  const closers = rated.filter(x => x.q <= 1).map(x => x.h.horse);
+  let suits;
+  if (shape === 'LONE SPEED' || shape === 'NO CLEAR SPEED'){
+    suits = 'An uncontested lead suits the front end. Horses rated to come from behind'
+      + (closers.length ? ` \u2014 ${closers.map(escHtml).join(', ')} \u2014 ` : ' ')
+      + 'need the leader to stop on its own.';
+  } else if (shape === 'CONTESTED'){
+    suits = 'A fought-for lead suits horses rated to come from off the pace'
+      + (closers.length ? `: ${closers.map(escHtml).join(', ')}.` : '.');
+  } else {
+    suits = 'A pressed or contested lead gives horses rated just off the pace something to run at.';
+  }
+  const order = rated.slice(0, Math.min(4, rated.length)).map(x =>
+    `${escHtml(x.h.horse)} <span class="cp-why">(${escHtml(x.h.runStyle || '\u2014')}${x.q != null ? ', ' + x.q : ''})</span>`
+  ).join(' &rarr; ');
+  return {shape, html: `<div class="pace">
+    <div class="pace-head">Projected pace \u2014 ${shape}</div>
+    <div class="pace-body">
+      <b>Order out of the gate:</b> <span class="pace-order">${order}</span><br>
+      ${note.charAt(0).toUpperCase() + note.slice(1)}. ${suits}
+      <span class="pace-foot">Quirin speed points measure how quickly a horse leaves, not how good it is. Projection only \u2014 how the race is actually run may differ.</span>
+    </div></div>`};
+}
+
 function speedShape(horses){
   const withSP = horses.filter(h => h.quirin != null).slice().sort((a,b) => b.quirin - a.quirin);
   if (!withSP.length) return null;
@@ -3620,7 +3711,7 @@ function pickPaceCautionHTML(rs){
     <b>Worth a second look \u2014 pace</b>
     <div class="cp-why" style="margin:4px 0;">${escHtml(pick.horse)} faded late in ${mine.fadedCount} of its last ${mine.shapes.length} \u2014 ${escHtml(mine.shapes.join(' \u00b7 '))}.</div>
     <div style="margin:4px 0;">Contender${rivals.length === 1 ? '' : 's'} showing the opposite pattern instead:<br>${rivalCells}</div>
-    <div class="cp-why" style="margin-top:6px;">Pool test (26 cards): a figure leader with this fading pattern won 24.6% of the time (n=61) vs 36.5% when it doesn't (n=96) \u2014 z=1.56. Real-looking, not yet confirmed. This does not change the Pick.</div>
+    <div class="cp-why" style="margin-top:6px;">Display only. This does not change the Pick.</div>
   </div>`;
 }
 
@@ -5236,7 +5327,6 @@ const TABS = {
   print: ['printSection'],
   cards: ['resultsSection'],
   field: ['fieldSection'],
-  top4: ['top4Section'],
   help: ['helpSection']
 };
 function showTab(name){
@@ -5385,24 +5475,80 @@ function raceConditionsAbbrev(rs){
   const parts = [dist, surf].filter(Boolean).join(' ');
   return [parts, cls].filter(Boolean).join(' \u00b7 ');
 }
-function renderTop4(raceSummaries){
-  const nav = document.getElementById('top4Nav');
-  const list = document.getElementById('top4List');
-  if (!nav || !list) return;
-  renderRaceNav(nav, raceSummaries, 'top4-r-');
-  list.innerHTML = raceSummaries.map(rs => {
+// ---- DECISION BOARD ----
+// Shipped 2026-09-16 as its own tab and merged into Picks the same day:
+// two tabs listed every race and named the same horses, so the board was the
+// Picks tab in shorter form. It now sits at the TOP of that one tab as a
+// scannable index, with the full per-race cards beneath it.
+// Robert's ask: one place that gathers the card instead of making him walk
+// every race card. Purely a re-presentation — it computes nothing new and
+// carries no ordering of one race against another, because nothing tested
+// has produced a defensible confidence order.
+function buildBoardIndex(raceSummaries){
+  if (!raceSummaries || !raceSummaries.length) return '';
+  const key = `<div class="board-key">
+    <span>Race number colour</span>
+    <span><i class="k-green"></i>Good information</span>
+    <span><i class="k-yellow"></i>Thin</span>
+    <span><i class="k-red"></i>Little</span>
+    <span><i class="k-grey"></i>Not scored</span>
+  </div>`;
+  return key + '<div class="board-wrap">' + raceSummaries.map(rs => {
+    const horses = (rs.horses || []).filter(h => !h.scratched);
+    const read = readability(rs);
+    // A race the readability check can't score at all is NOT the same as a race
+    // it scores badly. Defaulting the unknown case to red said "worst" when it
+    // meant "unknown", so it gets its own grey.
+    const lvl = read ? read.level : 'grey';
+    const lvlWord = {green:'Good information', yellow:'Thin information',
+                     red:'Little information', grey:'Not enough to score'}[lvl];
+    const p = pickFor(rs);
+    const pace = paceProjection(horses);
+    const mlOf = x => parseOdds(x.mlOddsStr);
+    const priced = horses.filter(x => mlOf(x) != null);
+    const fav = priced.length ? priced.reduce((a,b) => (mlOf(b) < mlOf(a) ? b : a)) : null;
+
+    let tag, named;
+    if (p && p.line === 'primary'){
+      tag = '<span class="btag btag-pick">Pick</span>';
+      named = `<span class="board-named">${horseLabel(p.h)}</span> <span class="cp-why">${escHtml(p.h.oddsStr || '')}</span>`;
+    } else if (p && p.line === 'price'){
+      tag = '<span class="btag btag-price">Price play</span>';
+      named = `<span class="board-named">${horseLabel(p.h)}</span> <span class="cp-why">${escHtml(p.h.oddsStr || '')}</span>`;
+    } else {
+      tag = '<span class="btag btag-none">No call</span>';
+      named = '<span class="board-quiet">The board does not name a horse in this race.</span>';
+    }
+
+    const bits = [];
+    if (fav) bits.push(`<b>Market choice:</b> ${escHtml(fav.horse)} ${escHtml(fav.oddsStr || '')}`);
+    if (pace) bits.push(`<b>Pace:</b> ${escHtml(pace.shape.toLowerCase())}`);
+    const dist = rs.raceDistYds || (horses[0] && horses[0].raceDistYds);
+    const sfc = chat_surfaceGroup((horses[0] && horses[0].surface) || '');
+    const sWord = sfc === 'T' ? 'turf' : sfc === 'A' ? 'all-weather' : sfc === 'D' ? 'dirt' : '';
+    const cond = [dist ? furlongs(dist) : '', sWord].filter(Boolean).join(' ');
+    if (cond) bits.unshift(`<b>${escHtml(cond)}</b>`);
+    bits.push(`${horses.length} runner${horses.length === 1 ? '' : 's'}`);
+
     const ranked = topProbableRanked(rs);
-    const rows = ranked.length
-      ? ranked.map((r, i) => `<tr><td class="cmp-metric">${i === 0 ? 'TOP' : 'NEXT ' + i}</td>` +
-          `<td>${horseLabel(r.h)}</td><td>${r.v.toFixed(1)}</td>` +
-          `<td>${escHtml(r.h.oddsStr || '')}</td></tr>`).join('')
-      : `<tr><td colspan="4" class="cp-why">Not enough rated Contenders in this race to rank.</td></tr>`;
-    return `<div class="race-card race-anchor-target" id="top4-r-${escAttr(rs.race)}">
-      <div class="race-card-top"><strong class="race-no">Race ${escHtml(rs.race)}</strong> <span class="cp-why">${escHtml(raceConditionsAbbrev(rs))}</span></div>
-      <div class="table-wrap"><table class="cmp-table"><thead><tr><th></th><th>Horse</th><th>Avg-3</th><th>ML</th></tr></thead>
-      <tbody>${rows}</tbody></table></div>
+    const top4 = ranked.length
+      ? `<details class="board-t4"><summary>Top 4 probable</summary>
+           <table class="cmp-table"><thead><tr><th></th><th>Horse</th><th>Avg-3</th><th>ML</th></tr></thead><tbody>${
+             ranked.map((r, i) => `<tr><td class="cmp-metric">${i === 0 ? 'TOP' : 'NEXT ' + i}</td>`
+               + `<td>${horseLabel(r.h)}</td><td>${r.v.toFixed(1)}</td>`
+               + `<td>${escHtml(r.h.oddsStr || '')}</td></tr>`).join('')
+           }</tbody></table></details>`
+      : '';
+
+    return `<div class="board-row">
+      <div class="board-rn lv-${lvl}" data-jump="${escAttr(rs.race)}" title="${escAttr(lvlWord + (read && read.why ? ' \u2014 ' + read.why : ''))}">${escHtml(rs.race || '?')}</div>
+      <div class="board-body">
+        <div class="board-top">${tag} ${named}</div>
+        <div class="board-meta">${bits.join(' &middot; ')}</div>
+        ${top4}
+      </div>
     </div>`;
-  }).join('');
+  }).join('') + '</div>';
 }
 
 function renderPicks(raceSummaries){
@@ -5412,10 +5558,20 @@ function renderPicks(raceSummaries){
   const best = buildBestOfDay(raceSummaries);
   const n = blocks.filter(b => b.indexOf('pick-card') !== -1).length;
   document.getElementById('pickCount').textContent = n;
+  const index = buildBoardIndex(raceSummaries);
   list.innerHTML = n
-    ? best + blocks.join('')
-    : `<div class="pick-none"><b>No picks on this card.</b> The rule needs the market favourite to also hold the field's single highest average of its last three speed figures. A quiet card is normal.</div>` + blocks.join('');
+    ? index + best + blocks.join('')
+    : index + `<div class="pick-none"><b>No picks on this card.</b> The rule needs the market favourite to also hold the field's single highest average of its last three speed figures. A quiet card is normal.</div>` + blocks.join('');
   bindTapHandlers(list);
+  // The race-number block carries its own handler: bindTapHandlers keys off
+  // .race-jump + data-jump, and wrapping the number in that anchor let other
+  // link rules win the cascade and swallow it. The block IS the target now.
+  list.querySelectorAll('.board-rn[data-jump]').forEach(d => {
+    d.addEventListener('click', e => {
+      e.preventDefault(); e.stopPropagation();
+      openRacePP(d.dataset.jump);
+    });
+  });
 }
 
 // The field table is ALWAYS in post order. Sorting it by edge or market rank
@@ -5983,6 +6139,6 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.68 · released 16 September 2026 · build 2026-09-16-a</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.74 · released 16 September 2026 · build 2026-09-16-g</div>
 </body>
 </html>
