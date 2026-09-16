@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Overlay Board v1.74 — Race Card Reader</title>
+<title>Overlay Board v1.79 — Race Card Reader</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
@@ -926,12 +926,21 @@
   .btag-pick{background:var(--green);} .btag-price{background:var(--amber-dim);}
   .btag-none{background:#8C8677;} .btag-read{background:var(--board-800);}
   .btag-pace{background:var(--blue);}
+
+  /* ERROR BANNER — a phone has no console, so errors have to show on screen. */
+  #errBar{position:fixed;left:0;right:0;bottom:0;z-index:9999;display:none;
+    background:#8B2A2A;color:#fff;padding:10px 12px;font-family:var(--mono);
+    font-size:11.5px;line-height:1.5;box-shadow:0 -2px 10px rgba(0,0,0,.3);max-height:45vh;overflow:auto;}
+  #errBar b{color:#FFD9A0;}
+  #errBar .eb-actions{margin-top:8px;display:flex;gap:8px;}
+  #errBar button{font-family:var(--mono);font-size:11px;padding:5px 10px;border:1px solid #fff;
+    background:transparent;color:#fff;border-radius:3px;cursor:pointer;}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <p class="eyebrow">Handicapping utility · <span class="ver">v1.74</span> · released 16 September 2026</p>
+    <p class="eyebrow">Handicapping utility · <span class="ver">v1.79</span> · released 16 September 2026</p>
     <h1><span class="flap">O</span><span class="flap">v</span><span class="flap">e</span><span class="flap">r</span><span class="flap">l</span><span class="flap">a</span><span class="flap">y</span> <span class="flap">B</span><span class="flap">o</span><span class="flap">a</span><span class="flap">r</span><span class="flap">d</span></h1>
     <p class="tagline">Upload a data file or program PDF. Overlay Board lays out the whole card: past performances, scratches, money moves, and where the board likes a horse.</p>
   </header>
@@ -1153,6 +1162,57 @@
   </div>
 </div>
 <script>
+
+// ---- ON-SCREEN ERROR REPORTING ----
+// This runs from a file on a phone, where there is no developer console, and
+// in a viewer whose origin is opaque — so window.onerror reports a bare
+// "Script error." with the message and line stripped out. The only way to see
+// the real exception is to catch it ourselves, so EVERY event listener is
+// wrapped at registration. The wrapper does not rethrow: a handler that blows
+// up should report itself, not take the page down.
+window.__obErrors = [];
+function __obReport(label, err){
+  const msg = (err && err.message) ? err.message : String(err);
+  const stack = (err && err.stack) ? String(err.stack).split('\n').slice(0, 5).join('\n') : '';
+  window.__obErrors.push(label + ': ' + msg + (stack ? '\n' + stack : ''));
+  const bar = document.getElementById('errBar'), box = document.getElementById('errBarMsg');
+  if (!bar || !box) return;
+  const esc = t => String(t).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  box.innerHTML = window.__obErrors.slice(-3).map(t => {
+    const lines = t.split('\n');
+    return '<div style="margin-bottom:7px;"><b>' + esc(lines[0]) + '</b><br>' +
+           lines.slice(1).map(esc).join('<br>') + '</div>';
+  }).join('');
+  bar.style.display = 'block';
+}
+(function(){
+  const _add = EventTarget.prototype.addEventListener;
+  EventTarget.prototype.addEventListener = function(type, fn, opts){
+    if (typeof fn === 'function'){
+      const wrapped = function(){
+        try { return fn.apply(this, arguments); }
+        catch(err){ __obReport('handler "' + type + '"', err); }
+      };
+      try { fn.__obWrapped = wrapped; } catch(e){}
+      return _add.call(this, type, wrapped, opts);
+    }
+    return _add.call(this, type, fn, opts);
+  };
+  window.addEventListener('error', e => {
+    if (e.error) __obReport('uncaught', e.error);
+    else __obReport('uncaught', {message: e.message + (e.filename ? ' @ ' + e.filename + ':' + e.lineno : '')});
+  });
+  window.addEventListener('unhandledrejection', e => __obReport('promise', e.reason || {}));
+  document.addEventListener('DOMContentLoaded', () => {
+    const c = document.getElementById('errCopy'), h = document.getElementById('errHide');
+    if (c) c.addEventListener('click', () => {
+      const t = window.__obErrors.join('\n\n');
+      if (navigator.clipboard) navigator.clipboard.writeText(t);
+      c.textContent = 'Copied'; setTimeout(() => { c.textContent = 'Copy'; }, 1500);
+    });
+    if (h) h.addEventListener('click', () => { document.getElementById('errBar').style.display = 'none'; });
+  });
+})();
 if (typeof pdfjsLib !== 'undefined') {
   pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 } else {
@@ -2152,7 +2212,21 @@ function applyChangesFeed(text){
 
   // Compute immediately on every feed apply, first time or a refresh alike,
   // so applying the feed and seeing the card is one step, not two.
-  document.getElementById('computeBtn').click();
+  // An exception thrown inside the compute listener does NOT propagate back to
+  // whoever called this — the browser reports it as an uncaught error and the
+  // feed looks like it failed. Catch it here so the status line says what
+  // actually broke.
+  try {
+    document.getElementById('computeBtn').click();
+  } catch(err){
+    statusEl.textContent = 'Scratches applied, but rebuilding the card failed: '
+      + (err && err.message ? err.message : String(err));
+    statusEl.className = 'status err';
+    console.error('rebuild after feed', err);
+    // Route it through the same on-screen reporter, since the status line is
+    // short and the stack is what actually identifies the fault.
+    __obReport('rebuild after feed', err);
+  }
 }
 
 document.querySelectorAll('#tabbar button').forEach(b =>
@@ -2573,8 +2647,6 @@ document.getElementById('computeBtn').addEventListener('click', () => {
           parts.push(`Early speed contested: ${list}`);
         }
       }
-      const pace = paceProjection(horses);
-      if (pace) parts.push(pace.html);
       const debutAtDistance = horses.filter(h => h.distStarts === 0).map(h => h.horse);
       if (debutAtDistance.length){
         parts.push(`First time at today's distance: ${debutAtDistance.map(escHtml).join(', ')}`);
@@ -3008,65 +3080,6 @@ function buildTiebreakRead(rs){
 
 // Quirin speed points read RELATIONALLY: lone speed means top Quirin and 2+
 // clear of the next horse. The raw number scores nothing.
-// ---- PROJECTED PACE ----
-// Quirin speed points measure how quickly a horse LEAVES, not how good it is.
-// Run style breaks ties between two horses on the same number, which the raw
-// figure cannot do. Display only: it names a likely shape, never a selection.
-const PACE_STYLE_BUMP = {E:1.5, EP:1.0, 'E/P':1.0, P:0, 'P/S':-0.5, S:-1.0, SS:-1.5};
-function paceRank(h){
-  if (h.quirin == null) return null;
-  const st = String(h.runStyle || '').toUpperCase().replace(/\s/g,'');
-  return h.quirin + (PACE_STYLE_BUMP[st] != null ? PACE_STYLE_BUMP[st] : 0);
-}
-function paceProjection(horses){
-  const field = (horses || []).filter(h => !h.scratched);
-  const rated = field.map(h => ({h, r: paceRank(h), q: h.quirin}))
-                     .filter(x => x.r != null)
-                     .sort((a,b) => b.r - a.r);
-  if (rated.length < 4) return null;
-  const speed = rated.filter(x => x.q >= 5);
-  const top = rated[0], second = rated[1];
-  let shape, note;
-  if (speed.length === 0){
-    shape = 'NO CLEAR SPEED';
-    note = `nothing in the field is rated to leave quickly; ${escHtml(top.h.horse)} projects to the lead by default`;
-  } else if (speed.length === 1 && (top.r - second.r) >= 2){
-    shape = 'LONE SPEED';
-    note = `${escHtml(top.h.horse)} is the only horse rated to leave quickly and projects to get the lead uncontested`;
-  } else if (speed.length === 1){
-    shape = 'PRESSED';
-    note = `${escHtml(top.h.horse)} projects to lead with ${escHtml(second.h.horse)} close enough to press`;
-  } else if (speed.length === 2){
-    shape = 'DUEL';
-    note = `${speed.map(x => escHtml(x.h.horse)).join(' and ')} are both rated to leave quickly and project to contest the lead`;
-  } else {
-    shape = 'CONTESTED';
-    note = `${speed.length} horses are rated to leave quickly \u2014 ${speed.map(x => escHtml(x.h.horse)).join(', ')} \u2014 so the early lead projects to be fought for`;
-  }
-  const closers = rated.filter(x => x.q <= 1).map(x => x.h.horse);
-  let suits;
-  if (shape === 'LONE SPEED' || shape === 'NO CLEAR SPEED'){
-    suits = 'An uncontested lead suits the front end. Horses rated to come from behind'
-      + (closers.length ? ` \u2014 ${closers.map(escHtml).join(', ')} \u2014 ` : ' ')
-      + 'need the leader to stop on its own.';
-  } else if (shape === 'CONTESTED'){
-    suits = 'A fought-for lead suits horses rated to come from off the pace'
-      + (closers.length ? `: ${closers.map(escHtml).join(', ')}.` : '.');
-  } else {
-    suits = 'A pressed or contested lead gives horses rated just off the pace something to run at.';
-  }
-  const order = rated.slice(0, Math.min(4, rated.length)).map(x =>
-    `${escHtml(x.h.horse)} <span class="cp-why">(${escHtml(x.h.runStyle || '\u2014')}${x.q != null ? ', ' + x.q : ''})</span>`
-  ).join(' &rarr; ');
-  return {shape, html: `<div class="pace">
-    <div class="pace-head">Projected pace \u2014 ${shape}</div>
-    <div class="pace-body">
-      <b>Order out of the gate:</b> <span class="pace-order">${order}</span><br>
-      ${note.charAt(0).toUpperCase() + note.slice(1)}. ${suits}
-      <span class="pace-foot">Quirin speed points measure how quickly a horse leaves, not how good it is. Projection only \u2014 how the race is actually run may differ.</span>
-    </div></div>`};
-}
-
 function speedShape(horses){
   const withSP = horses.filter(h => h.quirin != null).slice().sort((a,b) => b.quirin - a.quirin);
   if (!withSP.length) return null;
@@ -4899,6 +4912,21 @@ function paceRank(h){
   return q + (STYLE_BUMP[st] != null ? STYLE_BUMP[st] : 0);
 }
 
+// The board needs only the shape word, not the whole panel. Reads the same
+// ranking as paceProjection so the two can never disagree.
+function paceShapeOf(rs){
+  const field = ((rs && (rs.byMarket || rs.horses)) || []).filter(h => !h.scratched);
+  const rated = field.map(h => ({h, r: paceRank(h), q: h.quirin}))
+                     .filter(x => x.r != null).sort((a, b) => b.r - a.r);
+  if (rated.length < 4) return null;
+  const speed = rated.filter(x => x.q >= 5);
+  if (speed.length === 0) return 'NO CLEAR SPEED';
+  if (speed.length === 1 && (rated[0].r - rated[1].r) >= 2) return 'LONE SPEED';
+  if (speed.length === 1) return 'PRESSED';
+  if (speed.length === 2) return 'DUEL';
+  return 'CONTESTED';
+}
+
 function paceProjection(rs){
   const field = (rs.byMarket || rs.horses || []).filter(h => !h.scratched);
   const rated = field.map(h => ({h, r: paceRank(h), q: h.quirin}))
@@ -5494,6 +5522,7 @@ function buildBoardIndex(raceSummaries){
     <span><i class="k-grey"></i>Not scored</span>
   </div>`;
   return key + '<div class="board-wrap">' + raceSummaries.map(rs => {
+   try {
     const horses = (rs.horses || []).filter(h => !h.scratched);
     const read = readability(rs);
     // A race the readability check can't score at all is NOT the same as a race
@@ -5503,7 +5532,7 @@ function buildBoardIndex(raceSummaries){
     const lvlWord = {green:'Good information', yellow:'Thin information',
                      red:'Little information', grey:'Not enough to score'}[lvl];
     const p = pickFor(rs);
-    const pace = paceProjection(horses);
+    const paceShape = paceShapeOf(rs);
     const mlOf = x => parseOdds(x.mlOddsStr);
     const priced = horses.filter(x => mlOf(x) != null);
     const fav = priced.length ? priced.reduce((a,b) => (mlOf(b) < mlOf(a) ? b : a)) : null;
@@ -5522,7 +5551,7 @@ function buildBoardIndex(raceSummaries){
 
     const bits = [];
     if (fav) bits.push(`<b>Market choice:</b> ${escHtml(fav.horse)} ${escHtml(fav.oddsStr || '')}`);
-    if (pace) bits.push(`<b>Pace:</b> ${escHtml(pace.shape.toLowerCase())}`);
+    if (paceShape) bits.push(`<b>Pace:</b> ${escHtml(paceShape.toLowerCase())}`);
     const dist = rs.raceDistYds || (horses[0] && horses[0].raceDistYds);
     const sfc = chat_surfaceGroup((horses[0] && horses[0].surface) || '');
     const sWord = sfc === 'T' ? 'turf' : sfc === 'A' ? 'all-weather' : sfc === 'D' ? 'dirt' : '';
@@ -5548,6 +5577,16 @@ function buildBoardIndex(raceSummaries){
         ${top4}
       </div>
     </div>`;
+   } catch(err){
+    // A single race that can't be summarised should cost that race's detail,
+    // not the whole board. The race still gets a row and a working jump.
+    console.error('decision board, race ' + (rs && rs.race), err);
+    __obReport('decision board, race ' + (rs && rs.race), err);
+    return `<div class="board-row">
+      <div class="board-rn lv-grey" data-jump="${escAttr((rs && rs.race) || '')}">${escHtml((rs && rs.race) || '?')}</div>
+      <div class="board-body"><div class="board-quiet">This race could not be summarised \u2014 open its race card.</div></div>
+    </div>`;
+   }
   }).join('') + '</div>';
 }
 
@@ -6139,6 +6178,12 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.74 · released 16 September 2026 · build 2026-09-16-g</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.79 · released 16 September 2026 · build 2026-09-16-l</div>
+<div id="errBar" class="no-print">
+  <div id="errBarMsg"></div>
+  <div class="eb-actions">
+    <button id="errCopy">Copy</button><button id="errHide">Dismiss</button>
+  </div>
+</div>
 </body>
 </html>
