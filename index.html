@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Overlay Board v1.79 — Race Card Reader</title>
+<title>Overlay Board v1.81 — Race Card Reader</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
@@ -586,6 +586,7 @@
   }
   .pp-back:hover, .pp-back:active{background:var(--paper); border-color:var(--amber-dim);}
   @media print{ .pp-back{display:none !important;} }
+  .pp-return-flash{background:var(--paper-tint); outline:2px solid var(--amber-dim); outline-offset:2px; border-radius:3px; transition:background .3s;}
   .pp-head{margin:0 0 2px; font-size:18px; font-weight:800;}
   .pp-sub{font-family:var(--mono); font-size:12px; color:var(--ink-soft); margin-bottom:12px;}
   .pp-table-wrap{overflow-x:auto;}
@@ -940,7 +941,7 @@
 <body>
 <div class="wrap">
   <header>
-    <p class="eyebrow">Handicapping utility · <span class="ver">v1.79</span> · released 16 September 2026</p>
+    <p class="eyebrow">Handicapping utility · <span class="ver">v1.81</span> · released 17 September 2026</p>
     <h1><span class="flap">O</span><span class="flap">v</span><span class="flap">e</span><span class="flap">r</span><span class="flap">l</span><span class="flap">a</span><span class="flap">y</span> <span class="flap">B</span><span class="flap">o</span><span class="flap">a</span><span class="flap">r</span><span class="flap">d</span></h1>
     <p class="tagline">Upload a data file or program PDF. Overlay Board lays out the whole card: past performances, scratches, money moves, and where the board likes a horse.</p>
   </header>
@@ -1084,14 +1085,14 @@
       </div>
 
       <div class="help-block">
-        <h3>Worth a second look — pace <span class="help-status help-leaning">real-looking, not confirmed</span></h3>
-        <p>Fires when the Pick's own last three starts show a fading majority (2 of 3, read from the pace figures below) <b>and</b> a genuine Contender in the same field shows the opposite. Pool test: a figure leader with a fading pattern wins <b>24.6%</b> (n=61) vs <b>36.5%</b> when it doesn't (n=96) — z=1.56. Real-looking, short of the 1.96 bar for confirmed. Doesn't change the Pick.</p>
+        <h3>Worth a second look — pace <span class="help-status help-display">display only</span></h3>
+        <p>Fires when the Pick's own last three starts show a fading majority (2 of 3, read from the pace figures below) <b>and</b> a genuine Contender in the same field shows the opposite. Doesn't change the Pick.</p>
       </div>
 
       <div class="help-block">
-        <h3>Cross-check — Overlay Board / Grok / Chat</h3>
-        <p>All three computed natively from the same field, nothing typed in. Grok is Sole Call's actual pick logic, ported from its real source. Chat is Horse Handicap's full scoring pipeline, same treatment, including its own all-weather fix. Agreement across all three, even unanimous, is information — not a verdict. Tested directly: on a full card where all six fired picks got exact 3-way agreement, one of those six still lost.</p>
-      </div>
+        <h3>3/3 concurrence — AI(1) / AI(2) / AI(3)</h3>
+        <p><b>AI(1)</b> is this program's own Pick. <b>AI(2)</b> and <b>AI(3)</b> are two other selection methods, each ported into this file and run on the same field — nothing typed in or fetched. When all three name the same horse the race card shows <b>3/3 CONCURRENCE</b>; otherwise it shows how many agree with AI(1). Agreement is shown next to the Pick as information. It never changes the Pick, and it never hides a warning shown elsewhere on the card.</p>
+        </div>
 
       <div class="help-block">
         <h3>Readability <span class="help-status help-display">display only</span></h3>
@@ -1099,19 +1100,19 @@
       </div>
 
       <div class="help-block">
-        <h3>"Too close to call" <span class="help-status help-flat">tested, no signal</span></h3>
-        <p>Flags when the top few horses are within 3 points of each other on <b>Prime Power</b> — a different rating from the speed figure the Pick uses, so this can fire even when the Pick's own figure has a clean, sole leader. Tested directly: fired picks won 44.9% when Prime Power was tight at the top, 43.3% when it wasn't — z=-0.16, essentially flat. The flag is real information about the field; it doesn't mean the Pick is less trustworthy.</p>
+        <h3>"Too close to call" <span class="help-status help-display">display only</span></h3>
+        <p>Flags when the top few horses are within 3 points of each other on <b>Prime Power</b> — a different rating from the speed figure the Pick uses, so this can fire even when the Pick's own figure has a clean, sole leader. It describes the field; it doesn't change the Pick.</p>
       </div>
 
       <div class="help-block">
         <h3>Reading a past-performance line</h3>
         <p>Date, track, distance, surface, post, class move (▲ tougher · = about the same · ▼ easier than today), finish, who won/placed/showed, the BRIS speed figure, <b>Pace</b>, class text, trip comment.</p>
-        <p><b>Pace</b> shows the BRIS pace-call figures for that race in order (2-call, 4-call, 6-call, 8-call, late pace — same rating scale as Speed) plus a plain read of the shape: <b>faded late</b> if the early number drops off, <b>closed late</b> if it climbs, <b>even shape</b> otherwise. A fact about that one race, not a score. Tested field-wide (1,305 runners): winners show a fading majority 46.7% of the time, losers 53.1% — z=1.54, real-looking, not confirmed on its own. Restricted to figure leaders specifically it firms up a little (24.6% vs 36.5%, z=1.56) — see "Worth a second look" above.</p>
+        <p><b>Pace</b> shows the BRIS pace-call figures for that race in order (2-call, 4-call, 6-call, 8-call, late pace — same rating scale as Speed) plus a plain read of the shape: <b>faded late</b> if the early number drops off, <b>closed late</b> if it climbs, <b>even shape</b> otherwise. A fact about that one race, not a score. See "Worth a second look" above for where the shape is used.</p>
       </div>
 
       <div class="help-block">
         <h3>Full Field columns</h3>
-        <p><b>Form arrow</b> — beaten-lengths trend across the last few starts, oldest to newest: green ▲ closing (finishing closer than before), red ▼ widening (falling further behind), dash flat. Tap the arrow to reveal the actual sequence. Tested twice tonight (recency-of-figure, works-at-track) with no signal found either time — this stays a display fact, same as pace.</p>
+        <p><b>Form arrow</b> — beaten-lengths trend across the last few starts, oldest to newest: green ▲ closing (finishing closer than before), red ▼ widening (falling further behind), dash flat. Tap the arrow to reveal the actual sequence. A display fact, same as pace.</p>
         <p><b>Speed column with LONE tag</b> — Quirin speed points, BRIS's own 0–8 scale for early-speed tendency, not a speed figure. LONE means the top horse is at least 5 on that scale and at least 2 points clear of the next — likely gets an uncontested early lead. The 8-point scale has nothing to do with field size.</p>
         <p><b>The numeric speed column</b> (e.g. "94 (88)") — the actual BRIS speed figure: last race, best figure in parentheses if different. This is the number the Pick rule is built on.</p>
       </div>
@@ -1499,10 +1500,10 @@ function parseBrisnetSingleFile(text){
     const surface = get(7);
     // v7.53's own all-weather fix: field 7 alone can't tell true dirt from
     // synthetic. Field 25 is the explicit current All-Weather flag; field
-    // 1403+i is the same flag on each past race. Kept under chat-prefixed
+    // 1403+i is the same flag on each past race. Kept under ai3-prefixed
     // names — Overlay Board's own surface/ppRaces.surf stay on field 7/326
     // unchanged, since fixing that split is outside what was asked here.
-    const chatSurfaceToday = get(25) === 'A' ? 'A' : surface;
+    const ai3SurfaceToday = get(25) === 'A' ? 'A' : surface;
     const pp = get(251);
     const rtype = get(9);
     const todayClassTxt = get(11);
@@ -1591,7 +1592,7 @@ function parseBrisnetSingleFile(text){
       const finTxt = get(616+i);
       const rawMargin = num(736+i);
       const wonIt = String(finTxt).trim() === '1';
-      ppRaces.push({date: d, track: get(276+i), raceNum: get(296+i), distYds: num(316+i), surf: get(326+i), fin: finTxt, margin: rawMargin, won: wonIt, lenBehind: (rawMargin == null ? null : (wonIt ? -rawMargin : rawMargin)), comment: get(396+i), pastPost: num(356+i), pastField: num(346+i), winner: get(406+i), second: get(416+i), third: get(426+i), rtype: get(1086+i), claim: num(546+i), classTxt: get(536+i), spd: num(846+i), pace2: num(766+i), pace4: num(776+i), pace6: num(786+i), pace8: num(796+i), latePace: num(816+i), purse: num(556+i), trackCond: get(306+i), chatSurf: get(1403+i) === 'A' ? 'A' : get(326+i)});
+      ppRaces.push({date: d, track: get(276+i), raceNum: get(296+i), distYds: num(316+i), surf: get(326+i), fin: finTxt, margin: rawMargin, won: wonIt, lenBehind: (rawMargin == null ? null : (wonIt ? -rawMargin : rawMargin)), comment: get(396+i), pastPost: num(356+i), pastField: num(346+i), winner: get(406+i), second: get(416+i), third: get(426+i), rtype: get(1086+i), claim: num(546+i), classTxt: get(536+i), spd: num(846+i), pace2: num(766+i), pace4: num(776+i), pace6: num(786+i), pace8: num(796+i), latePace: num(816+i), purse: num(556+i), trackCond: get(306+i), ai3Surf: get(1403+i) === 'A' ? 'A' : get(326+i)});
     }
     // BRIS SPEED RATING, fields 846-855, one per past race. Identified from a
     // a real card rather than taken on trust: the pace blocks at 766,
@@ -1727,16 +1728,16 @@ function parseBrisnetSingleFile(text){
       turfStarts: num(75),
       turfWins: num(76), turfPlaces: num(77), turfShows: num(78), turfEarn: num(79),
       wetStarts: num(80), wetWins: num(81), wetPlaces: num(82), wetShows: num(83), wetEarn: num(84),
-      // Chat's own field offsets for trainer/jockey combo and the surface-
+      // AI(3)'s own field offsets for trainer/jockey combo and the surface-
       // specific best-speed variants — kept under their own names since
       // Overlay Board's existing tjStarts/tjWins already read fields 1413/14
       // for something else, and the two conventions must not be conflated.
-      chatTjStarts: num(219), chatTjWins: num(220), chatTjPlaces: num(221), chatTjShows: num(222), chatTjROI: num(223),
-      chatBestFast: num(1178), chatBestTurf: num(1179), chatBestOff: num(1180),
-      chatBestDist: num(1181), chatBestTrack: num(1331), chatBestLife: num(1328),
-      chatSurfaceToday, chatBestAW: num(236),
-      chatAWStarts: num(231), chatAWWins: num(232), chatAWPlaces: num(233),
-      chatAWShows: num(234), chatAWEarn: num(235),
+      ai3TjStarts: num(219), ai3TjWins: num(220), ai3TjPlaces: num(221), ai3TjShows: num(222), ai3TjROI: num(223),
+      ai3BestFast: num(1178), ai3BestTurf: num(1179), ai3BestOff: num(1180),
+      ai3BestDist: num(1181), ai3BestTrack: num(1331), ai3BestLife: num(1328),
+      ai3SurfaceToday, ai3BestAW: num(236),
+      ai3AWStarts: num(231), ai3AWWins: num(232), ai3AWPlaces: num(233),
+      ai3AWShows: num(234), ai3AWEarn: num(235),
       surface: surface,
       daysSinceWork,
       worksAtTrack,
@@ -1758,11 +1759,11 @@ function parseBrisnetSingleFile(text){
       // for every comma in these text fields, so they are put back.
       racePurse: num(12),
       raceConds: [225,226,227,228,229,230].map(n => get(n)).join('').replace(/;/g, ',').replace(/\s+/g,' ').trim(),
-      // Chat's own raceType/track-condition fields, for the port only —
+      // AI(3)'s own raceType/track-condition fields, for the port only —
       // classFamilyFromText's maiden detection and conditionSpeedScore both
       // read these directly and Overlay Board never captured either before.
-      chatRaceType: get(9),
-      chatTrackCond: get(8),
+      ai3RaceType: get(9),
+      ai3TrackCond: get(8),
       last3Fins,
       ppRaces,
       ppWorks
@@ -2163,12 +2164,12 @@ function applyChangesFeed(text){
       const to = surfCode(c.to);
       rows.filter(r => String(r.race).trim() === String(c.race).trim()).forEach(r => {
         if (r.surface !== to){ r.surface = to; courseApplied++; }
-        // chatSurfaceToday mirrors r.surface but starts from a different raw
+        // ai3SurfaceToday mirrors r.surface but starts from a different raw
         // field (BRIS field 25's explicit all-weather flag) — it needs the
         // same live update or it goes stale the moment weather changes a
         // turf card to synthetic, which is exactly when the all-weather fix
         // actually matters.
-        r.chatSurfaceToday = to;
+        r.ai3SurfaceToday = to;
       });
     });
     parts.push(`<div class="rss-warn">⚑ <b>Course change${feed.courses.length===1?'':'s'} applied.</b><br>` +
@@ -2570,22 +2571,22 @@ document.getElementById('computeBtn').addEventListener('click', () => {
       ltStarts: r.ltStarts, ltWins: r.ltWins, ltPlaces: r.ltPlaces,
       ltShows: r.ltShows, ltEarn: r.ltEarn,
       ppRaces: r.ppRaces || [],
-      // The Chat port's own fields — never copied into this object before,
+      // The AI(3) port's own fields — never copied into this object before,
       // so every surface-dependent read in it (surface itself, all six
       // best-speed variants, trainer/jockey combo, today's raceType and
       // track condition) was silently reading undefined. Found while
-      // checking Chat's own reported all-weather fix against real data —
-      // the actual bug here was upstream of anything Chat described.
+      // checking AI(3)'s own reported all-weather fix against real data —
+      // the actual bug here was upstream of anything AI(3) described.
       surface: r.surface || '',
       trackCode: r.trackCode || '', raceDateYmd: r.raceDateYmd || '',
-      chatRaceType: r.chatRaceType || '', chatTrackCond: r.chatTrackCond || '',
-      chatTjStarts: r.chatTjStarts, chatTjWins: r.chatTjWins,
-      chatTjPlaces: r.chatTjPlaces, chatTjShows: r.chatTjShows, chatTjROI: r.chatTjROI,
-      chatBestFast: r.chatBestFast, chatBestTurf: r.chatBestTurf, chatBestOff: r.chatBestOff,
-      chatBestDist: r.chatBestDist, chatBestTrack: r.chatBestTrack, chatBestLife: r.chatBestLife,
-      chatSurfaceToday: r.chatSurfaceToday || '', chatBestAW: r.chatBestAW,
-      chatAWStarts: r.chatAWStarts, chatAWWins: r.chatAWWins, chatAWPlaces: r.chatAWPlaces,
-      chatAWShows: r.chatAWShows, chatAWEarn: r.chatAWEarn,
+      ai3RaceType: r.ai3RaceType || '', ai3TrackCond: r.ai3TrackCond || '',
+      ai3TjStarts: r.ai3TjStarts, ai3TjWins: r.ai3TjWins,
+      ai3TjPlaces: r.ai3TjPlaces, ai3TjShows: r.ai3TjShows, ai3TjROI: r.ai3TjROI,
+      ai3BestFast: r.ai3BestFast, ai3BestTurf: r.ai3BestTurf, ai3BestOff: r.ai3BestOff,
+      ai3BestDist: r.ai3BestDist, ai3BestTrack: r.ai3BestTrack, ai3BestLife: r.ai3BestLife,
+      ai3SurfaceToday: r.ai3SurfaceToday || '', ai3BestAW: r.ai3BestAW,
+      ai3AWStarts: r.ai3AWStarts, ai3AWWins: r.ai3AWWins, ai3AWPlaces: r.ai3AWPlaces,
+      ai3AWShows: r.ai3AWShows, ai3AWEarn: r.ai3AWEarn,
       trnPlaces: r.trnPlaces, trnShows: r.trnShows,
       ppWorks: r.ppWorks || []
     });
@@ -3735,34 +3736,34 @@ function bestQuestionableBlockHTML(rs){
   return `<div class="cc-block">
     <div class="cc-head">Best-supported Questionable horse \u2014 information, not a call</div>
     <div class="cc-row"><label>${horseLabel(h)} \u2014 competitive at today\u2019s level ${h.classFit} of ${h.classSeen} \u00b7 ${hit.epsRank}${ordinalSuffix(hit.epsRank)} on earnings per start (${money(hit.eps)})</label></div>
-    <div class="cc-agree cc-some">Backtested against 26 pool cards, same criteria: 1 of 11 won (9.1%, close to the 9.4% baseline for all Questionable horses) but 5 of 11 hit the board (45.5% vs a 32.7% baseline). A real-looking gap on a sample too small to trust. This is not a pick and has not been shown to work \u2014 shown alongside whatever the Pick says, not instead of it, so you see it before betting rather than after.</div>
+    <div class="cc-agree cc-some">Information, not a call \u2014 shown alongside whatever the Pick says, not instead of it, so you see it before betting rather than after.</div>
   </div>`;
 }
-// ===== GROK (SOLE CALL) PICK, PORTED FROM ITS ACTUAL SOURCE =====
-// Not a guess at what Grok would do — this is Sole Call v1.51's own pickFor
+// ===== AI(2) PICK, PORTED FROM ITS ACTUAL SOURCE =====
+// Not a guess at what AI(2) would do — this is AI(2)'s own pickFor
 // and its supporting functions, copied over and run against the same parsed
 // field. Everything here that's identical to Overlay Board's own code
 // (topAvg3Sole, avg3Of, findMatchups, confidenceOf, earningsLeader,
 // escHtml, ordinalSuffix, isScratchedNow) is reused directly, verified
-// identical against Grok's actual source before reuse. Only the five
+// identical against AI(2)'s actual source before reuse. Only the five
 // functions that genuinely diverge are copied in below, under their own
 // names so nothing here can touch Overlay Board's own frozen rule.
-function grok_todayYdsOf(rs){
+function ai2_todayYdsOf(rs){
   const live = (rs.horses || []).filter(h => !h.scratched);
   return live.map(h => h.raceDistYds).find(v => v != null) || null;
 }
-function grok_comparableFigs(h, yds){
+function ai2_comparableFigs(h, yds){
   if (yds == null) return [];
   return ((h && h.ppRaces) || [])
     .filter(p => p.spd != null && p.spd > 0 && p.distYds != null && Math.abs(p.distYds - yds) <= 440)
     .slice(0, 3)
     .map(p => p.spd);
 }
-function grok_topComparableAvg3Sole(rs, h){
-  const yds = grok_todayYdsOf(rs);
+function ai2_topComparableAvg3Sole(rs, h){
+  const yds = ai2_todayYdsOf(rs);
   if (yds == null) return {ok: false, why: 'today\u2019s distance is not on file'};
   const rated = (rs.horses || []).filter(x => !x.scratched)
-    .map(x => ({x, figs: grok_comparableFigs(x, yds)}))
+    .map(x => ({x, figs: ai2_comparableFigs(x, yds)}))
     .filter(t => t.figs.length >= 2)
     .map(t => ({x: t.x, v: t.figs.reduce((a,b)=>a+b,0) / t.figs.length, n: t.figs.length}))
     .sort((a, b) => b.v - a.v);
@@ -3776,17 +3777,17 @@ function grok_topComparableAvg3Sole(rs, h){
   }
   return {ok: true, why: '', rated};
 }
-function grok_tripBlocksPick(trip){
+function ai2_tripBlocksPick(trip){
   if (!trip || trip.ok) return false;
   const w = String(trip.why || '');
   if (w.indexOf('distance is not on file') !== -1) return false;
   if (w.indexOf('fewer than three') !== -1) return false;
   return true;
 }
-function grok_lostCleanH2H(rs, h){
+function ai2_lostCleanH2H(rs, h){
   const live = (rs.horses || []).filter(x => !x.scratched);
   if (!h || live.length < 2) return {ok: true, why: ''};
-  const yds = grok_todayYdsOf(rs);
+  const yds = ai2_todayYdsOf(rs);
   const TROUBLE = ['bump','bmp','check','chk','stumbl','bobbl','awk','reluctant','veer','clip','jostl','squeez','forced wide','broke slow','steadied','stdy','shuffl','blocked','boxed','traffic','crowd','pinch','wide trip','no room','lost iron','fractious'];
   const hits = findMatchups(live).filter(m => {
     if (!m.winner || m.loser !== h) return false;
@@ -3802,7 +3803,7 @@ function grok_lostCleanH2H(rs, h){
   return {ok: false, why: `already beaten by ${escHtml(m.winner.horse)} in this field` +
     (when ? ` (${escHtml(when)})` : '') + ' at a comparable trip, with no trouble note to excuse it'};
 }
-function grok_soleMorningLineFav(rs, fav){
+function ai2_soleMorningLineFav(rs, fav){
   const mlOf = x => parseOdds(x.mlOddsStr);
   const priced = (rs.horses || []).filter(x => !x.scratched && mlOf(x) != null);
   if (!fav || priced.length < 2) return {ok: false, why: 'no second price to compare'};
@@ -3811,7 +3812,7 @@ function grok_soleMorningLineFav(rs, fav){
   if (tied.length) return {ok: false, why: `co-favourite with ${tied.map(x => x.horse).join(', ')}`};
   return {ok: true, why: ''};
 }
-function grok_raceReadGate(rs){
+function ai2_raceReadGate(rs){
   const live = (rs.horses || []).filter(h => !h.scratched);
   const n = live.length;
   if (!n) return null;
@@ -3830,7 +3831,7 @@ function grok_raceReadGate(rs){
   }
   return {level, why, n, noStarts, figured};
 }
-function grok_pickFor(rs){
+function ai2_pickFor(rs){
   const horses = (rs.horses || []).filter(h => !h.scratched);
   if (!horses.length) return {none: 'Every runner in this race is scratched.'};
   const mlOf = x => parseOdds(x.mlOddsStr);
@@ -3838,9 +3839,9 @@ function grok_pickFor(rs){
   const fav = priced.length ? priced.reduce((a, b) => (mlOf(b) < mlOf(a) ? b : a)) : null;
   if (!fav) return {none: 'No odds available for this race yet.'};
   const ability = topAvg3Sole(rs, fav);
-  const trip = grok_topComparableAvg3Sole(rs, fav);
-  const meet = grok_lostCleanH2H(rs, fav);
-  const tripBlocks = grok_tripBlocksPick(trip);
+  const trip = ai2_topComparableAvg3Sole(rs, fav);
+  const meet = ai2_lostCleanH2H(rs, fav);
+  const tripBlocks = ai2_tripBlocksPick(trip);
   if (ability.ok && tripBlocks){
     return {none: `${fav.horse} leads on last-three figures, but not at today's trip \u2014 ${trip.why}.`};
   }
@@ -3863,14 +3864,14 @@ function grok_pickFor(rs){
   if (rank === 2 && leader) return {line: 'price', h: fav};
   return {none: `${fav.horse} is the market's choice, but ${ability.why}.`};
 }
-function grok_convictionVetoes(rs, p){
+function ai2_convictionVetoes(rs, p){
   const vetoes = [];
   if (!p || p.none || p.line !== 'primary'){
     vetoes.push(p && p.none ? String(p.none).replace(/<[^>]+>/g, '') : 'not a Pick');
     return vetoes;
   }
   const h = p.h;
-  const gate = grok_raceReadGate(rs);
+  const gate = ai2_raceReadGate(rs);
   if (!gate || gate.level !== 'read'){
     vetoes.push(gate && gate.why.length ? `record is not thick enough to read (${gate.why.join('; ')})` : 'record is not thick enough to read');
   }
@@ -3878,67 +3879,67 @@ function grok_convictionVetoes(rs, p){
   if (conf.level !== 'high'){
     vetoes.push(conf.concerns.length ? `measured concern: ${conf.concerns.join('; ')}` : 'form carries a measured concern');
   }
-  const sole = grok_soleMorningLineFav(rs, h);
+  const sole = ai2_soleMorningLineFav(rs, h);
   if (!sole.ok) vetoes.push(sole.why);
-  const trip = grok_topComparableAvg3Sole(rs, h);
+  const trip = ai2_topComparableAvg3Sole(rs, h);
   if (!trip.ok) vetoes.push(trip.why);
-  const meet = grok_lostCleanH2H(rs, h);
+  const meet = ai2_lostCleanH2H(rs, h);
   if (meet && !meet.ok) vetoes.push(meet.why.replace(/<[^>]+>/g, ''));
   return vetoes;
 }
-function chat_calculateHorseScore(horse, field, allRows){
-  const pp = chat_relativeFeature(horse, field, x => chat_number(x.rawPP));
-  const todaySurface = chat_surfaceGroup(horse.chatSurfaceToday);
+function ai3_calculateHorseScore(horse, field, allRows){
+  const pp = ai3_relativeFeature(horse, field, x => ai3_number(x.rawPP));
+  const todaySurface = ai3_surfaceGroup(horse.ai3SurfaceToday);
   const currentSpeed = todaySurface==='T'
-    ? chat_relativeFeature(horse, field, x => chat_lastSurfaceSpeed(x))
-    : chat_relativeFeature(horse, field, x => chat_number(x.lastSpd));
+    ? ai3_relativeFeature(horse, field, x => ai3_lastSurfaceSpeed(x))
+    : ai3_relativeFeature(horse, field, x => ai3_number(x.lastSpd));
   const recentSpeed = todaySurface==='T'
-    ? chat_relativeFeature(horse, field, x => { const vals=(x.ppRaces||[]).filter(r=>chat_sameSurface(x.chatSurfaceToday,r.chatSurf)).slice(0,5).map(r=>chat_number(r.spd)).filter(v=>v>0); return chat_avg(vals); })
-    : chat_speedFormFit(horse, field);
-  const bestSpeed = chat_bestSpeedFit(horse, field);
-  const form = chat_formScore(horse);
-  const pace = chat_paceFit(horse, field);
-  const cls = chat_classFit(horse, field);
-  const career = chat_experienceRate(horse);
-  const trainer = chat_trainerStrength(horse);
-  const jockey = chat_jockeyStrength(horse);
-  const combo = chat_tjComboStrength(horse);
-  const workouts = chat_workoutScore(horse);
-  const postData = chat_postPositionEvidence(horse, field, allRows);
+    ? ai3_relativeFeature(horse, field, x => { const vals=(x.ppRaces||[]).filter(r=>ai3_sameSurface(x.ai3SurfaceToday,r.ai3Surf)).slice(0,5).map(r=>ai3_number(r.spd)).filter(v=>v>0); return ai3_avg(vals); })
+    : ai3_speedFormFit(horse, field);
+  const bestSpeed = ai3_bestSpeedFit(horse, field);
+  const form = ai3_formScore(horse);
+  const pace = ai3_paceFit(horse, field);
+  const cls = ai3_classFit(horse, field);
+  const career = ai3_experienceRate(horse);
+  const trainer = ai3_trainerStrength(horse);
+  const jockey = ai3_jockeyStrength(horse);
+  const combo = ai3_tjComboStrength(horse);
+  const workouts = ai3_workoutScore(horse);
+  const postData = ai3_postPositionEvidence(horse, field, allRows);
   const postFit = postData.score;
-  const surfaceFit = chat_percentileRank(chat_surfaceSpeedScore(horse), field.map(chat_surfaceSpeedScore));
-  const conditionFit = chat_percentileRank(chat_conditionSpeedScore(horse), field.map(chat_conditionSpeedScore));
+  const surfaceFit = ai3_percentileRank(ai3_surfaceSpeedScore(horse), field.map(ai3_surfaceSpeedScore));
+  const conditionFit = ai3_percentileRank(ai3_conditionSpeedScore(horse), field.map(ai3_conditionSpeedScore));
 
   let score = pp*.20 + currentSpeed*.10 + recentSpeed*.12 + bestSpeed*.06 + form*.12 + pace*.08 + cls*.10 +
     surfaceFit*.04 + conditionFit*.04 + career*.04 + trainer*.035 + jockey*.035 + combo*.025 + workouts*.015;
 
-  const q = chat_number(horse.quirin);
+  const q = ai3_number(horse.quirin);
   if (q>0){
-    const qField = field.map(x => chat_number(x.quirin)).filter(x => x>0);
-    score += chat_percentileRank(q, qField)*.02;
+    const qField = field.map(x => ai3_number(x.quirin)).filter(x => x>0);
+    score += ai3_percentileRank(q, qField)*.02;
   }
   score += (postFit-.5)*.05;
-  const turfProof = chat_turfProofStatus(horse);
+  const turfProof = ai3_turfProofStatus(horse);
   score += turfProof.adjust;
-  const allWeatherProof = chat_allWeatherProofStatus(horse);
+  const allWeatherProof = ai3_allWeatherProofStatus(horse);
   score += allWeatherProof.adjust;
-  const days = chat_number(horse.layoffDays);
+  const days = ai3_number(horse.layoffDays);
   if (days>120) score -= .015; else if (days>60) score -= .006;
-  const drop = chat_classDropStatus(horse);
+  const drop = ai3_classDropStatus(horse);
   if (drop.dropping && !drop.recent) score -= .07;
   else if (drop.dropping && drop.recent) score += .012;
   if (horse.riderChange) score -= .018;
-  const quality = chat_dataQuality(horse);
+  const quality = ai3_dataQuality(horse);
   if (quality.label==='POOR') score -= .08;
   else if (quality.label==='PARTIAL') score -= .025;
-  if (!chat_number(horse.rawPP) && !chat_number(horse.lastSpd)) score -= .035;
+  if (!ai3_number(horse.rawPP) && !ai3_number(horse.lastSpd)) score -= .035;
   score = Math.max(.01, Math.min(.99, score));
   return {score, components: {pp, currentSpeed, recentSpeed, bestSpeed, form, pace, cls, surfaceFit, conditionFit,
     career, trainer, jockey, combo, workouts, postFit, postData, quality, turfProof}};
 }
-function chat_calculateProbabilities(field, allRows){
+function ai3_calculateProbabilities(field, allRows){
   const scored = field.map(horse => {
-    const model = chat_calculateHorseScore(horse, field, allRows);
+    const model = ai3_calculateHorseScore(horse, field, allRows);
     return {horse, raw: model.score, components: model.components};
   });
   const temperature = .075;
@@ -3948,66 +3949,66 @@ function chat_calculateProbabilities(field, allRows){
   scored.forEach((x,i) => { x.probability = total ? exps[i]/total : 1/scored.length; });
   return scored.sort((a,b) => b.probability - a.probability);
 }
-function chat_isFirstTimeStarterForQuality(h){
-  const usable = (h.ppRaces||[]).filter(p => chat_number(p.fin)>0 && chat_number(p.fin)<90);
+function ai3_isFirstTimeStarterForQuality(h){
+  const usable = (h.ppRaces||[]).filter(p => ai3_number(p.fin)>0 && ai3_number(p.fin)<90);
   return usable.length===0;
 }
-function chat_rankValue(horse, field, selector){
-  const vals = (field||[]).map(h => ({h, v: chat_number(selector(h))})).filter(x => x.v>0).sort((a,b) => b.v-a.v);
+function ai3_rankValue(horse, field, selector){
+  const vals = (field||[]).map(h => ({h, v: ai3_number(selector(h))})).filter(x => x.v>0).sort((a,b) => b.v-a.v);
   const row = vals.find(x => x.h===horse);
   if (!row) return {rank:null, count:vals.length, value:0, tied:false};
   const rank = 1+vals.filter(x => x.v>row.v).length;
   const tied = vals.filter(x => x.v===row.v).length>1;
   return {rank, count:vals.length, value:row.v, tied};
 }
-function chat_signalConsensus(field, horse){
+function ai3_signalConsensus(field, horse){
   const active = (field||[]).filter(h => !h.scratched);
   const tests = [
-    ['Prime Power', h => chat_number(h.rawPP)],
-    ['Last Speed', h => chat_number(h.lastSpd)],
-    ['Best Speed', h => chat_number(chat_surfaceBestSpeed(h) || h.chatBestLife)],
-    ['Avg-3 Speed', chat_avg3RaceSpeed]
+    ['Prime Power', h => ai3_number(h.rawPP)],
+    ['Last Speed', h => ai3_number(h.lastSpd)],
+    ['Best Speed', h => ai3_number(ai3_surfaceBestSpeed(h) || h.ai3BestLife)],
+    ['Avg-3 Speed', ai3_avg3RaceSpeed]
   ];
   let wins=0, usable=0;
   tests.forEach(([name,fn]) => {
-    const r = chat_rankValue(horse, active, fn);
+    const r = ai3_rankValue(horse, active, fn);
     if (r.count>=3 && r.rank!==null){ usable++; if (r.rank===1) wins++; }
   });
-  const fts = active.filter(chat_isFirstTimeStarterForQuality).length;
+  const fts = active.filter(ai3_isFirstTimeStarterForQuality).length;
   let level='uncertain', label='HIGH UNCERTAINTY';
   if (usable>=3 && wins>=3){ level='high'; label='HIGH CONSENSUS'; }
   else if (usable>=3 && wins===2){ level='mixed'; label='MIXED SIGNALS'; }
   if (fts>0 && active.length>=10 && level==='high'){ level='mixed'; label='MIXED — FIELD RISK'; }
   return {level, label, wins, usable, fts, fieldSize: active.length};
 }
-function chat_primePowerGap(field, horse){
+function ai3_primePowerGap(field, horse){
   const active = (field||[]).filter(h => !h.scratched);
-  const vals = active.map(h => ({h, v: chat_number(h.rawPP)})).filter(x => x.v>0).sort((a,b) => b.v-a.v);
+  const vals = active.map(h => ({h, v: ai3_number(h.rawPP)})).filter(x => x.v>0).sort((a,b) => b.v-a.v);
   const mine = vals.find(x => x.h===horse);
   if (!mine || vals.length<2) return {rank:null, gap:null, leader:false};
   const rank = vals.findIndex(x => x.h===horse)+1;
   const second = vals.find(x => x.h!==horse);
   return {rank, gap: rank===1 && second ? mine.v-second.v : null, leader: rank===1};
 }
-function chat_careerEPS(h){ const st=chat_number(h.ltStarts), e=chat_number(h.ltEarn); return st>0 && e>0 ? e/st : 0; }
-function chat_turfEPS(h){ const st=chat_number(h.turfStarts), e=chat_number(h.turfEarn); return st>0 && e>0 ? e/st : 0; }
-function chat_wetEPS(h){ const st=chat_number(h.wetStarts), e=chat_number(h.wetEarn); return st>0 && e>0 ? e/st : 0; }
-function chat_performanceEarningsSupport(field, horse){
+function ai3_careerEPS(h){ const st=ai3_number(h.ltStarts), e=ai3_number(h.ltEarn); return st>0 && e>0 ? e/st : 0; }
+function ai3_turfEPS(h){ const st=ai3_number(h.turfStarts), e=ai3_number(h.turfEarn); return st>0 && e>0 ? e/st : 0; }
+function ai3_wetEPS(h){ const st=ai3_number(h.wetStarts), e=ai3_number(h.wetEarn); return st>0 && e>0 ? e/st : 0; }
+function ai3_performanceEarningsSupport(field, horse){
   const active = (field||[]).filter(h => !h.scratched);
   if (!horse || !active.length) return {level:'thin', label:'THIN DATA', points:0, max:0};
   let points=0, max=0;
-  const ce = chat_rankValue(horse, active, chat_careerEPS);
+  const ce = ai3_rankValue(horse, active, ai3_careerEPS);
   if (ce.count>=3 && ce.rank!==null){ max+=2; if (ce.rank===1) points+=2; else if (ce.rank<=3) points+=1; }
-  const g = chat_surfaceGroup(horse.chatSurfaceToday), cg = chat_conditionGroup(horse.chatTrackCond);
+  const g = ai3_surfaceGroup(horse.ai3SurfaceToday), cg = ai3_conditionGroup(horse.ai3TrackCond);
   let surfRank=null;
-  if (g==='T') surfRank = chat_rankValue(horse, active, chat_turfEPS);
-  else if (g==='D' && cg==='OFF') surfRank = chat_rankValue(horse, active, chat_wetEPS);
+  if (g==='T') surfRank = ai3_rankValue(horse, active, ai3_turfEPS);
+  else if (g==='D' && cg==='OFF') surfRank = ai3_rankValue(horse, active, ai3_wetEPS);
   if (surfRank && surfRank.count>=3 && surfRank.rank!==null){ max+=2; if (surfRank.rank===1) points+=2; else if (surfRank.rank<=3) points+=1; }
-  const sb = chat_rankValue(horse, active, chat_surfaceBestSpeed);
+  const sb = ai3_rankValue(horse, active, ai3_surfaceBestSpeed);
   if (sb.count>=3 && sb.rank!==null){ max+=2; if (sb.rank===1 && !sb.tied) points+=2; else if (sb.rank<=2) points+=1; }
-  const ls = chat_rankValue(horse, active, h => chat_number(h.lastSpd));
+  const ls = ai3_rankValue(horse, active, h => ai3_number(h.lastSpd));
   if (ls.count>=3 && ls.rank!==null){ max+=1; if (ls.rank===1) points+=1; }
-  max+=1; if (chat_speedConfirmedInfo(active, horse).confirmed) points+=1;
+  max+=1; if (ai3_speedConfirmedInfo(active, horse).confirmed) points+=1;
   const ratio = max ? points/max : 0;
   let level='thin', label='THIN / MIXED';
   if (max>=4 && ratio>=.72){ level='strong'; label='STRONG SUPPORT'; }
@@ -4015,31 +4016,31 @@ function chat_performanceEarningsSupport(field, horse){
   else if (max>=3 && ratio>=.30){ level='mixed'; label='MIXED SUPPORT'; }
   return {level, label, points, max, ratio};
 }
-function chat_speedConfirmedInfo(field, horse){
-  const withLast = (field||[]).filter(h => chat_number(h.lastSpd)>0);
-  const withBest = (field||[]).filter(h => chat_number(chat_surfaceBestSpeed(h))>0);
-  if (withLast.length<2 || withBest.length<2 || !chat_number(horse.lastSpd)) return {confirmed:false};
-  const maxLast = Math.max(...withLast.map(h => chat_number(h.lastSpd)));
-  const maxBest = Math.max(...withBest.map(h => chat_number(chat_surfaceBestSpeed(h))));
-  return {confirmed: chat_number(horse.lastSpd)===maxLast && chat_number(chat_surfaceBestSpeed(horse))===maxBest};
+function ai3_speedConfirmedInfo(field, horse){
+  const withLast = (field||[]).filter(h => ai3_number(h.lastSpd)>0);
+  const withBest = (field||[]).filter(h => ai3_number(ai3_surfaceBestSpeed(h))>0);
+  if (withLast.length<2 || withBest.length<2 || !ai3_number(horse.lastSpd)) return {confirmed:false};
+  const maxLast = Math.max(...withLast.map(h => ai3_number(h.lastSpd)));
+  const maxBest = Math.max(...withBest.map(h => ai3_number(ai3_surfaceBestSpeed(h))));
+  return {confirmed: ai3_number(horse.lastSpd)===maxLast && ai3_number(ai3_surfaceBestSpeed(horse))===maxBest};
 }
-function chat_recentSpeedConfirmedInfo(field, horse){
+function ai3_recentSpeedConfirmedInfo(field, horse){
   const active = (field||[]).filter(h => !h.scratched);
   if (!horse || active.length<3) return {confirmed:false};
-  const market = active.filter(h => chat_oddsDecimal(h.mlOddsStr)!==null).sort((a,b) => chat_oddsDecimal(a.mlOddsStr)-chat_oddsDecimal(b.mlOddsStr));
+  const market = active.filter(h => ai3_oddsDecimal(h.mlOddsStr)!==null).sort((a,b) => ai3_oddsDecimal(a.mlOddsStr)-ai3_oddsDecimal(b.mlOddsStr));
   if (!market.length) return {confirmed:false};
-  const favoriteOdds = chat_oddsDecimal(market[0].mlOddsStr);
-  const favorite = chat_oddsDecimal(horse.mlOddsStr)!==null && Math.abs(chat_oddsDecimal(horse.mlOddsStr)-favoriteOdds)<1e-9;
-  const a3 = chat_rankValue(horse, active, chat_avg3RaceSpeed);
+  const favoriteOdds = ai3_oddsDecimal(market[0].mlOddsStr);
+  const favorite = ai3_oddsDecimal(horse.mlOddsStr)!==null && Math.abs(ai3_oddsDecimal(horse.mlOddsStr)-favoriteOdds)<1e-9;
+  const a3 = ai3_rankValue(horse, active, ai3_avg3RaceSpeed);
   const confirmed = favorite && a3.count>=3 && a3.rank===1;
   return {confirmed};
 }
 // Class-family and entry-level-fit — the same shape as Overlay Board's own
-// entryLevelFit, but Chat's own thresholds and maiden-subtype weighting,
+// entryLevelFit, but AI(3)'s own thresholds and maiden-subtype weighting,
 // ported rather than reused since the two diverge in specifics.
-function chat_normalizedClassText(v){ return String(v||'').toUpperCase().replace(/[^A-Z0-9]/g,''); }
-function chat_classFamilyFromText(text, raceType){
-  const t = chat_normalizedClassText(text), rt = String(raceType||'').trim().toUpperCase();
+function ai3_normalizedClassText(v){ return String(v||'').toUpperCase().replace(/[^A-Z0-9]/g,''); }
+function ai3_classFamilyFromText(text, raceType){
+  const t = ai3_normalizedClassText(text), rt = String(raceType||'').trim().toUpperCase();
   if (rt==='S' || rt==='M' || rt==='MO') return 'MAIDEN';
   if (/^MOC/.test(t) || t.includes('MAIDENOPTIONAL')) return 'MAIDEN';
   if (/^(MD|MSW|MCL|MC)/.test(t) || t.includes('MDSPWT') || t.includes('MAIDEN')) return 'MAIDEN';
@@ -4048,56 +4049,56 @@ function chat_classFamilyFromText(text, raceType){
   if (['G1','G2','G3','N','NO'].includes(rt) || /^(STK|G1|G2|G3|HCP)/.test(t)) return 'STAKES';
   return 'OTHER';
 }
-function chat_maidenSubtypeStrength(text, raceType, claiming){
-  const t = chat_normalizedClassText(text), rt = String(raceType||'').trim().toUpperCase(), c = chat_number(claiming);
+function ai3_maidenSubtypeStrength(text, raceType, claiming){
+  const t = ai3_normalizedClassText(text), rt = String(raceType||'').trim().toUpperCase(), c = ai3_number(claiming);
   if (rt==='S' || /^MSW/.test(t) || t.includes('MDSPWT') || t.includes('MAIDENSPECIAL')) return 3.0;
   if (rt==='MO' || /^MOC/.test(t) || t.includes('MAIDENOPTIONAL')) return 2.5 + Math.min(0.35, c/200000);
   if (rt==='M' || /^(MCL|MC|MD)/.test(t) || t.includes('MAIDENCLAIM')) return 1.0 + Math.min(1.0, c/100000);
   return 2.0;
 }
-function chat_classStrengthFromValues(purse, claiming){
-  const p = chat_number(purse), c = chat_number(claiming);
+function ai3_classStrengthFromValues(purse, claiming){
+  const p = ai3_number(purse), c = ai3_number(claiming);
   if (!p && !c) return 0;
   return Math.log10(1+p)*10 + Math.log10(1+c)*4;
 }
-function chat_classProfile(text, raceType, purse, claiming){
-  const family = chat_classFamilyFromText(text, raceType);
-  const money = chat_classStrengthFromValues(purse, claiming);
-  const maiden = family==='MAIDEN' ? chat_maidenSubtypeStrength(text, raceType, claiming) : null;
+function ai3_classProfile(text, raceType, purse, claiming){
+  const family = ai3_classFamilyFromText(text, raceType);
+  const money = ai3_classStrengthFromValues(purse, claiming);
+  const maiden = family==='MAIDEN' ? ai3_maidenSubtypeStrength(text, raceType, claiming) : null;
   return {family, money, maiden};
 }
-function chat_todayClassProfile(horse){ return chat_classProfile(horse.classTxtToday, horse.chatRaceType, horse.racePurse, horse.todayClaim); }
-function chat_ppClassProfile(pp){ return chat_classProfile(pp && pp.classTxt, '', pp && pp.purse, pp && pp.claim); }
-function chat_classLevelDelta(pastProfile, todayProfile){
+function ai3_todayClassProfile(horse){ return ai3_classProfile(horse.classTxtToday, horse.ai3RaceType, horse.racePurse, horse.todayClaim); }
+function ai3_ppClassProfile(pp){ return ai3_classProfile(pp && pp.classTxt, '', pp && pp.purse, pp && pp.claim); }
+function ai3_classLevelDelta(pastProfile, todayProfile){
   if (!pastProfile || !todayProfile) return null;
   if (pastProfile.family==='MAIDEN' && todayProfile.family==='MAIDEN') return pastProfile.maiden - todayProfile.maiden;
   if (!pastProfile.money || !todayProfile.money) return null;
   return pastProfile.money - todayProfile.money;
 }
-function chat_classMoveRead(horse){
-  const now = chat_todayClassProfile(horse);
-  const last = (horse.ppRaces||[]).find(p => chat_classLevelDelta(chat_ppClassProfile(p), now)!==null);
+function ai3_classMoveRead(horse){
+  const now = ai3_todayClassProfile(horse);
+  const last = (horse.ppRaces||[]).find(p => ai3_classLevelDelta(ai3_ppClassProfile(p), now)!==null);
   if (!last) return {label:'UNKNOWN'};
-  const delta = chat_classLevelDelta(chat_ppClassProfile(last), now);
+  const delta = ai3_classLevelDelta(ai3_ppClassProfile(last), now);
   if (delta===null) return {label:'UNKNOWN'};
   if (delta>0.75) return {label:'DOWN'};
   if (delta<-0.75) return {label:'UP'};
   return {label:'SAME'};
 }
-function chat_competitiveAtLevel(pp){
-  const fin = chat_number(pp && pp.fin), bl = chat_number(pp && pp.margin);
+function ai3_competitiveAtLevel(pp){
+  const fin = ai3_number(pp && pp.fin), bl = ai3_number(pp && pp.margin);
   return (fin>0 && fin<=4) || (bl>=0 && bl<=5);
 }
-function chat_surfaceMatchesToday(pp, horse){ return chat_sameSurface(pp && pp.surf, horse && horse.chatSurfaceToday); }
-function chat_entryLevelFit(horse){
-  const nowProfile = chat_todayClassProfile(horse);
-  const recent = (horse.ppRaces||[]).slice(0,6).map(p => ({p, delta: chat_classLevelDelta(chat_ppClassProfile(p), nowProfile)})).filter(x => x.delta!==null);
-  if (chat_number(horse.ltStarts)===0 || !recent.length) return {label:'UNKNOWN', comparable:0, competitive:0};
+function ai3_surfaceMatchesToday(pp, horse){ return ai3_sameSurface(pp && pp.surf, horse && horse.ai3SurfaceToday); }
+function ai3_entryLevelFit(horse){
+  const nowProfile = ai3_todayClassProfile(horse);
+  const recent = (horse.ppRaces||[]).slice(0,6).map(p => ({p, delta: ai3_classLevelDelta(ai3_ppClassProfile(p), nowProfile)})).filter(x => x.delta!==null);
+  if (ai3_number(horse.ltStarts)===0 || !recent.length) return {label:'UNKNOWN', comparable:0, competitive:0};
   const comparable = recent.filter(x => x.delta >= -0.75);
-  const competitive = comparable.filter(x => chat_competitiveAtLevel(x.p));
-  const surfaceComparable = comparable.filter(x => chat_surfaceMatchesToday(x.p, horse));
-  const surfaceCompetitive = surfaceComparable.filter(x => chat_competitiveAtLevel(x.p));
-  const move = chat_classMoveRead(horse);
+  const competitive = comparable.filter(x => ai3_competitiveAtLevel(x.p));
+  const surfaceComparable = comparable.filter(x => ai3_surfaceMatchesToday(x.p, horse));
+  const surfaceCompetitive = surfaceComparable.filter(x => ai3_competitiveAtLevel(x.p));
+  const move = ai3_classMoveRead(horse);
   let label;
   if (competitive.length>=2 && (surfaceCompetitive.length>=1 || !surfaceComparable.length)) label='PROVEN';
   else if (competitive.length>=1) label='COMPETITIVE';
@@ -4107,27 +4108,27 @@ function chat_entryLevelFit(horse){
   else label='UNPROVEN';
   return {label, comparable: comparable.length, competitive: competitive.length};
 }
-function chat_raceDecision(top, field){
+function ai3_raceDecision(top, field){
   const horse = top.horse;
   const reasons = [];
-  const firstTimers = field.filter(h => chat_number(h.ltStarts)===0).length;
+  const firstTimers = field.filter(h => ai3_number(h.ltStarts)===0).length;
   const firstTimerRate = field.length ? firstTimers/field.length : 0;
-  if (chat_number(horse.raceDistYds)>3000) reasons.push('specialty or jump-distance race');
+  if (ai3_number(horse.raceDistYds)>3000) reasons.push('specialty or jump-distance race');
   if (top.components.quality.label==='POOR') reasons.push('poor core-data coverage');
   return {pass: reasons.length>0, reasons, firstTimers, firstTimerRate};
 }
-function chat_raceBetQuality(field, modelTopHorse){
+function ai3_raceBetQuality(field, modelTopHorse){
   const active = (field||[]).filter(h => !h.scratched);
-  const support = chat_performanceEarningsSupport(active, modelTopHorse);
-  const recentConfirm = chat_recentSpeedConfirmedInfo(active, modelTopHorse);
-  const fit = chat_entryLevelFit(modelTopHorse);
-  const turf = chat_turfProofStatus(modelTopHorse);
+  const support = ai3_performanceEarningsSupport(active, modelTopHorse);
+  const recentConfirm = ai3_recentSpeedConfirmedInfo(active, modelTopHorse);
+  const fit = ai3_entryLevelFit(modelTopHorse);
+  const turf = ai3_turfProofStatus(modelTopHorse);
   const fieldSize = active.length;
-  const ftsCount = active.filter(chat_isFirstTimeStarterForQuality).length;
-  const surfaceOK = !(chat_surfaceGroup(modelTopHorse.surface)==='T' && turf.code==='UNPROVEN');
+  const ftsCount = active.filter(ai3_isFirstTimeStarterForQuality).length;
+  const surfaceOK = !(ai3_surfaceGroup(modelTopHorse.surface)==='T' && turf.code==='UNPROVEN');
   const classOK = fit.label==='PROVEN' || fit.label==='COMPETITIVE' || fit.label==='CLASS RELIEF';
   const supportOK = support.level==='strong' || support.level==='solid';
-  const lightlyRacedWinner = chat_number(modelTopHorse.ltStarts)>0 && chat_number(modelTopHorse.ltStarts)<=2 && chat_number(modelTopHorse.ltWins)>0;
+  const lightlyRacedWinner = ai3_number(modelTopHorse.ltStarts)>0 && ai3_number(modelTopHorse.ltStarts)<=2 && ai3_number(modelTopHorse.ltWins)>0;
   if (support.level==='thin' && !recentConfirm.confirmed) return {level:'pass', label:'PASS / THIN DATA'};
   if (recentConfirm.confirmed && ftsCount===0 && fieldSize<=9 && supportOK && surfaceOK && (classOK || lightlyRacedWinner))
     return {level:'strong', label:'BET — STRONG'};
@@ -4138,30 +4139,30 @@ function chat_raceBetQuality(field, modelTopHorse){
   if (supportOK && surfaceOK && fit.label!=='OVERMATCHED' && fit.label!=='UNPROVEN UP') return {level:'standard', label:'BET — STANDARD'};
   return {level:'caution', label:'CAUTION — MIXED'};
 }
-function chat_modelBestBetProfile(scored, field){
+function ai3_modelBestBetProfile(scored, field){
   if (!scored || !scored.length) return {qualifies:false};
   const active = (field||[]).filter(h => !h.scratched);
   const top = scored[0], second = scored[1];
   const horse = top.horse;
-  const maiden = chat_classFamilyFromText(horse.classTxtToday, horse.chatRaceType)==='MAIDEN';
+  const maiden = ai3_classFamilyFromText(horse.classTxtToday, horse.ai3RaceType)==='MAIDEN';
   const quality = top.components.quality;
   const separation = second ? (top.probability-second.probability) : top.probability;
-  const structural = chat_raceDecision(top, active);
-  const surfGroup = chat_surfaceGroup(horse.chatSurfaceToday);
-  const turf = chat_turfProofStatus(horse);
+  const structural = ai3_raceDecision(top, active);
+  const surfGroup = ai3_surfaceGroup(horse.ai3SurfaceToday);
+  const turf = ai3_turfProofStatus(horse);
   const surfaceOK = surfGroup!=='T' || turf.code==='PROVEN' || turf.code==='COMPETITIVE';
-  const consensus = chat_signalConsensus(active, horse);
+  const consensus = ai3_signalConsensus(active, horse);
   const qualifies = !maiden && quality.label==='COMPLETE' && top.probability>=0.50 && separation>=0.25 &&
     !structural.pass && surfaceOK && consensus.level!=='uncertain';
   return {qualifies, separation, consensus};
 }
-function chat_finalRaceDecision(top, field, allRows){
-  const structural = chat_raceDecision(top, field);
-  let quality = chat_raceBetQuality(field, top.horse);
-  const consensus = chat_signalConsensus(field, top.horse);
+function ai3_finalRaceDecision(top, field, allRows){
+  const structural = ai3_raceDecision(top, field);
+  let quality = ai3_raceBetQuality(field, top.horse);
+  const consensus = ai3_signalConsensus(field, top.horse);
   const complete = top.components.quality.label==='COMPLETE';
   const active = (field||[]).filter(h => !h.scratched);
-  const fts = active.filter(chat_isFirstTimeStarterForQuality).length;
+  const fts = active.filter(ai3_isFirstTimeStarterForQuality).length;
   if (!structural.pass && quality.level==='pass' && complete && consensus.level==='high' && fts===0 && active.length<=9){
     quality = {...quality, level:'strong', label:'BET — STRONG'};
   }
@@ -4171,28 +4172,28 @@ function chat_finalRaceDecision(top, field, allRows){
 }
 // Top-level: mirrors what computeRaceCard does per race — score the field,
 // take the leader, run the decision layer, and upgrade to BEST BET exactly
-// when Chat's own code would.
-function chat_pickFor(rs, allRows){
+// when AI(3)'s own code would.
+function ai3_pickFor(rs, allRows){
   const active = (rs.horses || []).filter(h => !h.scratched);
   if (!active.length) return {h: null, label: 'no live runners'};
-  const scored = chat_calculateProbabilities(active, allRows || active);
+  const scored = ai3_calculateProbabilities(active, allRows || active);
   const top = scored[0];
-  const decision = chat_finalRaceDecision(top, active, allRows || active);
-  const bestProfile = chat_modelBestBetProfile(scored, active);
-  const topConsensus = chat_signalConsensus(active, top.horse);
+  const decision = ai3_finalRaceDecision(top, active, allRows || active);
+  const bestProfile = ai3_modelBestBetProfile(scored, active);
+  const topConsensus = ai3_signalConsensus(active, top.horse);
   let label = decision.label;
   if (bestProfile.qualifies && topConsensus.level!=='uncertain') label = 'BEST BET';
   return {h: top.horse, label, probability: top.probability, pass: decision.pass && label!=='BEST BET'};
 }
 
-// ===== CHAT (HORSE HANDICAP) PICK, PORTED FROM ITS ACTUAL SOURCE =====
-// Horse Handicap v7.51's own scoring pipeline, function by function, run
+// ===== AI(3) PICK, PORTED FROM ITS ACTUAL SOURCE =====
+// AI(3)'s own scoring pipeline, function by function, run
 // against the same parsed field. Field names are translated where the two
-// tools' row objects differ (chat's currentSurface -> our surface, and so
+// tools' row objects differ (AI(3)'s currentSurface -> our surface, and so
 // on) — verified against the real source line by line, not approximated.
 // Several fields Overlay Board never captured before this port were added
-// upstream in the parser under chat-prefixed names specifically so this
-// stays faithful to Chat's own field offsets rather than reusing ours where
+// upstream in the parser under ai3-prefixed names specifically so this
+// stays faithful to AI(3)'s own field offsets rather than reusing ours where
 // the two conventions differ (best-speed variants, trainer/jockey combo,
 // past-race purse and track condition, today's raceType).
 //
@@ -4202,62 +4203,62 @@ function chat_pickFor(rs, allRows){
 // (falling back to last speed if none are), where avg3Of skips invalid
 // slots and finds the first three that DO have a figure — not the same
 // horse's number, on any race missing a figure in slots 1-3. And best speed
-// here reads Chat's own dedicated BRIS field per surface/condition, not
+// here reads AI(3)'s own dedicated BRIS field per surface/condition, not
 // Overlay Board's own max-of-past-figures computation.
-function chat_number(v){
+function ai3_number(v){
   if (v === null || v === undefined) return 0;
   const n = parseFloat(String(v).replace(/[^0-9.+-]/g, ''));
   return Number.isFinite(n) ? n : 0;
 }
-function chat_avg(values){
+function ai3_avg(values){
   const v = values.filter(x => Number.isFinite(x) && x > 0);
   return v.length ? v.reduce((a,b) => a+b, 0) / v.length : 0;
 }
-function chat_percentileRank(value, values){
+function ai3_percentileRank(value, values){
   const valid = values.filter(v => Number.isFinite(v) && v > 0).sort((a,b) => a-b);
   if (!valid.length || !Number.isFinite(value) || value <= 0) return 0.5;
   let below = 0;
   valid.forEach(v => { if (v < value) below++; });
   return below / Math.max(1, valid.length - 1);
 }
-function chat_relativeFeature(horse, field, selector){
-  return chat_percentileRank(selector(horse), field.map(selector));
+function ai3_relativeFeature(horse, field, selector){
+  return ai3_percentileRank(selector(horse), field.map(selector));
 }
-function chat_oddsDecimal(oddsStr){
+function ai3_oddsDecimal(oddsStr){
   const raw = String(oddsStr || '').trim().toLowerCase();
   if (!raw) return null;
   let m = raw.match(/^(\d+(?:\.\d+)?)\s*(?:\/|-|to)\s*(\d+(?:\.\d+)?)$/);
-  if (m && chat_number(m[2]) > 0) return chat_number(m[1]) / chat_number(m[2]);
+  if (m && ai3_number(m[2]) > 0) return ai3_number(m[1]) / ai3_number(m[2]);
   m = raw.match(/^(\d+(?:\.\d+)?)$/);
-  if (m){ const v = chat_number(m[1]); if (v > 0) return v; }
+  if (m){ const v = ai3_number(m[1]); if (v > 0) return v; }
   m = raw.match(/^([+-]\d+(?:\.\d+)?)$/);
-  if (m){ const a = chat_number(m[1]); if (a > 0) return a/100; if (a < 0) return 100/Math.abs(a); }
+  if (m){ const a = ai3_number(m[1]); if (a > 0) return a/100; if (a < 0) return 100/Math.abs(a); }
   return null;
 }
-function chat_avg3RaceSpeed(horse){
-  const vals = (horse.ppRaces || []).slice(0,3).map(r => chat_number(r.spd)).filter(v => v > 0);
+function ai3_avg3RaceSpeed(horse){
+  const vals = (horse.ppRaces || []).slice(0,3).map(r => ai3_number(r.spd)).filter(v => v > 0);
   if (vals.length) return vals.reduce((a,b) => a+b, 0) / vals.length;
-  return chat_number(horse.lastSpd);
+  return ai3_number(horse.lastSpd);
 }
-function chat_recentSpeedScore(horse){
-  const vals = (horse.ppRaces || []).slice(0,5).map(x => chat_number(x.spd)).filter(x => x > 0);
-  return vals.length ? chat_avg(vals) : chat_number(horse.lastSpd);
+function ai3_recentSpeedScore(horse){
+  const vals = (horse.ppRaces || []).slice(0,5).map(x => ai3_number(x.spd)).filter(x => x > 0);
+  return vals.length ? ai3_avg(vals) : ai3_number(horse.lastSpd);
 }
-function chat_recentPaceScore(horse){
-  const vals = (horse.ppRaces || []).slice(0,4).map(x => chat_avg([
-    chat_number(x.pace2), chat_number(x.pace4), chat_number(x.pace6), chat_number(x.pace8), chat_number(x.latePace)
+function ai3_recentPaceScore(horse){
+  const vals = (horse.ppRaces || []).slice(0,4).map(x => ai3_avg([
+    ai3_number(x.pace2), ai3_number(x.pace4), ai3_number(x.pace6), ai3_number(x.pace8), ai3_number(x.latePace)
   ])).filter(x => x > 0);
-  return chat_avg(vals);
+  return ai3_avg(vals);
 }
-function chat_recentClassScore(horse){
+function ai3_recentClassScore(horse){
   const vals = (horse.ppRaces || []).slice(0,5).map(x => {
-    const purse = chat_number(x.purse), claiming = chat_number(x.claim);
+    const purse = ai3_number(x.purse), claiming = ai3_number(x.claim);
     if (!purse && !claiming) return 0;
     return Math.log10(1+purse)*10 + Math.log10(1+claiming)*4;
   }).filter(x => x > 0);
-  return chat_avg(vals);
+  return ai3_avg(vals);
 }
-function chat_surfaceGroup(value){
+function ai3_surfaceGroup(value){
   const s = String(value||'').trim().toUpperCase();
   if (!s) return '';
   if (s === 'T' || s.includes('TURF') || s.includes('GRASS')) return 'T';
@@ -4265,11 +4266,11 @@ function chat_surfaceGroup(value){
   if (s === 'D' || s === 'M' || s.includes('DIRT') || s.includes('MAIN')) return 'D';
   return s;
 }
-function chat_sameSurface(a, b){
-  const ga = chat_surfaceGroup(a), gb = chat_surfaceGroup(b);
+function ai3_sameSurface(a, b){
+  const ga = ai3_surfaceGroup(a), gb = ai3_surfaceGroup(b);
   return !!ga && ga === gb;
 }
-function chat_conditionGroup(value){
+function ai3_conditionGroup(value){
   const s = String(value||'').trim().toUpperCase();
   if (['FT','FST','FAST'].includes(s)) return 'FAST';
   if (['MY','MUDDY','SY','SL','SLOPPY'].includes(s)) return 'OFF';
@@ -4278,40 +4279,40 @@ function chat_conditionGroup(value){
   if (['GD','GOOD'].includes(s)) return 'GOOD';
   return s;
 }
-function chat_surfaceBestSpeed(horse){
-  const g = chat_surfaceGroup(horse.chatSurfaceToday);
-  const cond = chat_conditionGroup(horse.chatTrackCond);
+function ai3_surfaceBestSpeed(horse){
+  const g = ai3_surfaceGroup(horse.ai3SurfaceToday);
+  const cond = ai3_conditionGroup(horse.ai3TrackCond);
   // v7.53 fix: all-weather gets its own dedicated BRIS field, not a dirt or
   // lifetime fallback that may really be a turf figure in disguise — this
   // is the exact mechanism behind the Kalik/American Reign misreads.
-  if (g === 'T') return chat_number(horse.chatBestTurf);
-  if (g === 'A') return chat_number(horse.chatBestAW);
-  if (g === 'D' && cond === 'OFF') return chat_number(horse.chatBestOff) || chat_number(horse.chatBestFast) || chat_number(horse.chatBestLife);
-  if (g === 'D') return chat_number(horse.chatBestFast) || chat_number(horse.chatBestLife);
-  return chat_number(horse.chatBestLife);
+  if (g === 'T') return ai3_number(horse.ai3BestTurf);
+  if (g === 'A') return ai3_number(horse.ai3BestAW);
+  if (g === 'D' && cond === 'OFF') return ai3_number(horse.ai3BestOff) || ai3_number(horse.ai3BestFast) || ai3_number(horse.ai3BestLife);
+  if (g === 'D') return ai3_number(horse.ai3BestFast) || ai3_number(horse.ai3BestLife);
+  return ai3_number(horse.ai3BestLife);
 }
-function chat_surfaceSpeedScore(horse){
-  const vals = (horse.ppRaces||[]).filter(r => chat_sameSurface(horse.chatSurfaceToday, r.chatSurf)).slice(0,5).map(r => chat_number(r.spd)).filter(v => v>0);
-  return chat_avg(vals);
+function ai3_surfaceSpeedScore(horse){
+  const vals = (horse.ppRaces||[]).filter(r => ai3_sameSurface(horse.ai3SurfaceToday, r.ai3Surf)).slice(0,5).map(r => ai3_number(r.spd)).filter(v => v>0);
+  return ai3_avg(vals);
 }
-function chat_lastSurfaceSpeed(horse){
-  const pp = (horse.ppRaces||[]).find(r => chat_sameSurface(horse.chatSurfaceToday, r.chatSurf) && chat_number(r.spd) > 0);
-  return pp ? chat_number(pp.spd) : 0;
+function ai3_lastSurfaceSpeed(horse){
+  const pp = (horse.ppRaces||[]).find(r => ai3_sameSurface(horse.ai3SurfaceToday, r.ai3Surf) && ai3_number(r.spd) > 0);
+  return pp ? ai3_number(pp.spd) : 0;
 }
-function chat_conditionSpeedScore(horse){
-  const target = chat_conditionGroup(horse.chatTrackCond);
+function ai3_conditionSpeedScore(horse){
+  const target = ai3_conditionGroup(horse.ai3TrackCond);
   if (!target) return 0;
-  const vals = (horse.ppRaces||[]).filter(r => chat_conditionGroup(r.trackCond) === target).slice(0,5).map(r => chat_number(r.spd)).filter(v => v>0);
-  return chat_avg(vals);
+  const vals = (horse.ppRaces||[]).filter(r => ai3_conditionGroup(r.trackCond) === target).slice(0,5).map(r => ai3_number(r.spd)).filter(v => v>0);
+  return ai3_avg(vals);
 }
-function chat_turfProofStatus(horse){
-  if (chat_surfaceGroup(horse.chatSurfaceToday) !== 'T') return {code:'NA', label:'', adjust:0, detail:''};
-  const starts = chat_number(horse.turfStarts), wins = chat_number(horse.turfWins),
-        places = chat_number(horse.turfPlaces), shows = chat_number(horse.turfShows);
+function ai3_turfProofStatus(horse){
+  if (ai3_surfaceGroup(horse.ai3SurfaceToday) !== 'T') return {code:'NA', label:'', adjust:0, detail:''};
+  const starts = ai3_number(horse.turfStarts), wins = ai3_number(horse.turfWins),
+        places = ai3_number(horse.turfPlaces), shows = ai3_number(horse.turfShows);
   const itm = wins+places+shows;
-  const recent = (horse.ppRaces||[]).filter(r => chat_sameSurface('T', r.chatSurf)).slice(0,5);
+  const recent = (horse.ppRaces||[]).filter(r => ai3_sameSurface('T', r.ai3Surf)).slice(0,5);
   const competitive = recent.filter(r => {
-    const fin = chat_number(r.fin), bl = chat_number(r.margin);
+    const fin = ai3_number(r.fin), bl = ai3_number(r.margin);
     return (fin>0 && fin<=4) || (bl>=0 && bl<=5);
   }).length;
   if (starts<=0) return {code:'UNPROVEN', label:'UNPROVEN TURF', adjust:-0.12, detail:'No prior turf starts.'};
@@ -4323,14 +4324,14 @@ function chat_turfProofStatus(horse){
 // v7.53's actual all-weather fix, ported: a dedicated proof check using the
 // BRIS lifetime all-weather record and best-speed field, instead of falling
 // through to a dirt or lifetime figure that may really be a turf number.
-function chat_allWeatherProofStatus(horse){
-  if (chat_surfaceGroup(horse.chatSurfaceToday) !== 'A') return {code:'NA', label:'', adjust:0, detail:''};
-  const starts = chat_number(horse.chatAWStarts), wins = chat_number(horse.chatAWWins),
-        places = chat_number(horse.chatAWPlaces), shows = chat_number(horse.chatAWShows);
+function ai3_allWeatherProofStatus(horse){
+  if (ai3_surfaceGroup(horse.ai3SurfaceToday) !== 'A') return {code:'NA', label:'', adjust:0, detail:''};
+  const starts = ai3_number(horse.ai3AWStarts), wins = ai3_number(horse.ai3AWWins),
+        places = ai3_number(horse.ai3AWPlaces), shows = ai3_number(horse.ai3AWShows);
   const itm = wins+places+shows;
-  const recent = (horse.ppRaces||[]).filter(r => chat_sameSurface('A', r.chatSurf)).slice(0,5);
+  const recent = (horse.ppRaces||[]).filter(r => ai3_sameSurface('A', r.ai3Surf)).slice(0,5);
   const competitive = recent.filter(r => {
-    const fin = chat_number(r.fin), bl = chat_number(r.margin);
+    const fin = ai3_number(r.fin), bl = ai3_number(r.margin);
     return (fin>0 && fin<=3) || (bl>=0 && bl<=3);
   }).length;
   if (starts<=0) return {code:'UNPROVEN', label:'UNPROVEN ALL-WEATHER', adjust:-0.055, detail:'No prior all-weather starts in the BRIS lifetime record.'};
@@ -4339,35 +4340,35 @@ function chat_allWeatherProofStatus(horse){
   if (starts>=3) return {code:'WEAK', label:'WEAK ALL-WEATHER RECORD', adjust:-0.04, detail:`${starts} all-weather starts with no in-the-money finish.`};
   return {code:'THIN', label:'THIN ALL-WEATHER', adjust:-0.02, detail:`Only ${starts} all-weather start${starts===1?'':'s'} and limited evidence.`};
 }
-function chat_dataQuality(horse){
+function ai3_dataQuality(horse){
   const core = [
-    chat_number(horse.rawPP) > 0,
-    chat_number(horse.lastSpd) > 0,
-    chat_recentSpeedScore(horse) > 0,
-    (chat_number(horse.chatBestTrack) || chat_number(horse.chatBestDist) || chat_number(horse.chatBestLife)) > 0,
-    chat_recentPaceScore(horse) > 0,
-    chat_recentClassScore(horse) > 0
+    ai3_number(horse.rawPP) > 0,
+    ai3_number(horse.lastSpd) > 0,
+    ai3_recentSpeedScore(horse) > 0,
+    (ai3_number(horse.ai3BestTrack) || ai3_number(horse.ai3BestDist) || ai3_number(horse.ai3BestLife)) > 0,
+    ai3_recentPaceScore(horse) > 0,
+    ai3_recentClassScore(horse) > 0
   ];
   const present = core.filter(Boolean).length;
   const ratio = present / core.length;
   const label = ratio >= .84 ? 'COMPLETE' : ratio >= .5 ? 'PARTIAL' : 'POOR';
   return {present, total: core.length, ratio, label};
 }
-function chat_classDropStatus(horse){
-  const current = chat_number(horse.todayClaim);
+function ai3_classDropStatus(horse){
+  const current = ai3_number(horse.todayClaim);
   const last = (horse.ppRaces||[])[0];
-  const previous = last ? chat_number(last.claim) : 0;
-  const days = chat_number(horse.layoffDays);
+  const previous = last ? ai3_number(last.claim) : 0;
+  const days = ai3_number(horse.layoffDays);
   const dropping = current>0 && previous>0 && current < previous*.90;
   const recent = days>0 && days<=60;
   return {dropping, recent, days, current, previous, qualified: !dropping || recent};
 }
-function chat_formScore(horse){
+function ai3_formScore(horse){
   const races = (horse.ppRaces||[]).slice(0,5);
   if (!races.length) return .5;
   let total=0, weightTotal=0;
   races.forEach((r,i) => {
-    const fin = chat_number(r.fin), speed = chat_number(r.spd);
+    const fin = ai3_number(r.fin), speed = ai3_number(r.spd);
     const w = Math.max(1, 5-i);
     let finish = 0.5;
     if (fin>0 && fin<90) finish = Math.max(0, Math.min(1, (13-fin)/12));
@@ -4377,7 +4378,7 @@ function chat_formScore(horse){
   });
   return weightTotal ? total/weightTotal : .5;
 }
-function chat_parseDisplayDate(value){
+function ai3_parseDisplayDate(value){
   const s = String(value||'').trim();
   let m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
   if (m) return new Date(Number(m[3]), Number(m[1])-1, Number(m[2]));
@@ -4386,10 +4387,10 @@ function chat_parseDisplayDate(value){
   const d = new Date(s);
   return isNaN(d.getTime()) ? null : d;
 }
-function chat_eligibleWorkouts(horse){
-  const raceDate = chat_parseDisplayDate(horse.raceDateYmd);
+function ai3_eligibleWorkouts(horse){
+  const raceDate = ai3_parseDisplayDate(horse.raceDateYmd);
   const works = (horse.ppWorks||[]).slice();
-  const dated = works.map(w => ({w, date: chat_parseDisplayDate(w.date)})).filter(x => x.date);
+  const dated = works.map(w => ({w, date: ai3_parseDisplayDate(w.date)})).filter(x => x.date);
   let qualifying;
   if (raceDate){
     qualifying = dated.filter(x => { const days = (raceDate - x.date)/(1000*60*60*24); return days>=0 && days<=30; });
@@ -4397,11 +4398,11 @@ function chat_eligibleWorkouts(horse){
   qualifying.sort((a,b) => b.date - a.date);
   return qualifying.slice(0,4).map(x => x.w);
 }
-function chat_workoutScore(horse){
-  const works = chat_eligibleWorkouts(horse);
+function ai3_workoutScore(horse){
+  const works = ai3_eligibleWorkouts(horse);
   if (!works.length) return .5;
   let score = .5;
-  const useful = works.filter(w => chat_number(w.time) !== 0);
+  const useful = works.filter(w => ai3_number(w.time) !== 0);
   if (useful.length){
     score = .55;
     const bullet = useful.filter(w => String(w.time||'').trim().startsWith('-')).length;
@@ -4409,79 +4410,79 @@ function chat_workoutScore(horse){
   }
   return Math.min(1, score);
 }
-function chat_experienceRate(horse){
-  const starts = chat_number(horse.ltStarts);
+function ai3_experienceRate(horse){
+  const starts = ai3_number(horse.ltStarts);
   if (starts<=0) return .10;
-  return Math.min(.40, chat_number(horse.ltWins)/starts);
+  return Math.min(.40, ai3_number(horse.ltWins)/starts);
 }
-function chat_trainerStrength(horse){
-  const starts = chat_number(horse.trnStarts);
+function ai3_trainerStrength(horse){
+  const starts = ai3_number(horse.trnStarts);
   if (starts<=0) return .10;
-  const win = chat_number(horse.trnWins)/starts;
-  const itm = (chat_number(horse.trnWins)+chat_number(horse.trnPlaces)+chat_number(horse.trnShows))/starts;
+  const win = ai3_number(horse.trnWins)/starts;
+  const itm = (ai3_number(horse.trnWins)+ai3_number(horse.trnPlaces)+ai3_number(horse.trnShows))/starts;
   const shrink = Math.min(1, starts/50);
   return .10 + shrink*((win*.65 + itm*.35)-.10);
 }
-function chat_jockeyStrength(horse){
-  const starts = chat_number(horse.jkyStarts);
+function ai3_jockeyStrength(horse){
+  const starts = ai3_number(horse.jkyStarts);
   if (starts<=0) return .10;
-  const win = chat_number(horse.jkyWins)/starts;
-  const itm = (chat_number(horse.jkyWins)+chat_number(horse.jkyPlaces)+chat_number(horse.jkyShows))/starts;
+  const win = ai3_number(horse.jkyWins)/starts;
+  const itm = (ai3_number(horse.jkyWins)+ai3_number(horse.jkyPlaces)+ai3_number(horse.jkyShows))/starts;
   const shrink = Math.min(1, starts/50);
   return .10 + shrink*((win*.65 + itm*.35)-.10);
 }
-function chat_tjComboStrength(horse){
-  const starts = chat_number(horse.chatTjStarts);
+function ai3_tjComboStrength(horse){
+  const starts = ai3_number(horse.ai3TjStarts);
   if (starts<=0) return .10;
-  const win = chat_number(horse.chatTjWins)/starts;
-  const itm = (chat_number(horse.chatTjWins)+chat_number(horse.chatTjPlaces)+chat_number(horse.chatTjShows))/starts;
+  const win = ai3_number(horse.ai3TjWins)/starts;
+  const itm = (ai3_number(horse.ai3TjWins)+ai3_number(horse.ai3TjPlaces)+ai3_number(horse.ai3TjShows))/starts;
   return .10 + Math.min(1, starts/50)*((win*.65+itm*.35)-.10);
 }
-function chat_paceFit(horse, field){ return chat_relativeFeature(horse, field, r => chat_recentPaceScore(r)); }
-function chat_classFit(horse, field){ return chat_relativeFeature(horse, field, r => chat_recentClassScore(r)); }
-function chat_speedFormFit(horse, field){ return chat_percentileRank(chat_recentSpeedScore(horse), field.map(chat_recentSpeedScore)); }
-function chat_bestSpeedFit(horse, field){
-  const v = chat_surfaceBestSpeed(horse) || chat_number(horse.chatBestDist) || chat_number(horse.chatBestTrack) || chat_number(horse.chatBestLife);
-  return chat_percentileRank(v, field.map(x => chat_surfaceBestSpeed(x) || chat_number(x.chatBestDist) || chat_number(x.chatBestTrack) || chat_number(x.chatBestLife)));
+function ai3_paceFit(horse, field){ return ai3_relativeFeature(horse, field, r => ai3_recentPaceScore(r)); }
+function ai3_classFit(horse, field){ return ai3_relativeFeature(horse, field, r => ai3_recentClassScore(r)); }
+function ai3_speedFormFit(horse, field){ return ai3_percentileRank(ai3_recentSpeedScore(horse), field.map(ai3_recentSpeedScore)); }
+function ai3_bestSpeedFit(horse, field){
+  const v = ai3_surfaceBestSpeed(horse) || ai3_number(horse.ai3BestDist) || ai3_number(horse.ai3BestTrack) || ai3_number(horse.ai3BestLife);
+  return ai3_percentileRank(v, field.map(x => ai3_surfaceBestSpeed(x) || ai3_number(x.ai3BestDist) || ai3_number(x.ai3BestTrack) || ai3_number(x.ai3BestLife)));
 }
-function chat_postBucket(post, entrants){
-  const p = chat_number(post), n = chat_number(entrants);
+function ai3_postBucket(post, entrants){
+  const p = ai3_number(post), n = ai3_number(entrants);
   if (p<=0 || n<=1) return 'MIDDLE';
   const relative = (p-1)/(n-1);
   if (relative < 1/3) return 'INSIDE';
   if (relative < 2/3) return 'MIDDLE';
   return 'OUTSIDE';
 }
-function chat_postFinishPerformance(fin, entrants){
-  const f = chat_number(fin), n = chat_number(entrants);
+function ai3_postFinishPerformance(fin, entrants){
+  const f = ai3_number(fin), n = ai3_number(entrants);
   if (f<=0 || f>=90 || n<=1) return null;
   return Math.max(0, Math.min(1, 1-((f-1)/(n-1))));
 }
-// Scans every row currently loaded, not just today's race — same as Chat's
+// Scans every row currently loaded, not just today's race — same as AI(3)'s
 // own postPositionEvidence, which draws its post-bias sample from the whole
 // file. This needs the raw entry rows, so it takes them as a parameter
 // rather than reaching for a global, and callers pass Overlay Board's rows.
-function chat_postPositionEvidence(horse, field, allRows){
+function ai3_postPositionEvidence(horse, field, allRows){
   const targetTrack = String(horse.trackCode || '').trim().toUpperCase();
-  const targetSurface = horse.chatSurfaceToday;
-  const targetDistance = Math.abs(chat_number(horse.raceDistYds));
+  const targetSurface = horse.ai3SurfaceToday;
+  const targetDistance = Math.abs(ai3_number(horse.raceDistYds));
   if (!targetSurface || targetDistance<=0) return {score:.5, sample:0, bucket:'MIDDLE', source:'none'};
-  const todaysSpan = Math.max(field.length, ...field.map(h => chat_number(h.post)).filter(v=>v>0));
-  const currentBucket = chat_postBucket(horse.post, todaysSpan);
+  const todaysSpan = Math.max(field.length, ...field.map(h => ai3_number(h.post)).filter(v=>v>0));
+  const currentBucket = ai3_postBucket(horse.post, todaysSpan);
   const collect = (trackOnly) => {
     const observations = [];
     (allRows||[]).forEach(sourceHorse => {
       (sourceHorse.ppRaces||[]).forEach(r => {
         const priorTrack = String(r.track||'').trim().toUpperCase();
-        const priorDistance = Math.abs(chat_number(r.distYds));
-        const entrants = chat_number(r.pastField);
-        const priorPost = chat_number(r.pastPost);
-        const performance = chat_postFinishPerformance(r.fin, entrants);
+        const priorDistance = Math.abs(ai3_number(r.distYds));
+        const entrants = ai3_number(r.pastField);
+        const priorPost = ai3_number(r.pastPost);
+        const performance = ai3_postFinishPerformance(r.fin, entrants);
         if (performance===null) return;
-        if (!chat_sameSurface(targetSurface, r.chatSurf)) return;
+        if (!ai3_sameSurface(targetSurface, r.ai3Surf)) return;
         if (targetDistance>0 && priorDistance>0 && Math.abs(priorDistance-targetDistance)>220) return;
         if (trackOnly && targetTrack && priorTrack!==targetTrack) return;
-        observations.push({bucket: chat_postBucket(priorPost, entrants), performance});
+        observations.push({bucket: ai3_postBucket(priorPost, entrants), performance});
       });
     });
     return observations;
@@ -4500,7 +4501,7 @@ function chat_postPositionEvidence(horse, field, allRows){
   return {score, sample:observations.length, bucket:currentBucket, source, delta, bucketSample:bucketRows.length};
 }
 
-function grok_shotScoreOf(h, live, figs){
+function ai2_shotScoreOf(h, live, figs){
   const fi = figs.findIndex(x => x.h === h);
   const mlOf = x => parseOdds(x.mlOddsStr);
   const priced = live.filter(x => mlOf(x) != null).sort((a,b) => mlOf(a) - mlOf(b));
@@ -4508,20 +4509,20 @@ function grok_shotScoreOf(h, live, figs){
   let s = 0;
   if (fi === 0) s += 4; else if (fi === 1) s += 2; else if (fi === 2) s += 1;
   if (mi === 1) s += 3; else if (mi === 2) s += 2; else if (mi === 3) s += 1;
-  const meet = grok_lostCleanH2H({horses: live}, h);
+  const meet = ai2_lostCleanH2H({horses: live}, h);
   if (meet && !meet.ok) s -= 2;
   if (h.lastFinMargin != null && h.lastFinMargin > 8) s -= 1;
   if (h.layoffDays != null && h.layoffDays >= 180) s -= 1;
   return s;
 }
-// Sole Call's actual "shot list" — a different, broader ranking than its
+// AI(2)'s actual "shot list" — a different, broader ranking than its
 // pickFor: pools every Contender and Questionable horse, adds back the
 // figure leader and the Pick if the market cut either, scores each on
 // figure rank + market rank minus the same H2H/margin/layoff penalties as
 // its Pick veto, and returns the top 4. This is very likely the real source
 // of a "9 of 10" style claim, since — unlike pickFor — it names someone in
 // almost every race, not just the ones that clear every gate.
-function grok_shotListFor(rs){
+function ai2_shotListFor(rs){
   const live = (rs.horses || []).filter(h => !h.scratched);
   if (live.length < 2) return [];
   const byMkt = live.filter(h => h.decimalOdds != null).slice().sort((a,b) => (a.decimalOdds||99) - (b.decimalOdds||99));
@@ -4530,9 +4531,9 @@ function grok_shotListFor(rs){
   const pool = split.contenders.concat(split.questionable).map(x => x.h);
   const figs = live.map(h => ({h, v: avg3Of(h)})).filter(x => x.v != null).sort((a,b) => b.v - a.v);
   if (figs[0] && pool.indexOf(figs[0].h) < 0) pool.push(figs[0].h);
-  const pick = grok_pickFor(rs);
+  const pick = ai2_pickFor(rs);
   if (pick && pick.h && pool.indexOf(pick.h) < 0) pool.push(pick.h);
-  const rows = pool.map(h => ({h, score: grok_shotScoreOf(h, live, figs)}));
+  const rows = pool.map(h => ({h, score: ai2_shotScoreOf(h, live, figs)}));
   rows.sort((a,b) => b.score - a.score);
   return rows.slice(0, 4);
 }
@@ -4541,48 +4542,48 @@ function crossCheckBlockHTML(rs){
   const mine = topOverlayChoice(rs);
   const mineNorm = mine ? normHorseName(mine.horse) : '';
 
-  // Grok's is computed, not typed in — grok_pickFor is Sole Call v1.51's
+  // AI(2)'s is computed, not typed in — ai2_pickFor is AI(2)'s
   // actual pickFor, ported and verified against its real source, run here
   // against the same field.
-  const grokPick = grok_pickFor(rs);
-  const grokHorse = grokPick && grokPick.h ? grokPick.h : null;
-  const grokNorm = grokHorse ? normHorseName(grokHorse.horse) : '';
-  const grokLine = grokHorse
-    ? `<b>${escHtml(grokHorse.horse)}</b> (${escHtml(grokPick.line)})`
-    : `no pick \u2014 ${escHtml((grokPick && grokPick.none || '').replace(/^\S+\s/, m => m))}`;
+  const ai2Pick = ai2_pickFor(rs);
+  const ai2Horse = ai2Pick && ai2Pick.h ? ai2Pick.h : null;
+  const ai2Norm = ai2Horse ? normHorseName(ai2Horse.horse) : '';
+  const ai2Line = ai2Horse
+    ? `<b>${escHtml(ai2Horse.horse)}</b> (${escHtml(ai2Pick.line)})`
+    : `no pick \u2014 ${escHtml((ai2Pick && ai2Pick.none || '').replace(/^\S+\s/, m => m))}`;
 
-  // Chat's is computed too now — its full scoring pipeline, ported and run
+  // AI(3)'s is computed too now — its full scoring pipeline, ported and run
   // against the same field, using the same rows array for the post-position
-  // read that scans the whole file the way Chat's own version does.
-  const chatPick = chat_pickFor(rs, rows);
-  const chatHorse = chatPick && chatPick.h ? chatPick.h : null;
-  const chatNorm = chatHorse ? normHorseName(chatHorse.horse) : '';
-  const chatLine = chatHorse
-    ? `<b>${escHtml(chatHorse.horse)}</b> (${escHtml(chatPick.label)}, ${(chatPick.probability*100).toFixed(1)}% model share)`
+  // read that scans the whole file the way AI(3)'s own version does.
+  const ai3Pick = ai3_pickFor(rs, rows);
+  const ai3Horse = ai3Pick && ai3Pick.h ? ai3Pick.h : null;
+  const ai3Norm = ai3Horse ? normHorseName(ai3Horse.horse) : '';
+  const ai3Line = ai3Horse
+    ? `<b>${escHtml(ai3Horse.horse)}</b> (${escHtml(ai3Pick.label)})`
     : 'no live runners';
 
-  const entered = [chatNorm, grokNorm].filter(Boolean);
+  const others = [ai2Norm, ai3Norm];
   let agree = '';
-  if (mine && entered.length){
-    const matches = entered.filter(n => n === mineNorm).length;
-    if (matches === entered.length && entered.length === 2){
-      agree = `<div class="cc-agree cc-all">All three keyed on <b>${escHtml(mine.horse)}</b>.</div>`;
-    } else if (matches > 0){
-      agree = `<div class="cc-agree cc-some">${matches} of ${entered.length} agree with this program's <b>${escHtml(mine.horse)}</b>.</div>`;
+  if (mine){
+    const matches = others.filter(n => n && n === mineNorm).length;
+    if (matches === 2){
+      agree = `<div class="cc-agree cc-all"><b>3/3 CONCURRENCE</b> \u2014 AI(1), AI(2) and AI(3) all name <b>${escHtml(mine.horse)}</b>. Check the warnings on this card before treating it as settled.</div>`;
+    } else if (matches === 1){
+      agree = `<div class="cc-agree cc-some"><b>2/3</b> \u2014 AI(1) and ${ai2Norm === mineNorm ? 'AI(2)' : 'AI(3)'} name <b>${escHtml(mine.horse)}</b>.</div>`;
     } else {
-      agree = `<div class="cc-agree cc-none">No agreement \u2014 this program has <b>${escHtml(mine ? mine.horse : 'no live choice')}</b>.</div>`;
+      agree = `<div class="cc-agree cc-none"><b>1/3</b> \u2014 neither AI(2) nor AI(3) names AI(1)'s <b>${escHtml(mine.horse)}</b>.</div>`;
     }
   }
   return `<div class="cc-block">
-    <div class="cc-head">Cross-check \u2014 all three computed from this program's own ported copy of each source, run on this field. Nothing here is typed in or fetched.</div>
+    <div class="cc-head">Concurrence \u2014 three selection methods run on this field</div>
     <div class="cc-row">
-      <label>This program: <b>${mine ? escHtml(mine.horse) : '\u2014'}</b></label>
+      <label>AI(1): <b>${mine ? escHtml(mine.horse) : '\u2014'}</b></label>
     </div>
     <div class="cc-row">
-      <label>Grok (computed): ${grokLine}</label>
+      <label>AI(2): ${ai2Line}</label>
     </div>
     <div class="cc-row">
-      <label>Chat (computed): ${chatLine}</label>
+      <label>AI(3): ${ai3Line}</label>
     </div>
     <div class="cc-result" id="cc-result-${escAttr(rs.race)}">${agree}</div>
   </div>`;
@@ -5553,7 +5554,7 @@ function buildBoardIndex(raceSummaries){
     if (fav) bits.push(`<b>Market choice:</b> ${escHtml(fav.horse)} ${escHtml(fav.oddsStr || '')}`);
     if (paceShape) bits.push(`<b>Pace:</b> ${escHtml(paceShape.toLowerCase())}`);
     const dist = rs.raceDistYds || (horses[0] && horses[0].raceDistYds);
-    const sfc = chat_surfaceGroup((horses[0] && horses[0].surface) || '');
+    const sfc = ai3_surfaceGroup((horses[0] && horses[0].surface) || '');
     const sWord = sfc === 'T' ? 'turf' : sfc === 'A' ? 'all-weather' : sfc === 'D' ? 'dirt' : '';
     const cond = [dist ? furlongs(dist) : '', sWord].filter(Boolean).join(' ');
     if (cond) bits.unshift(`<b>${escHtml(cond)}</b>`);
@@ -5951,11 +5952,19 @@ let ppReturn = null;
 
 function markPPReturn(srcEl){
   const onBtn = document.querySelector('#tabbar button.on');
-  const anchor = srcEl && srcEl.closest ? srcEl.closest('.pick-card, .bo-row, .ticket, .field-race, .score-row, .race-anchor-target') : null;
+  // Anchor on the EXACT name tapped, not the card around it. The race card
+  // and pick card are tall; centring the whole card dropped you somewhere in
+  // its middle instead of back on the Contenders line you tapped from.
+  const tapped = srcEl && srcEl.nodeType === 1 ? srcEl : null;
+  if (tapped && !tapped.id) tapped.id = 'ppret-' + Math.random().toString(36).slice(2, 9);
+  const anchor = tapped && tapped.closest ? tapped.closest('.pick-card, .bo-row, .ticket, .field-race, .score-row, .race-anchor-target') : null;
   if (anchor && !anchor.id) anchor.id = 'ppret-' + Math.random().toString(36).slice(2, 9);
   ppReturn = {
     tab: onBtn ? onBtn.dataset.tab : null,
     label: onBtn ? (onBtn.textContent || '').replace(/\d+$/, '').trim() : '',
+    tappedId: tapped ? tapped.id : null,
+    // Where the name sat on the screen, so it comes back to the same spot.
+    tappedTop: tapped ? tapped.getBoundingClientRect().top : null,
     anchorId: anchor ? anchor.id : null,
     scrollY: window.scrollY || 0
   };
@@ -5972,10 +5981,21 @@ function closePPOverlay(){
   if (!r) return;
   if (r.tab) showTab(r.tab);
   // Let the tab paint before scrolling, or the target has no position yet.
+  // Instant, not smooth: the point is to land exactly where you left.
   requestAnimationFrame(() => {
+    const t = r.tappedId ? document.getElementById(r.tappedId) : null;
+    if (t && t.getClientRects().length){
+      const top = t.getBoundingClientRect().top + window.scrollY;
+      const want = (r.tappedTop != null && r.tappedTop > 0 && r.tappedTop < window.innerHeight - 40)
+        ? r.tappedTop : window.innerHeight / 3;
+      window.scrollTo({top: Math.max(0, top - want), behavior: 'auto'});
+      t.classList.add('pp-return-flash');
+      setTimeout(() => t.classList.remove('pp-return-flash'), 1200);
+      return;
+    }
     const el = r.anchorId ? document.getElementById(r.anchorId) : null;
-    if (el) el.scrollIntoView({behavior: 'smooth', block: 'center'});
-    else window.scrollTo({top: r.scrollY, behavior: 'smooth'});
+    if (el) el.scrollIntoView({behavior: 'auto', block: 'start'});
+    else window.scrollTo({top: r.scrollY, behavior: 'auto'});
   });
 }
 
@@ -6178,7 +6198,7 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.79 · released 16 September 2026 · build 2026-09-16-l</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.81 · released 17 September 2026 · build 2026-09-17-a</div>
 <div id="errBar" class="no-print">
   <div id="errBarMsg"></div>
   <div class="eb-actions">
