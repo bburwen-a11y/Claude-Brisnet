@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Overlay Board v1.83 — Race Card Reader</title>
+<title>Overlay Board v1.84 — Race Card Reader</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
@@ -586,6 +586,10 @@
   }
   .pp-back:hover, .pp-back:active{background:var(--paper); border-color:var(--amber-dim);}
   @media print{ .pp-back{display:none !important;} }
+  .pp-bred{margin:10px 0 6px; padding:8px 10px; border:1px solid var(--paper-line); border-radius:4px; font-size:13px; line-height:1.5;}
+  .pp-bred-head{font-family:var(--mono); font-size:10px; letter-spacing:.08em; text-transform:uppercase; opacity:.7; margin-bottom:3px;}
+  .pp-bred .bred-by{opacity:.75;}
+  .pp-bred-sub{opacity:.8; margin-top:3px;}
   .pp-return-flash{background:var(--paper-tint); outline:2px solid var(--amber-dim); outline-offset:2px; border-radius:3px; transition:background .3s;}
   .pp-head{margin:0 0 2px; font-size:18px; font-weight:800;}
   .pp-sub{font-family:var(--mono); font-size:12px; color:var(--ink-soft); margin-bottom:12px;}
@@ -941,7 +945,7 @@
 <body>
 <div class="wrap">
   <header>
-    <p class="eyebrow">Handicapping utility · <span class="ver">v1.83</span> · released 18 September 2026</p>
+    <p class="eyebrow">Handicapping utility · <span class="ver">v1.84</span> · released 18 September 2026</p>
     <h1><span class="flap">O</span><span class="flap">v</span><span class="flap">e</span><span class="flap">r</span><span class="flap">l</span><span class="flap">a</span><span class="flap">y</span> <span class="flap">B</span><span class="flap">o</span><span class="flap">a</span><span class="flap">r</span><span class="flap">d</span></h1>
     <p class="tagline">Upload a data file or program PDF. Overlay Board lays out the whole card: past performances, scratches, money moves, and where the board likes a horse.</p>
   </header>
@@ -1702,6 +1706,12 @@ function parseBrisnetSingleFile(text){
       else if (tr > rr) classMove = 'up';
     }
 
+    const yearRec = n => {
+      const st = num(n);
+      if (st == null || st <= 0) return null;
+      return {starts: st, wins: num(n + 1), places: num(n + 2), shows: num(n + 3), roi: num(n + 4)};
+    };
+
     out.push({
       race, post, horse: titleCase(horse), odds, score: pp,
       surfaceRating: surfaceRating !== '' ? String(surfaceRating) : '',
@@ -1722,6 +1732,20 @@ function parseBrisnetSingleFile(text){
       trnStarts: num(29), trnWins: num(30), trnPlaces: num(31), trnShows: num(32),
       jockey: titleCase(get(33)),
       jkyStarts: num(35), jkyWins: num(36), jkyPlaces: num(37), jkyShows: num(38),
+      // SEASON RECORDS. The meet block above (29-32 / 35-38) is zero on every
+      // row of some files, which left the connections showing a bare name. The
+      // file also carries full-year records: 1147-1151 trainer this year,
+      // 1152-1156 trainer last year, 1157-1161 jockey this year, 1162-1166
+      // jockey last year, each as starts / wins / places / shows / ROI.
+      trnYr: yearRec(1147), trnPrev: yearRec(1152),
+      jkyYr: yearRec(1157), jkyPrev: yearRec(1162),
+      // BREEDING. Names only — this file carries no progeny statistics for a
+      // sire or a broodmare sire (no turf %, no mud %, no average winning
+      // distance), so nothing here is a measure of anything.
+      sire: titleCase(get(52)), sireSire: titleCase(get(53)),
+      dam: titleCase(get(54)), damSire: titleCase(get(55)),
+      breeder: titleCase(get(56)), bredIn: (get(57) || '').trim(),
+      foalYear: get(46), coatColour: (get(50) || '').trim(), sexCode: (get(49) || '').trim(),
       runStyle: get(210),
       quirin: num(211),
       distStarts: num(65),
@@ -2147,7 +2171,7 @@ function applyChangesFeed(text){
   if (feed.riders.length){
     const line = r => {
       const sub = lookupJockey(r.to);
-      const rec = sub ? meetRecord(sub.starts, sub.wins, sub.places, sub.shows) : null;
+      const rec = sub ? connRecord(meetRecord(sub.starts, sub.wins, sub.places, sub.shows), sub.yr, sub.prev) : null;
       const tail = rec ? ` (${rec.txt} at this meet${sub.mounts ? `, ${sub.mounts} other mount${sub.mounts === 1 ? '' : 's'} today` : ''})`
                        : ` (no meet record for this rider in the file)`;
       return `R${escHtml(r.race)} #${escHtml(r.post)} ${escHtml(r.horse)}: ${escHtml(r.from)} → <b>${escHtml(r.to)}</b>${tail}`;
@@ -2559,6 +2583,11 @@ document.getElementById('computeBtn').addEventListener('click', () => {
       jockey: r.jockey || '', jkyStarts: r.jkyStarts, jkyWins: r.jkyWins,
       jkyPlaces: r.jkyPlaces, jkyShows: r.jkyShows,
       trainer: r.trainer || '', trnStarts: r.trnStarts, trnWins: r.trnWins,
+      trnYr: r.trnYr || null, trnPrev: r.trnPrev || null,
+      jkyYr: r.jkyYr || null, jkyPrev: r.jkyPrev || null,
+      sire: r.sire || '', sireSire: r.sireSire || '', dam: r.dam || '',
+      damSire: r.damSire || '', breeder: r.breeder || '', bredIn: r.bredIn || '',
+      foalYear: r.foalYear || '', coatColour: r.coatColour || '', sexCode: r.sexCode || '',
       riderChange: r.riderChange || null,
       tjStarts: (r.tjStarts !== '' && r.tjStarts != null && !isNaN(parseFloat(r.tjStarts))) ? parseFloat(r.tjStarts) : null,
       tjWins: (r.tjWins !== '' && r.tjWins != null && !isNaN(parseFloat(r.tjWins))) ? parseFloat(r.tjWins) : null,
@@ -3146,9 +3175,11 @@ function cardJockeyIndex(){
     let e = idx.find(x => sameJockey(x.name, r.jockey));
     if (!e){
       e = {name: r.jockey, starts: r.jkyStarts, wins: r.jkyWins,
-           places: r.jkyPlaces, shows: r.jkyShows, mounts: 0};
+           places: r.jkyPlaces, shows: r.jkyShows, mounts: 0,
+           yr: r.jkyYr || null, prev: r.jkyPrev || null};
       idx.push(e);
     }
+    if (!e.yr && r.jkyYr) { e.yr = r.jkyYr; e.prev = r.jkyPrev || null; }
     if (e.starts == null && r.jkyStarts != null){
       e.starts = r.jkyStarts; e.wins = r.jkyWins; e.places = r.jkyPlaces; e.shows = r.jkyShows;
     }
@@ -3168,11 +3199,62 @@ function meetRecord(starts, wins, places, shows){
   const pctWin = wins != null ? Math.round(wins / starts * 100) : null;
   return {txt: bits + (pctWin != null ? ` \u00b7 ${pctWin}%` : ''), pct: pctWin, starts};
 }
+// Season record as the file gives it: starts, win %, in-the-money %. This is
+// what stands in when the meet block is empty, which on some files it is on
+// every row — that is why the connections used to show a bare name.
+function seasonRecord(rec, label){
+  if (!rec || !rec.starts) return null;
+  const itm = [rec.wins, rec.places, rec.shows].every(v => v != null)
+    ? rec.wins + rec.places + rec.shows : null;
+  const pctWin = rec.wins != null ? Math.round(rec.wins / rec.starts * 100) : null;
+  const pctItm = itm != null ? Math.round(itm / rec.starts * 100) : null;
+  const bits = [`${rec.starts} st`];
+  if (pctWin != null) bits.push(`${pctWin}% w`);
+  if (pctItm != null) bits.push(`${pctItm}% itm`);
+  if (label) bits.push(label);
+  return {txt: bits.join(' \u00b7 '), pct: pctWin, starts: rec.starts};
+}
+// Meet first, because it is closest in time; then this year, then last year.
+function connRecord(meet, yr, prev){
+  return meet || seasonRecord(yr, 'this year') || seasonRecord(prev, 'last year');
+}
 function jockeyMeet(h){
-  return meetRecord(h.jkyStarts, h.jkyWins, h.jkyPlaces, h.jkyShows);
+  return connRecord(meetRecord(h.jkyStarts, h.jkyWins, h.jkyPlaces, h.jkyShows), h.jkyYr, h.jkyPrev);
 }
 function trainerMeet(h){
-  return meetRecord(h.trnStarts, h.trnWins, null, null);
+  return connRecord(meetRecord(h.trnStarts, h.trnWins, null, null), h.trnYr, h.trnPrev);
+}
+// One line for a named trainer, matching the rider line.
+function trainerLine(h){
+  if (!h || !h.trainer) return '';
+  const rec = trainerMeet(h);
+  return `<span class="jky" title="Trainer, with the record the data file supplies">${escHtml(h.trainer)}${rec ? ` <span class="jky-rec">${rec.txt}</span>` : ''}</span>`;
+}
+// SEX AND COLOUR CODES as the file writes them.
+const COAT = {B:'bay', BR:'brown', 'B/BR':'bay or brown', BBR:'bay or brown', CH:'chestnut',
+  DKB:'dark bay', DKBBR:'dark bay or brown', 'DK B/BR':'dark bay or brown', GR:'grey', RO:'roan',
+  'GR/RO':'grey or roan', GRRO:'grey or roan', BL:'black', WH:'white', W:'white'};
+const SEXW = {C:'colt', F:'filly', G:'gelding', H:'horse', M:'mare', R:'ridgling'};
+// BREEDING. Names, and what the file says about the horse itself. There are no
+// progeny statistics anywhere in this file — no turf %, no mud %, no average
+// winning distance for a sire — so nothing here measures anything.
+function breedingLine(h){
+  if (!h || (!h.sire && !h.dam)) return '';
+  const sire = h.sire ? `${escHtml(h.sire)}${h.sireSire ? ` <span class="bred-by">(by ${escHtml(h.sireSire)})</span>` : ''}` : '—';
+  const dam = h.dam ? `${escHtml(h.dam)}${h.damSire ? ` <span class="bred-by">(by ${escHtml(h.damSire)})</span>` : ''}` : '—';
+  const desc = [];
+  const coat = COAT[(h.coatColour || '').toUpperCase()];
+  const sex = SEXW[(h.sexCode || '').toUpperCase()];
+  if (coat || sex) desc.push([coat, sex].filter(Boolean).join(' '));
+  if (h.foalYear) desc.push(`foaled ${String(h.foalYear).length === 2 ? '20' + h.foalYear : h.foalYear}`);
+  if (h.bredIn) desc.push(`bred in ${escHtml(h.bredIn)}`);
+  if (h.breeder) desc.push(`by ${escHtml(h.breeder)}`);
+  return `<div class="pp-bred">
+    <div class="pp-bred-head">Breeding</div>
+    <div><b>Sire</b> ${sire}</div>
+    <div><b>Dam</b> ${dam}</div>
+    ${desc.length ? `<div class="pp-bred-sub">${desc.join(' \u00b7 ')}</div>` : ''}
+  </div>`;
 }
 
 // One line for the rider, and the whole point of it: when the rider has
@@ -3183,9 +3265,9 @@ function jockeyLine(h, opts){
   const rc = h.riderChange;
   if (rc){
     const sub = lookupJockey(rc.to);
-    const rec = sub ? meetRecord(sub.starts, sub.wins, sub.places, sub.shows) : null;
+    const rec = sub ? connRecord(meetRecord(sub.starts, sub.wins, sub.places, sub.shows), sub.yr, sub.prev) : null;
     const stat = rec
-      ? `<span class="jky-rec">${rec.txt} this meet</span>${sub.mounts ? `<span class="jky-rec"> \u00b7 ${sub.mounts} other mount${sub.mounts === 1 ? '' : 's'} today</span>` : ''}`
+      ? `<span class="jky-rec">${rec.txt}</span>${sub.mounts ? `<span class="jky-rec"> \u00b7 ${sub.mounts} other mount${sub.mounts === 1 ? '' : 's'} today</span>` : ''}`
       : `<span class="jky-rec jky-unknown">no meet record in this file</span>`;
     return `<span class="jky-change" title="Rider change from the Equibase feed. Stats shown are the new rider's current-meet record, found elsewhere on today's card.">
       <span class="jky-flag">RIDER CHANGE</span>
@@ -4832,7 +4914,7 @@ function buildPick(rs){
       ${pickContext(rs, h)}
       ${buildEvidenceBlock(rs, h)}
       ${pickFigLine(rs, h)}
-      ${h.jockey || h.riderChange ? `<div class="pick-jky">${h.riderChange ? '' : 'Jockey '}${jockeyLine(h)}</div>` : ''}
+      ${h.jockey || h.riderChange || h.trainer ? `<div class="pick-jky">${h.riderChange ? '' : (h.jockey ? 'Jockey ' : '')}${jockeyLine(h)}${(h.jockey || h.riderChange) && h.trainer ? ' &nbsp;\u00b7&nbsp; ' : ''}${h.trainer ? 'Trainer ' + trainerLine(h) : ''}</div>` : ''}
       ${blindSpotNote(rs)}
       ${driftDowngrade(h)}
     </div>`;
@@ -4848,7 +4930,7 @@ function buildPick(rs){
     ${pickContext(rs, p.h)}
     ${buildEvidenceBlock(rs, h)}
     ${pickFigLine(rs, p.h)}
-    ${p.h.jockey || p.h.riderChange ? `<div class="pick-jky">${p.h.riderChange ? '' : 'Jockey '}${jockeyLine(p.h)}</div>` : ''}
+    ${p.h.jockey || p.h.riderChange || p.h.trainer ? `<div class="pick-jky">${p.h.riderChange ? '' : (p.h.jockey ? 'Jockey ' : '')}${jockeyLine(p.h)}${(p.h.jockey || p.h.riderChange) && p.h.trainer ? ' &nbsp;\u00b7&nbsp; ' : ''}${p.h.trainer ? 'Trainer ' + trainerLine(p.h) : ''}</div>` : ''}
     ${blindSpotNote(rs)}
     ${driftDowngrade(p.h)}
   </div>`;
@@ -5883,11 +5965,11 @@ function ppHorseBlock(h, race, standalone, inModal){
     <div class="pp-sub">${standalone ? `Race ${escHtml(race)}` : ''}${h.rawPP != null ? `${standalone ? ' · ' : ''}Prime Power ${h.rawPP}` : ''}${h.surfaceRating != null ? ` · surface fit <b class="pp-adj">${h.surfaceRating}</b>` : ''}${h.classMove === 'down' ? ' · <b class="pp-adj">class drop</b>' : h.classMove === 'up' ? ' · <b class="pp-adj">class rise</b>' : ''}${h.runStyle ? ` · run style ${escHtml(h.runStyle)}` : ''}${h.quirin != null ? ` · Quirin ${h.quirin}` : ''}${h.distStarts != null ? ` · starts at today's distance: ${h.distStarts}` : ''}${h.daysSinceWork != null ? ` · last work ${h.daysSinceWork}d ago` : ''}${h.lastSpd != null ? ` · speed last <b class="pp-adj">${h.lastSpd}</b>, best ${h.bestSpd}` : ''}</div>
     ${(() => {
       const jl = jockeyLine(h);
-      const tr = trainerMeet(h);
-      const trBit = h.trainer ? `<span class="jky">${escHtml(h.trainer)}${tr ? ` <span class="jky-rec">${tr.txt}</span>` : ''}</span>` : '';
+      const trBit = trainerLine(h);
       if (!jl && !trBit) return '';
       return `<div class="pp-conn">${jl ? 'Jockey ' + jl : ''}${jl && trBit ? ' &nbsp;·&nbsp; ' : ''}${trBit ? 'Trainer ' + trBit : ''}</div>`;
     })()}
+    ${breedingLine(h)}
     ${ppRecordLine(h)}
     ${races ? `<div class="pp-section">Last ${(h.ppRaces||[]).length} starts${h.ltStarts != null && h.ltStarts > (h.ppRaces||[]).length ? ` <span style="text-transform:none;letter-spacing:0;font-weight:400;">(of ${h.ltStarts} career — the data file carries 10)</span>` : ''}</div>
     <div class="pp-table-wrap"><table class="pp-table"><thead><tr><th>Date</th><th>Trk</th><th>Dist</th><th>Class</th><th title="Post position that day, and the number of starters. Validated on 8,182 past starts.">PP</th><th>Fin</th><th>Btn</th><th title="BRIS speed rating for that race, as supplied by the data file">Spd</th><th title="BRIS pace-call figures for that race: 2-call, 4-call, 6-call, 8-call, late pace, in order supplied. Same rating scale as Speed — a fall-off from early to late reads as faded, a rise reads as closed.">Pace</th><th>Trip comment</th><th title="Who finished first, second and third in that race. Highlighted = a contender in today's race; bold = another runner in it.">W / P / S</th></tr></thead><tbody>${races}</tbody></table></div>` : `<p class="pp-sub">No past races in the data file — first-time starter.</p>`}
@@ -6198,7 +6280,7 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.83 · released 18 September 2026 · build 2026-09-18-a</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.84 · released 18 September 2026 · build 2026-09-18-b</div>
 <div id="errBar" class="no-print">
   <div id="errBarMsg"></div>
   <div class="eb-actions">
