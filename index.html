@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Overlay Board v1.82 — Race Card Reader</title>
+<title>Overlay Board v1.83 — Race Card Reader</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
@@ -941,7 +941,7 @@
 <body>
 <div class="wrap">
   <header>
-    <p class="eyebrow">Handicapping utility · <span class="ver">v1.82</span> · released 17 September 2026</p>
+    <p class="eyebrow">Handicapping utility · <span class="ver">v1.83</span> · released 18 September 2026</p>
     <h1><span class="flap">O</span><span class="flap">v</span><span class="flap">e</span><span class="flap">r</span><span class="flap">l</span><span class="flap">a</span><span class="flap">y</span> <span class="flap">B</span><span class="flap">o</span><span class="flap">a</span><span class="flap">r</span><span class="flap">d</span></h1>
     <p class="tagline">Upload a data file or program PDF. Overlay Board lays out the whole card: past performances, scratches, money moves, and where the board likes a horse.</p>
   </header>
@@ -3773,7 +3773,7 @@ function ai2_topComparableAvg3Sole(rs, h){
     const place = rated.findIndex(r => r.x === h);
     return {ok: false, why: place < 0
       ? 'does not carry two figures at today\u2019s trip'
-      : `it is ${ordinalSuffix(place + 1)} on trip-matched figures, behind ${escHtml(rated[0].x.horse)}`};
+      : `it is ${place + 1}${ordinalSuffix(place + 1)} on trip-matched figures, behind ${escHtml(rated[0].x.horse)}`};
   }
   return {ok: true, why: '', rated};
 }
@@ -6198,7 +6198,7 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.82 · released 17 September 2026 · build 2026-09-17-b</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.83 · released 18 September 2026 · build 2026-09-18-a</div>
 <div id="errBar" class="no-print">
   <div id="errBarMsg"></div>
   <div class="eb-actions">
