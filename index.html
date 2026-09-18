@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Overlay Board v1.84 — Race Card Reader</title>
+<title>Overlay Board v1.85 — Race Card Reader</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
@@ -945,7 +945,7 @@
 <body>
 <div class="wrap">
   <header>
-    <p class="eyebrow">Handicapping utility · <span class="ver">v1.84</span> · released 18 September 2026</p>
+    <p class="eyebrow">Handicapping utility · <span class="ver">v1.85</span> · released 18 September 2026</p>
     <h1><span class="flap">O</span><span class="flap">v</span><span class="flap">e</span><span class="flap">r</span><span class="flap">l</span><span class="flap">a</span><span class="flap">y</span> <span class="flap">B</span><span class="flap">o</span><span class="flap">a</span><span class="flap">r</span><span class="flap">d</span></h1>
     <p class="tagline">Upload a data file or program PDF. Overlay Board lays out the whole card: past performances, scratches, money moves, and where the board likes a horse.</p>
   </header>
@@ -3627,9 +3627,32 @@ function driftDowngrade(h){
 // Naming who cannot win is the easier problem. Cuts are made on PRICE (12-1
 // or longer, or outside the market's top five). Beaten 10L+ last comparable
 // start is flagged QUESTIONABLE rather than eliminated.
+// The projected leader, when the projection is for an UNCONTESTED lead. Uses
+// the same ranking as paceProjection, so the panel and this can never name
+// different horses. Two shapes qualify: LONE SPEED (one horse rated to leave
+// quickly, two clear) and NO CLEAR SPEED (nobody rated to leave, so the top
+// of the order leads by default).
+function uncontestedLeader(rs){
+  const field = ((rs && (rs.byMarket || rs.horses)) || []).filter(h => !h.scratched);
+  const rated = field.map(h => ({h, r: paceRank(h), q: h.quirin}))
+                     .filter(x => x.r != null).sort((a, b) => b.r - a.r);
+  if (rated.length < 4) return null;
+  const speed = rated.filter(x => x.q >= 5);
+  if (speed.length === 0) return {h: rated[0].h, shape: 'NO CLEAR SPEED', why: 'projects to the lead by default'};
+  if (speed.length === 1 && (rated[0].r - rated[1].r) >= 2) return {h: rated[0].h, shape: 'LONE SPEED', why: 'projects to an uncontested lead'};
+  return null;
+}
+
 function contenderSplit(rs){
   const horses = (rs.horses || []).filter(h => h.decimalOdds != null);
   if (horses.length < 4) return null;
+  // PACE PROMOTION. A horse the projection puts on an uncontested lead is a
+  // contender whatever its price. The panel was already saying this in words
+  // while the same horse sat under Questionable on price alone — Belmont
+  // 18 Sep R1, where Lisa Joy was the projected default leader at 15-1 and was
+  // filed as priced out. Display only: it changes who is worth reading, not
+  // the Pick, which never used pace.
+  const paceLead = uncontestedLeader(rs);
   const ranked = (rs.byMarket || []).filter(h => h.decimalOdds != null);
   const rankOf = h => ranked.indexOf(h) + 1;
   const out = {contenders: [], questionable: [], pretenders: []};
@@ -3639,6 +3662,10 @@ function contenderSplit(rs){
     const why = [];
     if (price >= 12) why.push(`${h.oddsStr} — priced out`);
     if (rank > 5) why.push(`${rank}th choice of ${ranked.length}`);
+    if (why.length && paceLead && h === paceLead.h){
+      out.contenders.push({h, why: [paceLead.why, why.join(', ')]});
+      return;
+    }
     if (why.length){
       // A price-cut horse is NOT called a pretender when the file gives no
       // basis to judge it. Two cases go to QUESTIONABLE instead: a horse whose
@@ -3659,10 +3686,14 @@ function contenderSplit(rs){
       return;
     }
     if (h.lastFinMargin != null && h.lastFinMargin > 10){
+      if (paceLead && h === paceLead.h){
+        out.contenders.push({h, why: [paceLead.why, `beaten ${h.lastFinMargin}L last comparable start`]});
+        return;
+      }
       out.questionable.push({h, why: [`beaten ${h.lastFinMargin}L last comparable start`]});
       return;
     }
-    out.contenders.push({h, why: []});
+    out.contenders.push({h, why: paceLead && h === paceLead.h ? [paceLead.why] : []});
   });
   out.contenders.sort((a,b) => a.h.decimalOdds - b.h.decimalOdds);
   out.questionable.sort((a,b) => a.h.decimalOdds - b.h.decimalOdds);
@@ -6280,7 +6311,7 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.84 · released 18 September 2026 · build 2026-09-18-b</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.85 · released 18 September 2026 · build 2026-09-18-c</div>
 <div id="errBar" class="no-print">
   <div id="errBarMsg"></div>
   <div class="eb-actions">
