@@ -3,8 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Overlay Board v1.90 — Race Card Reader</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<title>Overlay Board v1.91 — Race Card Reader</title>
+<!-- crossorigin lets the browser hand us the REAL message if this script
+     throws. Without it every failure inside it arrives as a bare
+     "Script error." with no file or line, which is what the red bar was
+     reporting on iOS. onerror covers the script never arriving at all. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"
+        crossorigin="anonymous"
+        onerror="window.__obPdfFailed = true;"></script>
 <style>
   :root{
     --board-950:#0F2A20;
@@ -978,7 +984,7 @@
 <body>
 <div class="wrap">
   <header>
-    <p class="eyebrow">Handicapping utility · <span class="ver">v1.90</span> · released 19 September 2026</p>
+    <p class="eyebrow">Handicapping utility · <span class="ver">v1.91</span> · released 19 September 2026</p>
     <h1><span class="flap">O</span><span class="flap">v</span><span class="flap">e</span><span class="flap">r</span><span class="flap">l</span><span class="flap">a</span><span class="flap">y</span> <span class="flap">B</span><span class="flap">o</span><span class="flap">a</span><span class="flap">r</span><span class="flap">d</span></h1>
     <p class="tagline">Upload a data file or program PDF. Overlay Board lays out the whole card: past performances, scratches, money moves, and where the board likes a horse.</p>
   </header>
@@ -1000,6 +1006,11 @@
           <p>Brisnet-style past-performance sheet. Runs in the browser; if it hangs on a phone, use Paste text instead.</p>
           <label class="file-btn" for="pdfInput">Choose PDF</label>
           <input type="file" id="pdfInput" accept=".pdf">
+          <div class="callout callout-amber" id="pdfUnavailable" style="display:none;">
+            <div class="callout-head">PDF reading unavailable here</div>
+            This browser could not load the PDF reader. Use the data file, or open the PDF,
+            select all, copy and use <b>Paste text</b> — it reads the same content.
+          </div>
           <div class="status" id="pdfStatus"></div>
         </div>
         <div class="upload-card">
@@ -1237,6 +1248,21 @@ function __obReport(label, err){
     return _add.call(this, type, fn, opts);
   };
   window.addEventListener('error', e => {
+    // A CROSS-ORIGIN SCRIPT THAT THREW. The browser strips the message, file
+    // and line, so all that arrives is "Script error." with nothing attached.
+    // That can only come from the CDN copy of pdf.js, never from this file —
+    // and it costs PDF upload only, while the data file, paste and everything
+    // else still work. Record it, flag PDF as unavailable, and leave the red
+    // bar for faults that are actually ours.
+    const opaque = !e.error && (!e.filename || e.filename === '') &&
+                   /^script error\.?$/i.test(String(e.message || '').trim());
+    if (opaque){
+      window.__obPdfFailed = true;
+      window.__obErrors.push('third-party script error (PDF support only) — everything else is unaffected');
+      const note = document.getElementById('pdfUnavailable');
+      if (note) note.style.display = 'block';
+      return;
+    }
     if (e.error) __obReport('uncaught', e.error);
     else __obReport('uncaught', {message: e.message + (e.filename ? ' @ ' + e.filename + ':' + e.lineno : '')});
   });
@@ -1251,10 +1277,19 @@ function __obReport(label, err){
     if (h) h.addEventListener('click', () => { document.getElementById('errBar').style.display = 'none'; });
   });
 })();
+function __obMarkPdfUnavailable(){
+  const note = document.getElementById('pdfUnavailable');
+  if (note) note.style.display = 'block';
+  const btn = document.querySelector('label[for="pdfInput"]');
+  if (btn) btn.setAttribute('title', 'PDF reading is unavailable in this browser');
+}
+if (window.__obPdfFailed) document.addEventListener('DOMContentLoaded', __obMarkPdfUnavailable);
 if (typeof pdfjsLib !== 'undefined') {
   pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 } else {
   console.warn('pdf.js did not load — PDF upload will be unavailable, everything else still works.');
+  window.__obPdfFailed = true;
+  document.addEventListener('DOMContentLoaded', __obMarkPdfUnavailable);
 }
 
 let rows = [];
@@ -6460,7 +6495,7 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.90 · released 19 September 2026 · build 2026-09-19-a</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.91 · released 19 September 2026 · build 2026-09-19-b</div>
 <div id="errBar" class="no-print">
   <div id="errBarMsg"></div>
   <div class="eb-actions">
