@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Overlay Board v1.91 — Race Card Reader</title>
+<title>Overlay Board v1.92 — Race Card Reader</title>
 <!-- crossorigin lets the browser hand us the REAL message if this script
      throws. Without it every failure inside it arrives as a bare
      "Script error." with no file or line, which is what the red bar was
@@ -984,7 +984,7 @@
 <body>
 <div class="wrap">
   <header>
-    <p class="eyebrow">Handicapping utility · <span class="ver">v1.91</span> · released 19 September 2026</p>
+    <p class="eyebrow">Handicapping utility · <span class="ver">v1.92</span> · released 19 September 2026</p>
     <h1><span class="flap">O</span><span class="flap">v</span><span class="flap">e</span><span class="flap">r</span><span class="flap">l</span><span class="flap">a</span><span class="flap">y</span> <span class="flap">B</span><span class="flap">o</span><span class="flap">a</span><span class="flap">r</span><span class="flap">d</span></h1>
     <p class="tagline">Upload a data file or program PDF. Overlay Board lays out the whole card: past performances, scratches, money moves, and where the board likes a horse.</p>
   </header>
@@ -3706,7 +3706,12 @@ function pickFor(rs){
 
   if (ability.ok){
     const second = usableEl && favEps != null ? usableEl.ranked.find(r => r.eps < favEps) : null;
-    return Object.assign({line: 'primary', tier: 1, second, nearTie: false}, base);
+    // EARNINGS IS NO LONGER A CONDITION of the Pick, so the card must not claim
+    // the horse leads on it. Carry the actual rank and the horse above it.
+    const epsRank = rank;
+    const epsAhead = usableEl && favEps != null ? usableEl.ranked.find(r => r.eps > favEps) : null;
+    return Object.assign({line: 'primary', tier: 1, second, nearTie: false, epsRank, epsAhead,
+                          epsOf: usableEl ? usableEl.ranked.length : null}, base);
   }
 
   // The favourite failed on recent figures. The Price play is a separate,
@@ -5063,7 +5068,9 @@ function buildPick(rs){
     const gap = second ? p.eps / second.eps : null;
     return `<div class="pick-card race-anchor-target" id="pick-r${escAttr(rs.race)}">
       ${head}
-      <div>Top career earnings in the field at <b>${money(p.eps)} per start</b>${epsBasis(h)}, <b>and</b> the market's choice.${second ? ` Next best on earnings is ${escHtml(second.h.horse)} at ${money(second.eps)}${gap && gap >= 1.5 ? `, a ${gap.toFixed(1)}\u00d7 gap` : ''}.` : ''}</div>
+      <div>${p.eps == null ? `The market's choice.` : (p.epsRank === 1
+        ? `Top career earnings in the field at <b>${money(p.eps)} per start</b>${epsBasis(h)}, <b>and</b> the market's choice.${second ? ` Next best on earnings is ${escHtml(second.h.horse)} at ${money(second.eps)}${gap && gap >= 1.5 ? `, a ${gap.toFixed(1)}\u00d7 gap` : ''}.` : ''}`
+        : `The market's choice, and <b>${ordinalOf(p.epsRank)}</b> in the field on career earnings at <b>${money(p.eps)} per start</b>${epsBasis(h)}${p.epsOf ? ` of ${p.epsOf} runners with a record` : ''}.${p.epsAhead ? ` ${escHtml(p.epsAhead.h.horse)} leads that column at ${money(p.epsAhead.eps)}.` : ''}`)}</div>
       ${raceCardJumpLink(rs)}
       ${confidenceBlock(rs, h)}
       ${pickContext(rs, h)}
@@ -5237,7 +5244,14 @@ function rankIn(horses, h, get){
   const vals = horses.map(x => ({x, v: get(x)})).filter(t => t.v != null && t.v > 0);
   if (vals.length < 3) return null;
   vals.sort((a, b) => b.v - a.v);
-  const me = vals.find(t => t.x.id === h.id);
+  // MATCH THE HORSE ITSELF FIRST. Matching on id alone silently fails when the
+  // rendered horse object carries no id — every lookup then matched the first
+  // entry, so this table showed the FIELD LEADER's number and "1 of N" for
+  // whichever horse it was describing (Belmont 19 Sep R9: the pick's row read
+  // $38,194 and rank 1, which belonged to another runner).
+  const me = vals.find(t => t.x === h)
+          || (h.id != null ? vals.find(t => t.x.id === h.id) : null)
+          || (h.horse ? vals.find(t => ppKey(t.x.horse) === ppKey(h.horse)) : null);
   if (!me) return null;
   const rank = 1 + vals.filter(t => t.v > me.v).length;
   const tied = vals.filter(t => t.v === me.v).length > 1;
@@ -6495,7 +6509,7 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.91 · released 19 September 2026 · build 2026-09-19-b</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.92 · released 19 September 2026 · build 2026-09-19-d</div>
 <div id="errBar" class="no-print">
   <div id="errBarMsg"></div>
   <div class="eb-actions">
