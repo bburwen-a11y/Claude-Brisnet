@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Overlay Board v1.85 — Race Card Reader</title>
+<title>Overlay Board v1.86 — Race Card Reader</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
@@ -590,6 +590,9 @@
   .pp-bred-head{font-family:var(--mono); font-size:10px; letter-spacing:.08em; text-transform:uppercase; opacity:.7; margin-bottom:3px;}
   .pp-bred .bred-by{opacity:.75;}
   .pp-bred-sub{opacity:.8; margin-top:3px;}
+  .pp-rider-split{margin:10px 0 6px; padding:8px 10px; border:1px solid var(--paper-line); border-radius:4px; font-size:13px; line-height:1.5;}
+  .pp-jky-cell{white-space:nowrap; font-size:11.5px;}
+  .pp-jky-same{color:var(--amber-dim);}
   .pp-return-flash{background:var(--paper-tint); outline:2px solid var(--amber-dim); outline-offset:2px; border-radius:3px; transition:background .3s;}
   .pp-head{margin:0 0 2px; font-size:18px; font-weight:800;}
   .pp-sub{font-family:var(--mono); font-size:12px; color:var(--ink-soft); margin-bottom:12px;}
@@ -945,7 +948,7 @@
 <body>
 <div class="wrap">
   <header>
-    <p class="eyebrow">Handicapping utility · <span class="ver">v1.85</span> · released 18 September 2026</p>
+    <p class="eyebrow">Handicapping utility · <span class="ver">v1.86</span> · released 18 September 2026</p>
     <h1><span class="flap">O</span><span class="flap">v</span><span class="flap">e</span><span class="flap">r</span><span class="flap">l</span><span class="flap">a</span><span class="flap">y</span> <span class="flap">B</span><span class="flap">o</span><span class="flap">a</span><span class="flap">r</span><span class="flap">d</span></h1>
     <p class="tagline">Upload a data file or program PDF. Overlay Board lays out the whole card: past performances, scratches, money moves, and where the board likes a horse.</p>
   </header>
@@ -1596,7 +1599,12 @@ function parseBrisnetSingleFile(text){
       const finTxt = get(616+i);
       const rawMargin = num(736+i);
       const wonIt = String(finTxt).trim() === '1';
-      ppRaces.push({date: d, track: get(276+i), raceNum: get(296+i), distYds: num(316+i), surf: get(326+i), fin: finTxt, margin: rawMargin, won: wonIt, lenBehind: (rawMargin == null ? null : (wonIt ? -rawMargin : rawMargin)), comment: get(396+i), pastPost: num(356+i), pastField: num(346+i), winner: get(406+i), second: get(416+i), third: get(426+i), rtype: get(1086+i), claim: num(546+i), classTxt: get(536+i), spd: num(846+i), pace2: num(766+i), pace4: num(776+i), pace6: num(786+i), pace8: num(796+i), latePace: num(816+i), purse: num(556+i), trackCond: get(306+i), ai3Surf: get(1403+i) === 'A' ? 'A' : get(326+i)});
+      ppRaces.push({date: d, track: get(276+i), raceNum: get(296+i), distYds: num(316+i), surf: get(326+i), fin: finTxt, margin: rawMargin, won: wonIt, lenBehind: (rawMargin == null ? null : (wonIt ? -rawMargin : rawMargin)), comment: get(396+i), pastPost: num(356+i), pastField: num(346+i), winner: get(406+i), second: get(416+i), third: get(426+i), rtype: get(1086+i), claim: num(546+i), classTxt: get(536+i), spd: num(846+i), pace2: num(766+i), pace4: num(776+i), pace6: num(786+i), pace8: num(796+i), latePace: num(816+i), purse: num(556+i), trackCond: get(306+i),
+        // WHO RODE THAT DAY. Fields 1066-1075 carry the rider of each past
+        // race and 1056-1065 the trainer, so a line can be read against the
+        // rider who was on it — verified on this file against today's rider
+        // block (a horse keeping its rider repeats the same name).
+        jky: titleCase(get(1066+i)).replace(/^\*/, ''), trn: titleCase(get(1056+i)).replace(/^\*/, ''), ai3Surf: get(1403+i) === 'A' ? 'A' : get(326+i)});
     }
     // BRIS SPEED RATING, fields 846-855, one per past race. Identified from a
     // a real card rather than taken on trust: the pace blocks at 766,
@@ -3505,6 +3513,35 @@ function topAvg3Sole(rs, h){
   return {ok: true, why: '', rated};
 }
 
+// ---- FIGURE NEAR-TIE: RIDER TIEBREAK, REGISTERED 2026-09-18, NOT LIVE ----
+// When the morning-line favourite trails the recent-figure leader by a point
+// or less, the figure is not separating them. Registered in advance: in that
+// case compare the two riders' season win percentages. NOTHING IS SCORED and
+// the Pick is unchanged — the line below prints the two horses, their figure
+// means and their riders so the call can be logged race by race.
+function nearTieWatch(rs){
+  const mlOf = x => parseOdds(x.mlOddsStr);
+  const priced = (rs.horses || []).filter(x => !x.scratched && mlOf(x) != null);
+  if (!priced.length) return null;
+  const fav = priced.reduce((a, b) => (mlOf(b) < mlOf(a) ? b : a));
+  const rated = (rs.horses || []).filter(x => !x.scratched && avg3Of(x) != null)
+                                 .map(x => ({x, v: avg3Of(x)})).sort((a, b) => b.v - a.v);
+  if (rated.length < 3) return null;
+  const lead = rated[0];
+  const favRow = rated.find(r => r.x === fav);
+  if (!favRow || lead.x === fav) return null;
+  const gap = lead.v - favRow.v;
+  if (gap > 1.0) return null;
+  const pctOf = x => {
+    const rec = jockeyMeet(x);
+    return rec && rec.pct != null ? rec.pct : null;
+  };
+  const riderOf = x => (x.riderChange ? x.riderChange.to : x.jockey) || '';
+  return {fav, lead: lead.x, gap, favV: favRow.v, leadV: lead.v,
+          favJky: riderOf(fav), leadJky: riderOf(lead.x),
+          favPct: pctOf(fav), leadPct: pctOf(lead.x)};
+}
+
 // ---- SURFACE-WINDOW RULE: TESTED AND WITHDRAWN 2026-09-16 ----
 // Shipped in v1.67 as a second live rule (same test as the Pick, with the
 // last-three-figure window restricted to today's surface) on the strength of
@@ -5323,6 +5360,20 @@ function buildReadPanel(rs){
       + `<span class="fig-note">${fig.covered} of ${fig.total} runners carry a figure.</span></div>`);
   }
 
+  // FIGURE NEAR-TIE. Printed whenever the favourite is within a point of the
+  // recent-figure leader, with both riders alongside. Information only.
+  const nt = nearTieWatch(rs);
+  if (nt){
+    const jkyBit = x => x ? escHtml(x) : 'rider unlisted';
+    const pctBit = v => v != null ? ` ${Math.round(v)}%` : '';
+    lines.push(`<div class="bet-line"><span class="bet-tag">FIGURE NEAR-TIE</span> `
+      + `${horseLabel(nt.fav)} (${nt.favV.toFixed(2)}) is the market's choice and sits ${nt.gap.toFixed(2)} behind `
+      + `${escHtml(nt.lead.horse)} (${nt.leadV.toFixed(2)}) on the recent-figure mean. `
+      + `Riders: ${jkyBit(nt.favJky)}${pctBit(nt.favPct)} on ${escHtml(nt.fav.horse)}, `
+      + `${jkyBit(nt.leadJky)}${pctBit(nt.leadPct)} on ${escHtml(nt.lead.horse)}.`
+      + `<span class="fig-note">The figure is not separating these two. Shown for reading; it changes no pick.</span></div>`);
+  }
+
   // SAME BARN. Logged, watch-only, feeding nothing. When a trainer runs more
   // than one in a race, the split between them is worth seeing rather than
   // assuming the shorter price is the stable's opinion. Shown as information
@@ -5976,8 +6027,9 @@ function paceShapeText(p){
 
 function ppHorseBlock(h, race, standalone, inModal){
   const wpsSets = raceRunnerSets(race);
+  const todayRider = (h.riderChange ? h.riderChange.to : h.jockey) || '';
   const races = (h.ppRaces || []).map(p => `
-    <tr><td>${fmtPPDate(p.date)}</td><td>${escHtml(p.track||'')}</td><td>${fmtDistY(p.distYds)}${/^[Tt]$/.test(p.surf||'') ? '<span class="pp-turf" title="run on turf">T</span>' : ''}</td><td class="pp-class">${escHtml(p.classTxt || fmtClass(p.rtype, p.claim))}${classLadder(p, h)}</td><td class="pp-post">${(p.pastPost != null && p.pastField != null && p.pastPost >= 1 && p.pastPost <= p.pastField) ? `${p.pastPost}<span class="pp-of">/${p.pastField}</span>` : ''}</td><td>${escHtml(p.fin||'')}</td><td>${p.margin != null ? (p.won ? '<span class="pp-wonby">won ' + p.margin + 'L</span>' : p.margin + 'L') : ''}</td><td class="pp-spd">${p.spd != null && p.spd > 0 ? p.spd : ''}</td><td class="pp-pace">${escHtml(paceCallsText(p))}${paceShapeText(p) ? `<br><span class="pp-of">${escHtml(paceShapeText(p))}</span>` : ''}</td><td>${escHtml((p.comment||'').slice(0,36))}</td><td class="pp-wps">${wpsCell([p.winner, p.second, p.third], wpsSets)}</td></tr>`).join('');
+    <tr><td>${fmtPPDate(p.date)}</td><td>${escHtml(p.track||'')}</td><td>${fmtDistY(p.distYds)}${/^[Tt]$/.test(p.surf||'') ? '<span class="pp-turf" title="run on turf">T</span>' : ''}</td><td class="pp-class">${escHtml(p.classTxt || fmtClass(p.rtype, p.claim))}${classLadder(p, h)}</td><td class="pp-post">${(p.pastPost != null && p.pastField != null && p.pastPost >= 1 && p.pastPost <= p.pastField) ? `${p.pastPost}<span class="pp-of">/${p.pastField}</span>` : ''}</td><td>${escHtml(p.fin||'')}</td><td>${p.margin != null ? (p.won ? '<span class="pp-wonby">won ' + p.margin + 'L</span>' : p.margin + 'L') : ''}</td><td class="pp-spd">${p.spd != null && p.spd > 0 ? p.spd : ''}</td><td class="pp-pace">${escHtml(paceCallsText(p))}${paceShapeText(p) ? `<br><span class="pp-of">${escHtml(paceShapeText(p))}</span>` : ''}</td><td class="pp-jky-cell">${p.jky ? (sameJockey(p.jky, todayRider) ? `<b class="pp-jky-same" title="today's rider">${escHtml(p.jky)}</b>` : escHtml(p.jky)) : ''}</td><td>${escHtml((p.comment||'').slice(0,36))}</td><td class="pp-wps">${wpsCell([p.winner, p.second, p.third], wpsSets)}</td></tr>`).join('');
   const works = (h.ppWorks || []).slice(0, PP_WORK_LIMIT).map(w => {
     const bullet = (w.time || '').trim().startsWith('-');
     return `${bullet ? '● ' : ''}${fmtPPDate(w.date)} ${escHtml(w.track||'')} ${escHtml((w.time||'').replace('-',''))} ${escHtml(w.desc||'')}`;
@@ -6003,8 +6055,42 @@ function ppHorseBlock(h, race, standalone, inModal){
     ${breedingLine(h)}
     ${ppRecordLine(h)}
     ${races ? `<div class="pp-section">Last ${(h.ppRaces||[]).length} starts${h.ltStarts != null && h.ltStarts > (h.ppRaces||[]).length ? ` <span style="text-transform:none;letter-spacing:0;font-weight:400;">(of ${h.ltStarts} career — the data file carries 10)</span>` : ''}</div>
-    <div class="pp-table-wrap"><table class="pp-table"><thead><tr><th>Date</th><th>Trk</th><th>Dist</th><th>Class</th><th title="Post position that day, and the number of starters. Validated on 8,182 past starts.">PP</th><th>Fin</th><th>Btn</th><th title="BRIS speed rating for that race, as supplied by the data file">Spd</th><th title="BRIS pace-call figures for that race: 2-call, 4-call, 6-call, 8-call, late pace, in order supplied. Same rating scale as Speed — a fall-off from early to late reads as faded, a rise reads as closed.">Pace</th><th>Trip comment</th><th title="Who finished first, second and third in that race. Highlighted = a contender in today's race; bold = another runner in it.">W / P / S</th></tr></thead><tbody>${races}</tbody></table></div>` : `<p class="pp-sub">No past races in the data file — first-time starter.</p>`}
+    <div class="pp-table-wrap"><table class="pp-table"><thead><tr><th>Date</th><th>Trk</th><th>Dist</th><th>Class</th><th title="Post position that day, and the number of starters. Validated on 8,182 past starts.">PP</th><th>Fin</th><th>Btn</th><th title="BRIS speed rating for that race, as supplied by the data file">Spd</th><th title="BRIS pace-call figures for that race: 2-call, 4-call, 6-call, 8-call, late pace, in order supplied. Same rating scale as Speed — a fall-off from early to late reads as faded, a rise reads as closed.">Pace</th><th title="Who rode that day. Bold = the rider on the horse today, so the horse's record for this rider can be read against its record for others.">Jky</th><th>Trip comment</th><th title="Who finished first, second and third in that race. Highlighted = a contender in today's race; bold = another runner in it.">W / P / S</th></tr></thead><tbody>${races}</tbody></table></div>` : `<p class="pp-sub">No past races in the data file — first-time starter.</p>`}
+    ${riderSplitLine(h)}
     ${works ? `<div class="pp-section">Last ${Math.min((h.ppWorks||[]).length, PP_WORK_LIMIT)} workouts (● = bullet)</div><div class="pp-works">${works}</div>` : ''}`;
+}
+
+// THIS HORSE FOR THIS RIDER. Splits the horse's own past lines into the ones
+// today's rider was on and the ones he was not, and prints each side's
+// finishes, average beaten lengths and average speed figure. Entirely the
+// horse's own record from the data file — it names no better or worse rider,
+// it only puts the two sets side by side. Nothing here is scored, and the
+// samples are a handful of starts either way.
+function riderSplitLine(h){
+  const rider = (h.riderChange ? h.riderChange.to : h.jockey) || '';
+  const races = (h.ppRaces || []).filter(p => p.jky);
+  if (!rider || races.length < 3) return '';
+  const mine = races.filter(p => sameJockey(p.jky, rider));
+  const other = races.filter(p => !sameJockey(p.jky, rider));
+  if (!mine.length || !other.length) return '';
+  const side = list => {
+    const fins = list.map(p => parseInt(p.fin, 10)).filter(v => !isNaN(v));
+    const btn = list.map(p => p.lenBehind).filter(v => v != null);
+    const spd = list.map(p => p.spd).filter(v => v != null && v > 0);
+    const wins = fins.filter(v => v === 1).length;
+    const itm = fins.filter(v => v <= 3).length;
+    const bits = [`${list.length} start${list.length === 1 ? '' : 's'}`];
+    bits.push(`${wins} win${wins === 1 ? '' : 's'}, ${itm} in the money`);
+    if (btn.length) bits.push(`avg ${(btn.reduce((a, b) => a + b, 0) / btn.length).toFixed(1)}L behind`);
+    if (spd.length) bits.push(`avg figure ${(spd.reduce((a, b) => a + b, 0) / spd.length).toFixed(1)}`);
+    return bits.join(' \u00b7 ');
+  };
+  return `<div class="pp-rider-split">
+    <div class="pp-bred-head">This horse with today's rider</div>
+    <div><b>${escHtml(titleCase(rider))}</b> \u2014 ${side(mine)}</div>
+    <div><b>Other riders</b> \u2014 ${side(other)}</div>
+    <div class="pp-bred-sub">From this horse's own last ${races.length} lines in the data file. A handful of starts either way.</div>
+  </div>`;
 }
 
 // Career line: starts, the win-place-show breakdown, how often the horse hits
@@ -6311,7 +6397,7 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.85 · released 18 September 2026 · build 2026-09-18-c</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.86 · released 18 September 2026 · build 2026-09-18-d</div>
 <div id="errBar" class="no-print">
   <div id="errBarMsg"></div>
   <div class="eb-actions">
