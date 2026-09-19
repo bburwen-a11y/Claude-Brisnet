@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Overlay Board v1.86 — Race Card Reader</title>
+<title>Overlay Board v1.89 — Race Card Reader</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
@@ -308,6 +308,7 @@
     margin-bottom:10px; font-size:13px; color:var(--ink-soft); background:var(--paper-dim);
   }
   .pick-none b{color:var(--ink);}
+  .pace-contender{margin-top:7px; padding-top:6px; border-top:1px solid var(--paper-line); font-size:13px;}
   .pick-card.tier2{border-left-color:#5C7A8A;}
   .pp-turf{
     font-family:var(--mono); font-weight:800; font-size:11px; color:#2E6E45;
@@ -948,7 +949,7 @@
 <body>
 <div class="wrap">
   <header>
-    <p class="eyebrow">Handicapping utility · <span class="ver">v1.86</span> · released 18 September 2026</p>
+    <p class="eyebrow">Handicapping utility · <span class="ver">v1.89</span> · released 18 September 2026</p>
     <h1><span class="flap">O</span><span class="flap">v</span><span class="flap">e</span><span class="flap">r</span><span class="flap">l</span><span class="flap">a</span><span class="flap">y</span> <span class="flap">B</span><span class="flap">o</span><span class="flap">a</span><span class="flap">r</span><span class="flap">d</span></h1>
     <p class="tagline">Upload a data file or program PDF. Overlay Board lays out the whole card: past performances, scratches, money moves, and where the board likes a horse.</p>
   </header>
@@ -3675,7 +3676,15 @@ function uncontestedLeader(rs){
                      .filter(x => x.r != null).sort((a, b) => b.r - a.r);
   if (rated.length < 4) return null;
   const speed = rated.filter(x => x.q >= 5);
-  if (speed.length === 0) return {h: rated[0].h, shape: 'NO CLEAR SPEED', why: 'projects to the lead by default'};
+  // A field where NOBODY carries a speed point is a field of zeros, and the
+  // top of a list of equal zeros is whoever the array happened to hold first.
+  // Belmont 18 Sep R3 named two different horses depending on which order the
+  // field was read in. So the default-leader case now requires a real
+  // separation on the blended rank as well.
+  if (speed.length === 0){
+    if (rated[0].r <= 0 || (rated[0].r - rated[1].r) < 1) return null;
+    return {h: rated[0].h, shape: 'NO CLEAR SPEED', why: 'projects to the lead by default'};
+  }
   if (speed.length === 1 && (rated[0].r - rated[1].r) >= 2) return {h: rated[0].h, shape: 'LONE SPEED', why: 'projects to an uncontested lead'};
   return null;
 }
@@ -4953,9 +4962,22 @@ function confidenceBlock(rs, h){
     + pickContenders(rs, h) + `</div>`;
 }
 
+// On a race the rule declines, the projection still has something to say about
+// the shape. The horse it puts on an uncontested lead is named here as a
+// CONTENDER — a horse to read, not a selection. It is deliberately not
+// promoted to a Pick: the Pick rule is frozen and rests on figures, and pace
+// has never been measured as a selection.
+function paceContenderNote(rs){
+  const u = uncontestedLeader(rs);
+  if (!u || !u.h) return '';
+  return `<div class="pace-contender"><b>Contender on the projected shape:</b> `
+    + `${escHtml(u.h.horse)} (${escHtml(u.h.oddsStr || '')}) ${escHtml(u.why)} \u2014 ${escHtml(u.shape.toLowerCase())}. `
+    + `Listed as a horse to read, not a pick.</div>`;
+}
+
 function buildPick(rs){
   const p = pickFor(rs);
-  if (p.none) return `<div class="pick-none race-anchor-target" id="pick-r${escAttr(rs.race)}"><b>Race ${escHtml(rs.race)} — no pick.</b> ${p.none}</div>`;
+  if (p.none) return `<div class="pick-none race-anchor-target" id="pick-r${escAttr(rs.race)}"><b>Race ${escHtml(rs.race)} — no pick.</b> ${p.none}${paceContenderNote(rs)}</div>`;
   if (isScratchedNow(rs, p.h)){
     return `<div class="pick-none race-anchor-target" id="pick-r${escAttr(rs.race)}"><b>Race ${escHtml(rs.race)} — no pick.</b> `
       + `${escHtml(p.h.horse)} is marked scratched. Rebuild the card to re-rank the race.</div>`;
@@ -5319,7 +5341,10 @@ function fmtLen(v){
 }
 function furlongs(yds){
   const f = yds / 220;
-  return (Math.abs(f - Math.round(f)) < 0.06 ? Math.round(f) : f.toFixed(1)) + 'f';
+  // Same convention as the past-performance tables — a mile and up is written
+  // in miles, so the race header and the previous-meetings lines can't say
+  // "10f" while the table beside them says "1 1/4M".
+  return fmtDistY(yds);
 }
 function surfWord(c){
   const k = String(c || '').toUpperCase();
@@ -5898,11 +5923,19 @@ function fmtPPDate(d){ return d && d.length === 8 ? `${d.slice(4,6)}/${d.slice(6
 function fmtDistY(y){
   if (y == null) return '';
   const f = Math.abs(y)/220;
-  if (f < 8){
+  // Anything a mile or longer reads in miles, not furlongs: "1 1/4M", not
+  // "10f". Under that it stays in furlongs. The only gap is 7 5/8 to 7 7/8,
+  // which has no natural mile expression and keeps its furlong form — on this
+  // file that band is a single past start out of 1,200.
+  if (f < 7.98){
     const whole = Math.floor(f);
     const rem = f - whole;
     if (Math.abs(rem) < 0.02) return whole + 'f';
+    if (Math.abs(rem - 0.25) < 0.04) return whole + ' 1/4f';
     if (Math.abs(rem - 0.5) < 0.04) return whole + ' 1/2f';
+    if (Math.abs(rem - 0.75) < 0.04) return whole + ' 3/4f';
+    const yds = Math.round(Math.abs(y) - whole*220);
+    if (yds) return whole + 'f ' + yds + 'y';
     return (Math.round(f*100)/100) + 'f';
   }
   const wholeM = Math.floor(f/8);
@@ -6397,7 +6430,7 @@ function renderPrintView(){
 
 renderRows();
 </script>
-  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.86 · released 18 September 2026 · build 2026-09-18-d</div>
+  <div style="text-align:center; padding:14px 0 24px; font-family:var(--mono); font-size:10px; color:var(--paper-line); opacity:.7;">Overlay Board v1.89 · released 18 September 2026 · build 2026-09-18-g</div>
 <div id="errBar" class="no-print">
   <div id="errBarMsg"></div>
   <div class="eb-actions">
